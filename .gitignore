@@ -1,0 +1,91 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Environment variables (CRITICAL - DO NOT COMMIT!)
+.env
+backend/.env
+mobile/.env
+*.env
+.env.local
+.env.production
+.env.development
+
+# Build outputs
+backend/dist/
+backend/build/
+mobile/build/
+mobile/.dart_tool/
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+.DS_Store?
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# AWS Keys (CRITICAL - DO NOT COMMIT!)
+*.pem
+*.key
+*.p12
+*.p8
+easy-basket-key.pem
+
+# Firebase
+firebase-debug.log
+.firebase/
+firebase-options.json
+
+# Flutter
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/pubspec.lock
+
+# TypeScript
+*.tsbuildinfo
+backend/tsconfig.tsbuildinfo
+
+# Database
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Coverage
+coverage/
+*.lcov
+
+# Testing
+.nyc_output/
+
+# Misc
+*.zip
+*.tar.gz
+*.rar
+
