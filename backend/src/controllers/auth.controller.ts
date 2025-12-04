@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
+
 import { AppDataSource } from '../config/database';
-import { User } from '../entities/User';
-import { OTPService } from '../services/otp.service';
 import { FCMService } from '../services/fcm.service';
+import { OTPService } from '../services/otp.service';
+import { SNSService } from '../services/sns.service';
+import { User } from '../entities/User';
+import jwt from 'jsonwebtoken';
 
 export class AuthController {
   static async login(req: Request, res: Response): Promise<void> {
@@ -19,13 +21,24 @@ export class AuthController {
       const otp = OTPService.generateOTP();
       OTPService.storeOTP(phoneNumber, otp);
 
-      // In production, send OTP via SMS service (Twilio, MSG91, etc.)
-      // For now, log it (in development, use '1234')
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`OTP for ${phoneNumber}: ${otp} (or use 1234 for testing)`);
+      // Send OTP via AWS SNS (if configured) or log for development
+      if (SNSService.isAvailable()) {
+        // Send via AWS SNS
+        const sent = await SNSService.sendOTP(phoneNumber, otp);
+        if (!sent) {
+          console.warn(`Failed to send OTP via SNS for ${phoneNumber}. OTP: ${otp}`);
+          // Fallback: log OTP in development mode
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`OTP for ${phoneNumber}: ${otp} (or use 1234 for testing)`);
+          }
+        }
       } else {
-        // TODO: Integrate SMS service here
-        console.log(`OTP sent to ${phoneNumber}`);
+        // Development mode or SNS not configured
+        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
+          console.log(`OTP for ${phoneNumber}: ${otp} (or use 1234 for testing)`);
+        } else {
+          console.warn(`AWS SNS not configured. OTP generated but not sent: ${otp}`);
+        }
       }
 
       res.json({ message: 'OTP sent successfully' });
