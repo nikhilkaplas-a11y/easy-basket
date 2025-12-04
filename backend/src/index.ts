@@ -35,6 +35,14 @@ app.get('/', (req, res) => {
   res.send('Easy Basket Backend is running');
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Easy Basket Backend is running',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 AppDataSource.initialize()
   .then(() => {
     console.log('Database connected');

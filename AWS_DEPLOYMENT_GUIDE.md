@@ -28,6 +28,7 @@ Complete step-by-step guide to deploy Easy Basket backend on AWS.
    - **Master Username:** `admin` (or your choice)
    - **Master Password:** Create strong password (save it!)
    - **DB Instance Class:** `db.t3.micro` (free tier) or `db.t3.small` (production)
+   - **Password nikhilkaplas
 
 3. **Storage:**
    - **Storage Type:** General Purpose SSD (gp3)
@@ -173,13 +174,13 @@ mkdir -p ~/easy-basket
 cd ~/easy-basket
 
 # Clone your repository (or upload files)
-# Option 1: If using Git
-git clone https://github.com/YOUR_USERNAME/easyBucket.git backend
-cd backend
+# Option 1: If using Git (clone entire repo)
+git clone https://github.com/nikhilkaplas-a11y/easy-basket.git .
+# This creates: ~/easy-basket/backend/ and ~/easy-basket/mobile/
 
-# Option 2: If not using Git, use SCP to upload files
+# Option 2: If not using Git, use SCP to upload entire project
 # On your local machine:
-# scp -i easy-basket-key.pem -r backend/ ec2-user@YOUR_PUBLIC_IP:~/easy-basket/
+# scp -i easy-basket-key.pem -r /Users/nikhil/Projects/easyBucket/* ec2-user@YOUR_PUBLIC_IP:~/easy-basket/
 
 # Install dependencies
 cd backend
@@ -228,7 +229,13 @@ CORS_ORIGIN=https://your-app-domain.com,http://localhost:3000
 
 **Save and exit:** `Ctrl+X`, then `Y`, then `Enter`
 
-### 2.6 Initialize Database
+### 2.6 Initialize Database:wq
+
+
+
+
+
+
 
 ```bash
 # Test database connection
