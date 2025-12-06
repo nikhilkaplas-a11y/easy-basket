@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
@@ -8,15 +9,18 @@ class AuthProvider with ChangeNotifier {
   final SharedPreferences prefs;
 
   UserModel? _user;
-  String? _token;
+  String? _accessToken;
+  String? _refreshToken;
   bool _isLoading = false;
   String? _error;
 
   UserModel? get user => _user;
-  String? get token => _token;
+  String? get token => _accessToken; // For backward compatibility
+  String? get accessToken => _accessToken;
+  String? get refreshToken => _refreshToken;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isAuthenticated => _token != null && _user != null;
+  bool get isAuthenticated => _accessToken != null && _user != null;
 
   AuthProvider({
     required this.authService,
@@ -26,9 +30,19 @@ class AuthProvider with ChangeNotifier {
   }
 
   void _loadAuthData() {
-    _token = prefs.getString('auth_token');
+    _accessToken = prefs.getString('access_token');
+    _refreshToken = prefs.getString('refresh_token');
+    // Also check for old 'auth_token' for backward compatibility
+    if (_accessToken == null) {
+      _accessToken = prefs.getString('auth_token');
+      if (_accessToken != null) {
+        // Migrate old token to new format
+        prefs.setString('access_token', _accessToken!);
+        prefs.remove('auth_token');
+      }
+    }
     final userJson = prefs.getString('user_data');
-    if (userJson != null && _token != null) {
+    if (userJson != null && _accessToken != null) {
       try {
         // Parse user data from stored JSON string
         // Note: user_data is stored as JSON string, need to parse it
@@ -36,6 +50,8 @@ class AuthProvider with ChangeNotifier {
         // This ensures fresh role data
       } catch (e) {
         // If parsing fails, clear stored data
+        prefs.remove('access_token');
+        prefs.remove('refresh_token');
         prefs.remove('auth_token');
         prefs.remove('user_data');
       }
@@ -64,16 +80,24 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final result = await authService.verifyOTP(phoneNumber, otp, fcmToken: fcmToken);
-      _token = result['token'] as String;
+      _accessToken = result['accessToken'] as String;
+      _refreshToken = result['refreshToken'] as String;
       _user = result['user'] as UserModel;
 
-      await prefs.setString('auth_token', _token!);
+      // Store tokens
+      await prefs.setString('access_token', _accessToken!);
+      await prefs.setString('refresh_token', _refreshToken!);
+      // Remove old auth_token if exists
+      await prefs.remove('auth_token');
+      
       // Store user data as JSON string for later retrieval
-      final userJsonString = _user!.toJson().toString();
+      final userJsonString = jsonEncode(_user!.toJson());
       await prefs.setString('user_data', userJsonString);
       
       // Debug: Print user role to verify
-      print('User logged in with role: ${_user!.role}');
+      if (kDebugMode) {
+        print('User logged in with role: ${_user!.role}');
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -87,7 +111,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> updateProfile({String? name, String? email, String? fcmToken}) async {
-    if (_token == null) return;
+    if (_accessToken == null) return;
 
     _isLoading = true;
     _error = null;
@@ -95,12 +119,13 @@ class AuthProvider with ChangeNotifier {
 
     try {
       _user = await authService.updateProfile(
-        token: _token!,
+        token: _accessToken!,
         name: name,
         email: email,
         fcmToken: fcmToken,
       );
-      await prefs.setString('user_data', _user!.toJson().toString());
+      final userJsonString = jsonEncode(_user!.toJson());
+      await prefs.setString('user_data', userJsonString);
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
     } finally {
@@ -109,10 +134,46 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> refreshAccessToken() async {
+    if (_refreshToken == null) {
+      return false;
+    }
+
+    try {
+      final result = await authService.refreshToken(_refreshToken!);
+      _accessToken = result['accessToken'] as String;
+      _user = result['user'] as UserModel;
+
+      // Update stored tokens
+      await prefs.setString('access_token', _accessToken!);
+      final userJsonString = jsonEncode(_user!.toJson());
+      await prefs.setString('user_data', userJsonString);
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      // Refresh failed, logout user
+      if (kDebugMode) {
+        print('Token refresh failed: $e');
+      }
+      await logout();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
+    // Revoke refresh token on server
+    if (_refreshToken != null) {
+      await authService.logout(_refreshToken, _accessToken);
+    }
+
+    // Clear local state
     _user = null;
-    _token = null;
-    await prefs.remove('auth_token');
+    _accessToken = null;
+    _refreshToken = null;
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
+    await prefs.remove('auth_token'); // Remove old token if exists
     await prefs.remove('user_data');
     notifyListeners();
   }

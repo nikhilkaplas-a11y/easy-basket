@@ -23,10 +23,39 @@ class AuthService {
       if (fcmToken != null) 'fcmToken': fcmToken,
     });
 
+    // Backend returns accessToken and refreshToken
     return {
-      'token': response['token'] as String,
+      'accessToken': response['accessToken'] as String,
+      'refreshToken': response['refreshToken'] as String,
       'user': UserModel.fromJson(response['user'] as Map<String, dynamic>),
     };
+  }
+
+  Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
+    final response = await apiService.post('/auth/refresh', {
+      'refreshToken': refreshToken,
+    });
+
+    return {
+      'accessToken': response['accessToken'] as String,
+      'user': UserModel.fromJson(response['user'] as Map<String, dynamic>),
+    };
+  }
+
+  Future<void> logout(String? refreshToken, String? accessToken) async {
+    try {
+      if (refreshToken != null) {
+        // Revoke refresh token on server
+        await apiService.post(
+          '/auth/logout',
+          {'refreshToken': refreshToken},
+          token: accessToken,
+        );
+      }
+    } catch (e) {
+      // Continue logout even if API call fails
+      print('Error revoking token: $e');
+    }
   }
 
   Future<UserModel> updateProfile({

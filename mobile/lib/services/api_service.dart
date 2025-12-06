@@ -112,6 +112,15 @@ class ApiService {
       } catch (e) {
         throw Exception('Invalid JSON response: $e');
       }
+    } else if (response.statusCode == 401) {
+      // Unauthorized - token expired or invalid
+      try {
+        final error = jsonDecode(response.body) as Map<String, dynamic>;
+        throw TokenExpiredException(error['message'] ?? 'Authentication required');
+      } catch (e) {
+        if (e is TokenExpiredException) rethrow;
+        throw TokenExpiredException('Authentication required');
+      }
     } else {
       try {
         final error = jsonDecode(response.body) as Map<String, dynamic>;
@@ -121,5 +130,14 @@ class ApiService {
       }
     }
   }
+}
+
+// Custom exception for token expiration
+class TokenExpiredException implements Exception {
+  final String message;
+  TokenExpiredException(this.message);
+  
+  @override
+  String toString() => message;
 }
 

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/razorpay_service.dart';
 import '../../utils/theme.dart';
+import 'payment_status_screen.dart';
 import 'package:intl/intl.dart';
 
 // Conditional import for Razorpay types
@@ -21,14 +23,18 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
+class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserver {
   String _selectedPaymentMethod = 'razorpay';
   final _notesController = TextEditingController();
   bool _isProcessingPayment = false;
+  DateTime? _paymentStartTime;
+  int? _currentOrderId; // Store the order ID we're processing
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    
     // Set up Razorpay callbacks (only for mobile)
     if (!kIsWeb) {
       RazorpayService.onSuccess = _handlePaymentSuccess;
@@ -36,22 +42,99 @@ class _PaymentScreenState extends State<PaymentScreen> {
       RazorpayService.onExternalWallet = _handleExternalWallet;
     }
   }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // When app comes back to foreground after payment
+    if (state == AppLifecycleState.resumed && _isProcessingPayment) {
+      // Check if we've been processing for more than 5 seconds
+      if (_paymentStartTime != null) {
+        final duration = DateTime.now().difference(_paymentStartTime!);
+        if (duration.inSeconds > 5) {
+          // App returned but callback didn't fire - check orders
+          _checkPaymentStatus();
+        }
+      }
+    }
+  }
+  
+  Future<void> _checkPaymentStatus() async {
+    if (!mounted) return;
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    
+    if (authProvider.token == null) return;
+    
+    try {
+      // Refresh orders to see if payment went through
+      await orderProvider.fetchOrders(authProvider.token!);
+      
+      if (mounted) {
+        setState(() {
+          _isProcessingPayment = false;
+          _paymentStartTime = null;
+        });
+        
+        // Navigate to payment status page (pending - check orders)
+        if (mounted) {
+          context.go('/payment/status', extra: {
+            'status': PaymentStatus.pending,
+            'message': 'Please check your orders to confirm payment status.',
+            'orderId': null,
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessingPayment = false;
+          _paymentStartTime = null;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notesController.dispose();
+    // Reset loading state before disposing
+    if (_isProcessingPayment) {
+      _isProcessingPayment = false;
+    }
+    _currentOrderId = null; // Clear stored order ID
     RazorpayService.clear();
+    // Clear callbacks to prevent memory leaks
+    RazorpayService.onSuccess = null;
+    RazorpayService.onError = null;
+    RazorpayService.onExternalWallet = null;
     super.dispose();
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     if (!mounted) return;
     
-    setState(() => _isProcessingPayment = false);
+    // Immediately reset loading state
+    if (mounted) {
+      setState(() => _isProcessingPayment = false);
+    }
     
     final orderProvider = Provider.of<OrderProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    
+    // Show processing message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verifying payment...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
 
     if (authProvider.token == null) {
       if (mounted) {
@@ -66,60 +149,58 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
 
-    // Extract order ID from response
-    final orderIdStr = response.orderId;
-    if (orderIdStr == null || orderIdStr.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid payment response. Missing order ID.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        // Pop payment screen to go back
-        context.pop();
-      }
-      return;
-    }
+    // Get order ID from stored state (we stored it when opening Razorpay)
+    int? orderId = _currentOrderId;
 
-    // Try to extract order ID - handle both "ORDER_123" and "123" formats
-    int? orderId;
-    if (orderIdStr.contains('_')) {
-      final parts = orderIdStr.split('_');
-      final lastPart = parts.last;
-      orderId = int.tryParse(lastPart);
-    } else {
-      orderId = int.tryParse(orderIdStr);
+    if (orderId == null) {
+      // If order ID is not in state, try to extract from Razorpay orderId
+      // Razorpay order ID format might be "ORDER_123" (our format) or "order_ABC123" (Razorpay format)
+      final orderIdStr = response.orderId;
+      if (orderIdStr != null && orderIdStr.isNotEmpty) {
+        if (orderIdStr.contains('_')) {
+          final parts = orderIdStr.split('_');
+          // Check if it's our format "ORDER_123"
+          if (parts.length >= 2 && parts[0].toUpperCase() == 'ORDER') {
+            orderId = int.tryParse(parts.last);
+          }
+        } else {
+          // Try parsing as direct number
+          orderId = int.tryParse(orderIdStr);
+        }
+      }
     }
 
     if (orderId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Invalid payment response. Invalid order ID format.'),
-            backgroundColor: Colors.red,
+            content: Text('Unable to identify order. Please check your orders.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
           ),
         );
-        context.pop();
+        // Instead of going back, go to orders page
+        context.go('/orders');
       }
       return;
     }
 
     final paymentId = response.paymentId ?? '';
-    final signature = response.signature ?? '';
+      final signature = response.signature ?? '';
+      final razorpayOrderId = response.orderId ?? ''; // This is Razorpay's order ID
 
-    if (paymentId.isEmpty || signature.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid payment response. Missing payment details.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        context.pop();
+      if (paymentId.isEmpty || signature.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid payment response. Missing payment details.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          context.go('/orders'); // Go to orders instead of back
+        }
+        return;
       }
-      return;
-    }
 
     try {
       // Verify payment with backend
@@ -127,7 +208,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         orderId: orderId,
         paymentId: paymentId,
         signature: signature,
-        razorpayOrderId: orderIdStr,
+        razorpayOrderId: razorpayOrderId, // Use Razorpay's order ID
         token: authProvider.token!,
       );
 
@@ -137,44 +218,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
         await orderProvider.fetchOrders(authProvider.token!);
         
         if (mounted) {
-          // Pop payment screen first, then navigate to orders
-          context.pop();
-          // Small delay to ensure navigation completes
-          await Future.delayed(const Duration(milliseconds: 200));
-          if (mounted) {
-            context.go('/orders');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Payment successful! Order placed.'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
+          // Navigate to payment status page
+          context.go('/payment/status', extra: {
+            'status': PaymentStatus.success,
+            'message': 'Payment successful! Your order has been placed.',
+            'orderId': orderId,
+          });
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Payment verification failed. Please contact support.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-          // Pop payment screen even if verification failed
-          context.pop();
+          // Navigate to payment status page with failure
+          context.go('/payment/status', extra: {
+            'status': PaymentStatus.failed,
+            'message': 'Payment verification failed. Please contact support or try again.',
+            'orderId': orderId,
+          });
         }
       }
     } catch (e) {
+      // Ensure loading state is reset on error
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing payment: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        context.pop();
+        setState(() => _isProcessingPayment = false);
+        // Navigate to payment status page with error
+        context.go('/payment/status', extra: {
+          'status': PaymentStatus.failed,
+          'message': 'Error processing payment: ${e.toString()}',
+          'orderId': _currentOrderId,
+        });
+      }
+    } finally {
+      // Always reset loading state
+      if (mounted && _isProcessingPayment) {
+        setState(() => _isProcessingPayment = false);
       }
     }
   }
@@ -185,14 +260,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessingPayment = false);
     
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment failed: ${response.message ?? 'Unknown error'}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      // Don't pop - let user try again or go back manually
+      // Navigate to payment status page with failure
+      context.go('/payment/status', extra: {
+        'status': PaymentStatus.failed,
+        'message': 'Payment failed: ${response.message ?? 'Unknown error'}',
+        'orderId': _currentOrderId,
+      });
     }
   }
 
@@ -273,20 +346,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
         // Small delay to ensure state is updated
         await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          context.go('/orders');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Order placed successfully! Pay on delivery.'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          // Navigate to payment status page (COD is like success)
+          context.go('/payment/status', extra: {
+            'status': PaymentStatus.success,
+            'message': 'Order placed successfully! Pay on delivery.',
+            'orderId': order.id,
+          });
         }
       }
     }
   }
 
   Future<void> _processRazorpayPayment(int orderId, double amount, String token) async {
-    setState(() => _isProcessingPayment = true);
+    if (!mounted) return;
+    
+    setState(() {
+      _isProcessingPayment = true;
+      _paymentStartTime = DateTime.now();
+    });
 
     try {
       // Create Razorpay order
@@ -329,6 +406,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
 
+      // Store order ID in state for payment callback
+      setState(() {
+        _currentOrderId = orderId;
+      });
+
       // Open Razorpay checkout
       RazorpayService.openCheckout(
         keyId: keyId,
@@ -340,6 +422,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         prefillContact: user?.phoneNumber,
         notes: {
           'orderId': orderId.toString(),
+          'internalOrderId': orderId.toString(), // Store in multiple places for reliability
         },
       );
     } catch (e) {

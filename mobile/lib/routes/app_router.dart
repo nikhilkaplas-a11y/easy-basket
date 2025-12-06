@@ -12,6 +12,7 @@ import '../screens/address/address_list_screen.dart';
 import '../screens/address/add_address_screen.dart';
 import '../screens/address/map_address_picker_screen.dart';
 import '../screens/payment/payment_screen.dart';
+import '../screens/payment/payment_status_screen.dart';
 import '../screens/orders/order_tracking_screen.dart';
 import '../screens/orders/order_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
@@ -142,6 +143,23 @@ class AppRouter {
         builder: (context, state) {
           final addressId = state.extra as int?;
           return PaymentScreen(addressId: addressId);
+        },
+      ),
+      GoRoute(
+        path: '/payment/status',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) {
+            return const PaymentStatusScreen(
+              status: PaymentStatus.failed,
+              message: 'Invalid payment status',
+            );
+          }
+          return PaymentStatusScreen(
+            status: extra['status'] as PaymentStatus,
+            message: extra['message'] as String,
+            orderId: extra['orderId'] as int?,
+          );
         },
       ),
       GoRoute(

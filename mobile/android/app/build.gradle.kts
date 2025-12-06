@@ -20,8 +20,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.easy_basket"
+        // TODO: Change to your unique Application ID before publishing to Play Store
+        // Format: com.yourcompany.appname (e.g., com.easybasket.app)
+        applicationId = "com.easybasket.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -30,11 +31,37 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            // Keystore file path (relative to android/app/)
+            val keystoreFile = file("../easy-basket-key.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                // Use environment variables for passwords (more secure)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+                keyAlias = "easy-basket-key"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Use release signing config if keystore exists, otherwise use debug (for testing)
+            val keystoreFile = file("../easy-basket-key.jks")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fallback to debug signing (remove this before production!)
+                signingConfig = signingConfigs.getByName("debug")
+            }
+            // Enable minification for smaller APK size
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
