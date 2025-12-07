@@ -23,11 +23,24 @@ class AuthService {
       if (fcmToken != null) 'fcmToken': fcmToken,
     });
 
+    // Check if response is valid
+    if (response == null) {
+      throw Exception('Invalid response from server');
+    }
+
     // Backend returns accessToken and refreshToken
+    final accessToken = response['accessToken'] as String?;
+    final refreshToken = response['refreshToken'] as String?;
+    final userData = response['user'] as Map<String, dynamic>?;
+
+    if (accessToken == null || refreshToken == null || userData == null) {
+      throw Exception('Missing required fields in response: ${response.keys}');
+    }
+
     return {
-      'accessToken': response['accessToken'] as String,
-      'refreshToken': response['refreshToken'] as String,
-      'user': UserModel.fromJson(response['user'] as Map<String, dynamic>),
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+      'user': UserModel.fromJson(userData),
     };
   }
 

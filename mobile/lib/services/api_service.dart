@@ -48,6 +48,9 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
+      // Re-throw if it's already a TokenExpiredException
+      if (e is TokenExpiredException) rethrow;
+      // Otherwise wrap in generic exception
       throw Exception('Network error: $e');
     }
   }

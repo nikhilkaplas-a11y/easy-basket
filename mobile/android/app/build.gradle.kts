@@ -55,13 +55,13 @@ android {
                 // Fallback to debug signing (remove this before production!)
                 signingConfig = signingConfigs.getByName("debug")
             }
-            // Enable minification for smaller APK size
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Disable minification for testing APK (enable for Play Store)
+            isMinifyEnabled = false
+            isShrinkResources = false
+            // proguardFiles(
+            //     getDefaultProguardFile("proguard-android-optimize.txt"),
+            //     "proguard-rules.pro"
+            // )
         }
     }
 }
