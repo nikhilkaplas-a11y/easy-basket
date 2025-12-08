@@ -22,7 +22,7 @@ class ProductCard extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     
     // Calculate responsive height based on screen size
-    final cardHeight = screenWidth < 360 ? 180.0 : screenWidth < 400 ? 200.0 : 220.0;
+    final cardHeight = screenWidth < 360 ? 200.0 : screenWidth < 400 ? 220.0 : 240.0;
     final fontSize = responsive.fontSize(13);
     final priceFontSize = responsive.fontSize(15);
     final buttonFontSize = responsive.fontSize(10);
@@ -75,7 +75,7 @@ class ProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
+                    Expanded(
                       child: Text(
                         product.name,
                         style: TextStyle(

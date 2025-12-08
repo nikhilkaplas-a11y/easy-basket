@@ -2,6 +2,8 @@ import { AppDataSource } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { FCMService } from '../services/fcm.service';
 import { Order } from '../entities/Order';
+import { User } from '../entities/User';
+import { IsNull } from 'typeorm';
 import { Response } from 'express';
 
 export class DeliveryController {
@@ -53,9 +55,10 @@ export class DeliveryController {
         return;
       }
 
-      const validStatuses = ['out_for_delivery', 'delivered'];
+      // Allow delivery agents to update status: accepted -> preparing -> out_for_delivery -> delivered
+      const validStatuses = ['accepted', 'preparing', 'out_for_delivery', 'delivered'];
       if (!validStatuses.includes(status)) {
-        res.status(400).json({ message: 'Invalid status. Only out_for_delivery and delivered are allowed' });
+        res.status(400).json({ message: 'Invalid status. Allowed: accepted, preparing, out_for_delivery, delivered' });
         return;
       }
 
@@ -78,7 +81,10 @@ export class DeliveryController {
         let notificationTitle = 'Order Update';
         let notificationBody = `Your order #${order.id} status: ${status}`;
 
-        if (status === 'out_for_delivery') {
+        if (status === 'preparing') {
+          notificationTitle = 'Order Preparing';
+          notificationBody = `Your order #${order.id} is being prepared`;
+        } else if (status === 'out_for_delivery') {
           notificationTitle = 'Out for Delivery';
           notificationBody = `Your order #${order.id} is out for delivery`;
         } else if (status === 'delivered') {
@@ -177,6 +183,96 @@ export class DeliveryController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching order details' });
+    }
+  }
+
+  // Get available orders (accepted/preparing without delivery boy assigned)
+  static async getAvailableOrders(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { status } = req.query;
+      const orderRepository = AppDataSource.getRepository(Order);
+      const queryBuilder = orderRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.user', 'user')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('order.deliveryAddress', 'deliveryAddress')
+        .where('order.deliveryBoyId IS NULL')
+        .andWhere('order.status IN (:...statuses)', { statuses: ['accepted', 'preparing'] })
+        .orderBy('order.createdAt', 'DESC');
+
+      if (status) {
+        queryBuilder.andWhere('order.status = :status', { status });
+      }
+
+      const orders = await queryBuilder.getMany();
+      res.json(orders);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error fetching available orders' });
+    }
+  }
+
+  // Accept/claim an available order
+  static async acceptOrder(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const deliveryBoyId = req.user?.id;
+      const { id } = req.params;
+
+      if (!deliveryBoyId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOne({
+        where: { 
+          id: Number(id),
+          deliveryBoy: IsNull(), // Only unassigned orders
+          status: 'accepted' // Only accepted orders can be claimed
+        },
+        relations: ['user', 'deliveryBoy'],
+      });
+
+      if (!order) {
+        res.status(404).json({ message: 'Order not found or already assigned' });
+        return;
+      }
+
+      // Assign order to delivery boy
+      const userRepository = AppDataSource.getRepository(User);
+      const deliveryBoy = await userRepository.findOneBy({ id: deliveryBoyId, role: 'delivery' });
+
+      if (!deliveryBoy) {
+        res.status(404).json({ message: 'Delivery boy not found' });
+        return;
+      }
+
+      order.deliveryBoy = deliveryBoy;
+      await orderRepository.save(order);
+
+      // Notify customer
+      if (order.user.fcmToken) {
+        await FCMService.sendNotification(
+          order.user.fcmToken,
+          'Order Assigned',
+          `Order #${order.id} has been assigned to a delivery agent`,
+          { orderId: order.id.toString(), type: 'order_assigned' }
+        );
+      }
+
+      // Notify admin
+      await FCMService.sendNotificationToRole(
+        'admin',
+        'Order Accepted by Delivery Agent',
+        `Order #${order.id} has been accepted by delivery agent`,
+        { orderId: order.id.toString(), type: 'order_accepted_by_delivery' }
+      );
+
+      res.json(order);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error accepting order' });
     }
   }
 

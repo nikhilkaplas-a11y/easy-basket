@@ -53,11 +53,32 @@ class OrderProvider with ChangeNotifier {
   }
 
   Future<OrderModel?> fetchOrderById(int id, String token) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       final response = await apiService.get('/orders/$id', token: token);
-      return OrderModel.fromJson(response as Map<String, dynamic>);
+      final order = OrderModel.fromJson(response as Map<String, dynamic>);
+      
+      // Add or update the order in the list to prevent glitches during navigation
+      final existingIndex = _orders.indexWhere((o) => o.id == id);
+      if (existingIndex >= 0) {
+        // Update existing order
+        _orders[existingIndex] = order;
+      } else {
+        // Add new order to the list
+        _orders.insert(0, order);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      
+      return order;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
       return null;
     }
   }

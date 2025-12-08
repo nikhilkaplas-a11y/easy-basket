@@ -22,9 +22,10 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      if (authProvider.token != null) {
+      if (authProvider.accessToken != null) {
         deliveryProvider.fetchStats();
         deliveryProvider.fetchOrders();
+        deliveryProvider.fetchAvailableOrders(); // Fetch available orders
       }
     });
   }
@@ -43,6 +44,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
             onPressed: () {
               deliveryProvider.fetchStats();
               deliveryProvider.fetchOrders();
+              deliveryProvider.fetchAvailableOrders();
             },
           ),
         ],
@@ -51,6 +53,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
         onRefresh: () async {
           await deliveryProvider.fetchStats();
           await deliveryProvider.fetchOrders();
+          await deliveryProvider.fetchAvailableOrders();
         },
         child: SingleChildScrollView(
           child: Column(
@@ -134,6 +137,55 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                   ],
                 ),
               ),
+              
+              const SizedBox(height: 24),
+              
+              // Available Orders (Unassigned)
+              if (deliveryProvider.availableOrders.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Available Orders',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${deliveryProvider.availableOrders.length}',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: deliveryProvider.availableOrders.length > 3 ? 3 : deliveryProvider.availableOrders.length,
+                        itemBuilder: (context, index) {
+                          final order = deliveryProvider.availableOrders[index];
+                          return _AvailableOrderCard(order: order);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               
               const SizedBox(height: 24),
               
@@ -387,6 +439,110 @@ class _OrderCard extends StatelessWidget {
       default:
         return AppTheme.primaryGreen;
     }
+  }
+}
+
+class _AvailableOrderCard extends StatelessWidget {
+  final dynamic order;
+
+  const _AvailableOrderCard({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+    final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Colors.orange.withOpacity(0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Order #${order.id}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    order.statusText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Customer: ${order.user.name ?? order.user.phoneNumber}',
+              style: TextStyle(fontSize: 14, color: AppTheme.grey),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${order.deliveryAddress.addressLine1}, ${order.deliveryAddress.city}',
+              style: TextStyle(fontSize: 12, color: AppTheme.grey),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  currencyFormat.format(order.totalAmount),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    if (authProvider.accessToken != null) {
+                      final success = await deliveryProvider.acceptOrder(
+                        token: authProvider.accessToken!,
+                        orderId: order.id,
+                      );
+                      if (success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Order accepted successfully!')),
+                        );
+                      } else if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(deliveryProvider.error ?? 'Failed to accept order')),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text('Accept Order'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

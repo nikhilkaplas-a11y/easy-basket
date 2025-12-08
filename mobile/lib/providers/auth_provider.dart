@@ -41,15 +41,23 @@ class AuthProvider with ChangeNotifier {
         prefs.remove('auth_token');
       }
     }
-    final userJson = prefs.getString('user_data');
-    if (userJson != null && _accessToken != null) {
+    final userJsonString = prefs.getString('user_data');
+    if (userJsonString != null && _accessToken != null) {
       try {
         // Parse user data from stored JSON string
-        // Note: user_data is stored as JSON string, need to parse it
-        // For now, user will be loaded on next login/verify
-        // This ensures fresh role data
+        final userJson = jsonDecode(userJsonString) as Map<String, dynamic>;
+        _user = UserModel.fromJson(userJson);
+        if (kDebugMode) {
+          print('Auth data loaded: User role: ${_user?.role}');
+        }
       } catch (e) {
         // If parsing fails, clear stored data
+        if (kDebugMode) {
+          print('Error loading user data from prefs: $e');
+        }
+        _user = null;
+        _accessToken = null;
+        _refreshToken = null;
         prefs.remove('access_token');
         prefs.remove('refresh_token');
         prefs.remove('auth_token');

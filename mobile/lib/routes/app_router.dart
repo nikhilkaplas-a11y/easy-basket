@@ -7,6 +7,7 @@ import '../screens/auth/login_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/products/product_list_screen.dart';
 import '../screens/products/product_detail_screen.dart';
+import '../screens/categories/categories_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/address/address_list_screen.dart';
 import '../screens/address/add_address_screen.dart';
@@ -95,6 +96,10 @@ class AppRouter {
       GoRoute(
         path: '/home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/categories',
+        builder: (context, state) => const CategoriesScreen(),
       ),
       GoRoute(
         path: '/products',

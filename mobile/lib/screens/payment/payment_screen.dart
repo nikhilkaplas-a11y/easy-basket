@@ -213,16 +213,21 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       );
 
       if (verified) {
-        cartProvider.clear();
         // Refresh orders before navigating
         await orderProvider.fetchOrders(authProvider.token!);
         
         if (mounted) {
-          // Navigate to payment status page
+          // Navigate to payment status page FIRST (before clearing cart to avoid showing zero)
           context.go('/payment/status', extra: {
             'status': PaymentStatus.success,
             'message': 'Payment successful! Your order has been placed.',
             'orderId': orderId,
+          });
+          
+          // Clear cart AFTER navigation to avoid showing zero value during redirect
+          // Use post-frame callback to ensure navigation completes first
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            cartProvider.clear();
           });
         }
       } else {
@@ -340,17 +345,21 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     } else if (_selectedPaymentMethod == 'cash') {
       // Cash on Delivery - order already created
       if (mounted) {
-        cartProvider.clear();
         // Refresh orders before navigating
         await orderProvider.fetchOrders(authProvider.token!);
-        // Small delay to ensure state is updated
-        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // Navigate to payment status page FIRST (before clearing cart to avoid showing zero)
         if (mounted) {
-          // Navigate to payment status page (COD is like success)
           context.go('/payment/status', extra: {
             'status': PaymentStatus.success,
             'message': 'Order placed successfully! Pay on delivery.',
             'orderId': order.id,
+          });
+          
+          // Clear cart AFTER navigation to avoid showing zero value during redirect
+          // Use post-frame callback to ensure navigation completes first
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            cartProvider.clear();
           });
         }
       }

@@ -44,7 +44,7 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
     final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    if (authProvider.token == null) return;
+    if (authProvider.accessToken == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -66,7 +66,7 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
 
     if (confirmed == true) {
       final success = await deliveryProvider.updateOrderStatus(
-        token: authProvider.token!,
+        token: authProvider.accessToken!,
         orderId: widget.orderId,
         status: status,
       );
@@ -382,7 +382,16 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (order.status == 'accepted' || order.status == 'preparing')
+                    if (order.status == 'accepted')
+                      ElevatedButton(
+                        onPressed: () => _updateStatus('preparing'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text('Start Preparing'),
+                      ),
+                    if (order.status == 'preparing')
                       ElevatedButton(
                         onPressed: () => _updateStatus('out_for_delivery'),
                         style: ElevatedButton.styleFrom(

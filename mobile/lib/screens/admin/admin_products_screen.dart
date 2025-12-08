@@ -302,15 +302,6 @@ class _ProductCard extends StatelessWidget {
                           color: product.isAvailable ? Colors.green : Colors.red,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Stock: ${product.stock}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: product.stock < 10 ? Colors.orange : AppTheme.grey,
-                          fontWeight: product.stock < 10 ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
                     ],
                   ),
                   if (product.category != null) ...[

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/product_card.dart';
+import '../../models/category_model.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 
@@ -17,18 +18,65 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   final _searchController = TextEditingController();
+  String? _categoryName;
 
   @override
   void initState() {
     super.initState();
+    // Clear any stale category name on init
+    _categoryName = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProducts();
+      _loadCategoriesAndProducts();
     });
   }
 
-  void _loadProducts() {
+  void _loadCategoriesAndProducts() {
     final provider = Provider.of<ProductProvider>(context, listen: false);
-    provider.fetchProducts(categoryId: widget.categoryId);
+    
+    // Load categories first to get category name
+    if (provider.categories.isEmpty) {
+      provider.fetchCategories().then((_) {
+        _updateCategoryName();
+        _loadProducts();
+      });
+    } else {
+      _updateCategoryName();
+      _loadProducts();
+    }
+  }
+
+  void _updateCategoryName() {
+    if (widget.categoryId != null) {
+      final provider = Provider.of<ProductProvider>(context, listen: false);
+      // Find the exact category matching the ID
+      try {
+        final category = provider.categories.firstWhere(
+          (cat) => cat.id == widget.categoryId,
+        );
+        if (mounted) {
+          setState(() {
+            _categoryName = category.name;
+          });
+        }
+      } catch (e) {
+        // Category not found in list yet, will get from products
+        if (mounted) {
+          setState(() {
+            _categoryName = null;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    final provider = Provider.of<ProductProvider>(context, listen: false);
+    await provider.fetchProducts(categoryId: widget.categoryId);
+    
+    // Update category name after products load (only if not already set)
+    if (widget.categoryId != null && _categoryName == null) {
+      _updateCategoryName();
+    }
   }
 
   @override
@@ -36,6 +84,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
     super.didUpdateWidget(oldWidget);
     // Reload products if categoryId changes
     if (oldWidget.categoryId != widget.categoryId) {
+      // Immediately clear old category name to prevent showing wrong name
+      _categoryName = null;
+      // Force rebuild to clear UI
+      if (mounted) {
+        setState(() {
+          _categoryName = null;
+        });
+      }
+      // Reload with new category
+      _updateCategoryName();
       _loadProducts();
     }
   }
@@ -55,7 +113,71 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.categoryId != null ? 'Category Products' : 'All Products'),
+        elevation: 0,
+        title: Consumer<ProductProvider>(
+          builder: (context, provider, _) {
+            // Always look up category name from categories list first (most reliable)
+            // Don't rely on cached _categoryName to avoid stale data
+            String displayTitle = 'All Products';
+            
+            if (widget.categoryId != null) {
+              // First priority: look up from categories list (always fresh)
+              try {
+                final category = provider.categories.firstWhere(
+                  (cat) => cat.id == widget.categoryId,
+                );
+                displayTitle = category.name;
+                // Update cached name for consistency
+                if (_categoryName != category.name) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        _categoryName = category.name;
+                      });
+                    }
+                  });
+                }
+              } catch (e) {
+                // Second priority: try to get from products (only if category ID matches)
+                if (provider.products.isNotEmpty) {
+                  // Find a product that belongs to this category
+                  try {
+                    final matchingProduct = provider.products.firstWhere(
+                      (product) => product.category?.id == widget.categoryId,
+                    );
+                    if (matchingProduct.category != null && matchingProduct.category!.id == widget.categoryId) {
+                      displayTitle = matchingProduct.category!.name;
+                      // Update cached name
+                      if (_categoryName != matchingProduct.category!.name) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _categoryName = matchingProduct.category!.name;
+                            });
+                          }
+                        });
+                      }
+                    } else {
+                      displayTitle = 'Products';
+                    }
+                  } catch (e) {
+                    displayTitle = 'Products';
+                  }
+                } else {
+                  displayTitle = 'Products';
+                }
+              }
+            }
+            
+            return Text(
+              displayTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'RoundedSans',
+              ),
+            );
+          },
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/home'),
@@ -63,22 +185,162 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ),
       body: Column(
         children: [
+          // Category Info Header (if category selected)
+          if (widget.categoryId != null)
+            Consumer<ProductProvider>(
+              builder: (context, provider, _) {
+                // Get category from categories list first (most reliable)
+                CategoryModel? category;
+                
+                try {
+                  category = provider.categories.firstWhere(
+                    (cat) => cat.id == widget.categoryId,
+                  );
+                } catch (e) {
+                  // If not in categories list, try to get from products (only if category ID matches)
+                  if (provider.products.isNotEmpty) {
+                    // Find a product that belongs to this category
+                    try {
+                      final matchingProduct = provider.products.firstWhere(
+                        (product) => product.category?.id == widget.categoryId,
+                      );
+                      if (matchingProduct.category != null && matchingProduct.category!.id == widget.categoryId) {
+                        category = matchingProduct.category;
+                      }
+                    } catch (e) {
+                      // No matching product found, skip header
+                      return const SizedBox.shrink();
+                    }
+                  } else {
+                    // No products and category not in list, skip header
+                    return const SizedBox.shrink();
+                  }
+                }
+                
+                if (category == null) {
+                  return const SizedBox.shrink();
+                }
+                
+                final productCount = provider.products.length;
+                
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withOpacity(0.05),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: AppTheme.lightGrey.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (category.imageUrl != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            category.imageUrl!,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryGreen.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.category,
+                                color: AppTheme.primaryGreen,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.category,
+                            color: AppTheme.primaryGreen,
+                            size: 20,
+                          ),
+                        ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'RoundedSans',
+                              ),
+                            ),
+                            if (category.description != null && category.description!.isNotEmpty)
+                              Text(
+                                category.description!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.grey,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            else
+                              Text(
+                                '$productCount ${productCount == 1 ? 'product' : 'products'} available',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.grey,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search products...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(
+                  color: AppTheme.grey.withOpacity(0.5),
+                ),
+                prefixIcon: const Icon(Icons.search, color: AppTheme.grey),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear, color: AppTheme.grey),
                         onPressed: () {
                           _searchController.clear();
                           _searchProducts('');
                         },
                       )
                     : null,
+                filled: true,
+                fillColor: AppTheme.lightGrey.withOpacity(0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onChanged: _searchProducts,
             ),
@@ -86,13 +348,24 @@ class _ProductListScreenState extends State<ProductListScreen> {
           Expanded(
             child: Consumer<ProductProvider>(
               builder: (context, provider, _) {
-                // Debug info
-                if (provider.products.isNotEmpty) {
-                  print('ProductListScreen: Rendering ${provider.products.length} products');
+                // Update category name from products if available
+                if (widget.categoryId != null && 
+                    provider.products.isNotEmpty && 
+                    provider.products.first.category != null &&
+                    _categoryName == null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    setState(() {
+                      _categoryName = provider.products.first.category!.name;
+                    });
+                  });
                 }
                 
                 if (provider.isLoading && provider.products.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                    ),
+                  );
                 }
                 if (provider.products.isEmpty && !provider.isLoading) {
                   return Center(
@@ -167,8 +440,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     final responsive = Responsive(context);
                     final crossAxisCount = responsive.getGridColumns();
                     final screenWidth = MediaQuery.of(context).size.width;
-                    // Calculate aspect ratio based on screen size
-                    final aspectRatio = screenWidth < 360 ? 0.65 : screenWidth < 400 ? 0.68 : 0.72;
+                    // Calculate aspect ratio based on screen size (adjusted for taller cards)
+                    final aspectRatio = screenWidth < 360 ? 0.60 : screenWidth < 400 ? 0.63 : 0.67;
                     
                     return GridView.builder(
                       padding: responsive.padding,

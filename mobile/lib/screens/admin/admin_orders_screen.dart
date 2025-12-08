@@ -41,7 +41,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (adminProvider.hasMore && !adminProvider.isLoadingMore) {
         final status = _selectedStatus == 'all' ? null : _selectedStatus;
-        adminProvider.fetchOrders(status: status, token: authProvider.token, loadMore: true);
+        adminProvider.fetchOrders(status: status, token: authProvider.accessToken, loadMore: true);
       }
     }
   }
@@ -50,31 +50,137 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final status = _selectedStatus == 'all' ? null : _selectedStatus;
-    adminProvider.fetchOrders(status: status, token: authProvider.token);
+    adminProvider.fetchOrders(status: status, token: authProvider.accessToken);
   }
 
   Future<void> _updateOrderStatus(int orderId, String newStatus, {int? deliveryBoyId}) async {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    if (authProvider.token == null) return;
+    if (authProvider.accessToken == null) return;
+
+    // If accepting or preparing, show delivery agent selection dialog (optional)
+    if ((newStatus == 'accepted' || newStatus == 'preparing') && deliveryBoyId == null) {
+      final selectedAgent = await _showDeliveryAgentDialog(adminProvider, authProvider.accessToken!);
+      // If user cancelled the dialog, don't proceed
+      if (selectedAgent == -1 && mounted) {
+        return; // User cancelled
+      }
+      // If selectedAgent is null, it means "Skip assignment" (delivery agents can accept later)
+      deliveryBoyId = selectedAgent == -1 ? null : selectedAgent;
+    }
 
     final success = await adminProvider.updateOrderStatus(
-      token: authProvider.token!,
+      token: authProvider.accessToken!,
       orderId: orderId,
       status: newStatus,
       deliveryBoyId: deliveryBoyId,
     );
 
     if (success && mounted) {
+      final message = deliveryBoyId != null
+          ? 'Order status updated and assigned to delivery agent!'
+          : 'Order status updated! Delivery agents can accept it from available orders.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order status updated successfully!')),
+        SnackBar(content: Text(message)),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(adminProvider.error ?? 'Failed to update status')),
       );
     }
+  }
+
+  Future<int?> _showDeliveryAgentDialog(AdminProvider adminProvider, String token) async {
+    // Always fetch fresh delivery agents list
+    await adminProvider.fetchDeliveryAgents(token: token);
+
+    // Check for errors
+    if (adminProvider.error != null && adminProvider.deliveryAgents.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading delivery agents: ${adminProvider.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    return showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Assign Delivery Agent'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: adminProvider.isLoading
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              : adminProvider.deliveryAgents.isEmpty
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_off, size: 48, color: AppTheme.grey),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No delivery agents available',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        if (adminProvider.error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Error: ${adminProvider.error}',
+                              style: TextStyle(color: Colors.red, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        const Text(
+                          'You can accept the order without assignment. Delivery agents can accept it later from available orders.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: adminProvider.deliveryAgents.length + 1, // +1 for "Skip" option
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          // "Skip assignment" option
+                          return ListTile(
+                            leading: const Icon(Icons.skip_next, color: AppTheme.primaryGreen),
+                            title: const Text('Skip Assignment'),
+                            subtitle: const Text('Delivery agents can accept later'),
+                            onTap: () => Navigator.pop(context, null),
+                          );
+                        }
+                        final agent = adminProvider.deliveryAgents[index - 1];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppTheme.primaryGreen.withOpacity(0.2),
+                            child: Icon(Icons.person, color: AppTheme.primaryGreen),
+                          ),
+                          title: Text(agent.name ?? 'Unknown'),
+                          subtitle: Text(agent.phoneNumber ?? ''),
+                          onTap: () => Navigator.pop(context, agent.id),
+                        );
+                      },
+                    ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, -1), // -1 means cancelled
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -259,6 +365,11 @@ class _OrderCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Customer: ${order.user.name ?? order.user.phoneNumber}'),
+            if (order.deliveryBoy != null)
+              Text(
+                'Delivery: ${order.deliveryBoy.name ?? order.deliveryBoy.phoneNumber}',
+                style: TextStyle(fontSize: 11, color: AppTheme.primaryGreen),
+              ),
             Text(
               currencyFormat.format(order.totalAmount),
               style: const TextStyle(

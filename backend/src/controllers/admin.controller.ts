@@ -80,7 +80,8 @@ export class AdminController {
         order.notes = notes;
       }
 
-      if (deliveryBoyId && status === 'out_for_delivery') {
+      // Allow assigning delivery boy when accepting, preparing, or out_for_delivery
+      if (deliveryBoyId && ['accepted', 'preparing', 'out_for_delivery'].includes(status)) {
         const userRepository = AppDataSource.getRepository(User);
         const deliveryBoy = await userRepository.findOneBy({
           id: deliveryBoyId,
@@ -384,6 +385,56 @@ export class AdminController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error deleting product' });
+    }
+  }
+
+  // Get list of delivery agents for assignment
+  static async getDeliveryAgents(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userRepository = AppDataSource.getRepository(User);
+      
+      // Use query builder for more control and better null handling
+      const deliveryAgents = await userRepository
+        .createQueryBuilder('user')
+        .select(['user.id', 'user.name', 'user.phoneNumber', 'user.email'])
+        .where('user.role = :role', { role: 'delivery' })
+        .andWhere('user.isActive = :isActive', { isActive: true })
+        .orderBy('user.name', 'ASC', 'NULLS LAST')
+        .addOrderBy('user.phoneNumber', 'ASC')
+        .getMany();
+
+      console.log(`✅ Found ${deliveryAgents.length} active delivery agents`);
+      
+      if (deliveryAgents.length === 0) {
+        console.log('⚠️ No active delivery agents found. Checking all users with delivery role...');
+        const allDeliveryUsers = await userRepository.find({
+          where: { role: 'delivery' },
+          select: ['id', 'name', 'phoneNumber', 'email', 'isActive'],
+        });
+        console.log(`📊 Total users with delivery role: ${allDeliveryUsers.length}`);
+        if (allDeliveryUsers.length > 0) {
+          console.log('Delivery users found:');
+          allDeliveryUsers.forEach(user => {
+            console.log(`  - ID: ${user.id}, Phone: ${user.phoneNumber}, Name: ${user.name || 'N/A'}, Active: ${user.isActive}`);
+          });
+          console.log('💡 Tip: Make sure isActive = true for delivery agents');
+        } else {
+          console.log('❌ No users found with role="delivery"');
+          console.log('💡 Tip: Update user role to "delivery" in database or via Admin Dashboard');
+        }
+      } else {
+        deliveryAgents.forEach(agent => {
+          console.log(`  ✓ ${agent.name || 'N/A'} (${agent.phoneNumber})`);
+        });
+      }
+
+      res.json(deliveryAgents);
+    } catch (error) {
+      console.error('❌ Error fetching delivery agents:', error);
+      res.status(500).json({ 
+        message: 'Error fetching delivery agents',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 }

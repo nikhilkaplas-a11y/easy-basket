@@ -206,13 +206,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Categories Section (Blinkit Style - Grid Layout)
+              // Categories Section (Horizontal Scrollable Slider - Blinkit Style)
               Consumer<ProductProvider>(
                 builder: (context, provider, _) {
                   if (provider.isLoading && provider.categories.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.all(24.0),
-                      child: Center(child: CircularProgressIndicator()),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                        ),
+                      ),
                     );
                   }
                   if (provider.categories.isEmpty) {
@@ -220,59 +224,59 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                   return Container(
                     color: AppTheme.white,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Categories',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.black,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final responsive = Responsive(context);
-                            final crossAxisCount = responsive.getCategoryGridColumns();
-                            // Calculate aspect ratio based on screen size
-                            final aspectRatio = constraints.maxWidth < 360 ? 0.95 : 0.9;
-                            
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                childAspectRatio: aspectRatio,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
-                              ),
-                              itemCount: provider.categories.length > 8 ? 8 : provider.categories.length,
-                              itemBuilder: (context, index) {
-                                final category = provider.categories[index];
-                                return _CategoryGridCard(category: category);
-                              },
-                            );
-                          },
-                        ),
-                        if (provider.categories.length > 8)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Center(
-                              child: TextButton(
-                                onPressed: () => context.push('/products'),
-                                child: const Text(
-                                  'View All Categories',
-                                  style: TextStyle(
-                                    color: AppTheme.primaryGreen,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Categories',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.black,
+                                fontFamily: 'RoundedSans',
                               ),
                             ),
+                            TextButton(
+                              onPressed: () => context.push('/categories'),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'View All',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryGreen,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      fontFamily: 'RoundedSans',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 14,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 100,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: provider.categories.length,
+                            itemBuilder: (context, index) {
+                              final category = provider.categories[index];
+                              return _CategorySliderCard(category: category);
+                            },
                           ),
+                        ),
                       ],
                     ),
                   );
@@ -379,68 +383,85 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Category Grid Card (Blinkit Style)
-class _CategoryGridCard extends StatelessWidget {
+// Category Slider Card (Horizontal Scrollable - Blinkit Style)
+class _CategorySliderCard extends StatelessWidget {
   final CategoryModel category;
 
-  const _CategoryGridCard({required this.category});
+  const _CategorySliderCard({required this.category});
 
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final iconSize = screenWidth < 360 ? 45.0 : 50.0;
+    // Reduced icon size to fit in 100px height container
+    final iconSize = screenWidth < 360 ? 50.0 : 55.0;
     final fontSize = responsive.fontSize(11);
     
     return GestureDetector(
       onTap: () => context.push('/products?categoryId=${category.id}'),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: iconSize,
-            height: iconSize,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: category.imageUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      category.imageUrl!,
-                      width: iconSize,
-                      height: iconSize,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(
-                        Icons.category,
-                        size: responsive.iconSize(24),
-                        color: AppTheme.primaryGreen,
-                      ),
-                    ),
-                  )
-                : Icon(
-                    Icons.category,
-                    size: responsive.iconSize(24),
-                    color: AppTheme.primaryGreen,
+      child: Container(
+        width: 90,
+        height: 100,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: iconSize,
+              height: iconSize,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-          ),
-          SizedBox(height: screenWidth < 360 ? 4 : 6),
-          Flexible(
-            child: Text(
-              category.name,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.black,
+                ],
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              child: category.imageUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        category.imageUrl!,
+                        width: iconSize,
+                        height: iconSize,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.category,
+                          size: responsive.iconSize(24),
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      Icons.category,
+                      size: responsive.iconSize(24),
+                      color: AppTheme.primaryGreen,
+                    ),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  category.name,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.black,
+                    fontFamily: 'RoundedSans',
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

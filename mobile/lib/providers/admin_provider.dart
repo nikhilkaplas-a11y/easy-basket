@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show ChangeNotifier, kDebugMode;
 import '../services/api_service.dart';
 import '../models/order_model.dart';
 import '../models/user_model.dart';
@@ -11,6 +11,7 @@ class AdminProvider with ChangeNotifier {
   Map<String, dynamic>? _stats;
   List<OrderModel> _orders = [];
   List<UserModel> _users = [];
+  List<UserModel> _deliveryAgents = [];
   List<ProductModel> _products = [];
   List<CategoryModel> _categories = [];
   bool _isLoading = false;
@@ -22,6 +23,7 @@ class AdminProvider with ChangeNotifier {
   Map<String, dynamic>? get stats => _stats;
   List<OrderModel> get orders => _orders;
   List<UserModel> get users => _users;
+  List<UserModel> get deliveryAgents => _deliveryAgents;
   List<ProductModel> get products => _products;
   List<CategoryModel> get categories => _categories;
   bool get isLoading => _isLoading;
@@ -497,6 +499,33 @@ class AdminProvider with ChangeNotifier {
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
       return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchDeliveryAgents({String? token}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await apiService.get('/admin/delivery-agents', token: token);
+      final List<dynamic> data = response is List ? response : [];
+      _deliveryAgents = data.map((json) => UserModel.fromJson(json as Map<String, dynamic>)).toList();
+      
+      if (kDebugMode) {
+        print('✅ Fetched ${_deliveryAgents.length} delivery agents');
+        if (_deliveryAgents.isEmpty) {
+          print('⚠️ No delivery agents found. Make sure users have role="delivery" and isActive=true');
+        }
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      if (kDebugMode) {
+        print('❌ Error fetching delivery agents: $_error');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

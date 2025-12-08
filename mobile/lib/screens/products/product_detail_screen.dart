@@ -110,27 +110,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      Row(
-                        children: [
-                          Text(
-                            'Stock: ${product.stock} ${product.unit ?? 'piece'}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: product.stock > 0
-                                  ? AppTheme.primaryGreen
-                                  : Colors.red,
-                              fontFamily: 'RoundedSans',
-                            ),
-                          ),
-                          const Spacer(),
-                          if (product.category != null)
+                      if (product.category != null) ...[
+                        Row(
+                          children: [
+                            const Spacer(),
                             Chip(
                               label: Text(product.category!.name),
                               backgroundColor: AppTheme.lightGrey,
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      const SizedBox(height: 8),
                       if (product.isAvailable && product.stock > 0) ...[
                         Row(
                           children: [
