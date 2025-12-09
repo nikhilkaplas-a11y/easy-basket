@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
@@ -23,9 +24,10 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
       if (authProvider.accessToken != null) {
-        deliveryProvider.fetchStats();
-        deliveryProvider.fetchOrders();
-        deliveryProvider.fetchAvailableOrders(); // Fetch available orders
+        final token = authProvider.accessToken!;
+        deliveryProvider.fetchStats(token: token);
+        deliveryProvider.fetchOrders(token: token);
+        deliveryProvider.fetchAvailableOrders(token: token); // Fetch available orders
       }
     });
   }
@@ -42,18 +44,70 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              deliveryProvider.fetchStats();
-              deliveryProvider.fetchOrders();
-              deliveryProvider.fetchAvailableOrders();
+              final token = authProvider.accessToken;
+              if (token != null) {
+                deliveryProvider.fetchStats(token: token);
+                deliveryProvider.fetchOrders(token: token);
+                deliveryProvider.fetchAvailableOrders(token: token);
+              }
             },
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+                
+                if (confirmed == true && context.mounted) {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  await authProvider.logout();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Text('Logout', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await deliveryProvider.fetchStats();
-          await deliveryProvider.fetchOrders();
-          await deliveryProvider.fetchAvailableOrders();
+          final token = authProvider.accessToken;
+          if (token != null) {
+            await deliveryProvider.fetchStats(token: token);
+            await deliveryProvider.fetchOrders(token: token);
+            await deliveryProvider.fetchAvailableOrders(token: token);
+          }
         },
         child: SingleChildScrollView(
           child: Column(
@@ -406,12 +460,32 @@ class _OrderCard extends StatelessWidget {
                       color: AppTheme.primaryGreen,
                     ),
                   ),
-                  Text(
-                    formatISTShort(order.createdAt),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.grey,
-                    ),
+                  Row(
+                    children: [
+                      // Quick navigation button if coordinates available
+                      if (order.deliveryAddress?.latitude != null && order.deliveryAddress?.longitude != null)
+                        IconButton(
+                          icon: const Icon(Icons.navigation, size: 20, color: AppTheme.primaryGreen),
+                          onPressed: () async {
+                            final lat = double.parse(order.deliveryAddress.latitude!);
+                            final lng = double.parse(order.deliveryAddress.longitude!);
+                            final url = Uri.parse(
+                              'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving'
+                            );
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(url, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          tooltip: 'Get Directions',
+                        ),
+                      Text(
+                        formatISTShort(order.createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.grey,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

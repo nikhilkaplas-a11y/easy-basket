@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -33,7 +29,9 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
 
   Future<void> _loadOrderDetails() async {
     final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
-    final order = await deliveryProvider.getOrderDetails(widget.orderId);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.accessToken;
+    final order = await deliveryProvider.getOrderDetails(widget.orderId, token: token);
     setState(() {
       _order = order;
       _isLoading = false;
@@ -88,18 +86,49 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
     if (_order == null) return;
 
     final address = _order!.deliveryAddress;
+    
+    // Use exact coordinates if available (more accurate for instant delivery)
+    if (address.latitude != null && address.longitude != null) {
+      try {
+        final lat = double.parse(address.latitude!);
+        final lng = double.parse(address.longitude!);
+        
+        // Open Google Maps with exact coordinates for turn-by-turn navigation
+        final url = Uri.parse(
+          'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving'
+        );
+        
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not open Google Maps')),
+            );
+          }
+        }
+      } catch (e) {
+        // Fallback to text search if coordinate parsing fails
+        _openNavigationWithText(address);
+      }
+    } else {
+      // Fallback to text-based search if coordinates not available
+      _openNavigationWithText(address);
+    }
+  }
+
+  Future<void> _openNavigationWithText(dynamic address) async {
     final query = '${address.addressLine1}, ${address.city}, ${address.state} ${address.pincode}';
     final encodedQuery = Uri.encodeComponent(query);
-    final url = 'https://www.google.com/maps/search/?api=1&query=$encodedQuery';
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedQuery');
 
     try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open navigation')),
+            const SnackBar(content: Text('Could not open Google Maps')),
           );
         }
       }
@@ -107,6 +136,40 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _viewOnMaps() async {
+    if (_order == null) return;
+
+    final address = _order!.deliveryAddress;
+    
+    // Use exact coordinates if available
+    if (address.latitude != null && address.longitude != null) {
+      try {
+        final lat = double.parse(address.latitude!);
+        final lng = double.parse(address.longitude!);
+        
+        // Navigate to map view screen with route
+        context.push('/delivery/map', extra: {
+          'destinationLat': lat,
+          'destinationLng': lng,
+          'destinationAddress': _order!.deliveryAddress.addressLine1,
+          'orderId': _order!.id,
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid coordinates')),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Address coordinates not available')),
         );
       }
     }
@@ -269,65 +332,188 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Delivery Address',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  order.deliveryAddress.addressLine1,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                if (order.deliveryAddress.addressLine2 != null)
-                                  Text(
-                                    order.deliveryAddress.addressLine2!,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                Text(
-                                  '${order.deliveryAddress.city}, ${order.deliveryAddress.state} - ${order.deliveryAddress.pincode}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                if (order.deliveryAddress.landmark != null)
-                                  Text(
-                                    'Landmark: ${order.deliveryAddress.landmark}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: AppTheme.grey,
-                                    ),
-                                  ),
-                              ],
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.location_on,
+                              color: AppTheme.primaryGreen,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Delivery Address',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _openNavigation,
-                          icon: const Icon(Icons.navigation),
-                          label: const Text('Open in Maps'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryGreen,
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.deliveryAddress.addressLine1,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (order.deliveryAddress.addressLine2 != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                order.deliveryAddress.addressLine2!,
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              '${order.deliveryAddress.city}, ${order.deliveryAddress.state} - ${order.deliveryAddress.pincode}',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: AppTheme.grey,
+                              ),
+                            ),
+                            if (order.deliveryAddress.landmark != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Landmark: ${order.deliveryAddress.landmark}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.grey,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Show coordinates if available
+                      if (order.deliveryAddress.latitude != null && order.deliveryAddress.longitude != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightGrey,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.gps_fixed, size: 14, color: AppTheme.primaryGreen),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  '${order.deliveryAddress.latitude}, ${order.deliveryAddress.longitude}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.grey,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ],
+                      const SizedBox(height: 16),
+                      // Navigation buttons - Stack vertically on small screens
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          // If width is less than 350, stack buttons vertically
+                          if (constraints.maxWidth < 350) {
+                            return Column(
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _openNavigation,
+                                    icon: const Icon(Icons.directions, size: 18),
+                                    label: const Text('Get Directions'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryGreen,
+                                      foregroundColor: AppTheme.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _viewOnMaps,
+                                    icon: const Icon(Icons.map, size: 18),
+                                    label: const Text('View Map'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          } else {
+                            // Horizontal layout for larger screens
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _openNavigation,
+                                    icon: const Icon(Icons.directions, size: 18),
+                                    label: const Text('Get Directions'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryGreen,
+                                      foregroundColor: AppTheme.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _viewOnMaps,
+                                    icon: const Icon(Icons.map, size: 18),
+                                    label: const Text('View Map'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                        },
                       ),
                     ],
                   ),

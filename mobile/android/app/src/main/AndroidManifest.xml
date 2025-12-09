@@ -26,7 +26,7 @@
         </activity>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_GOOGLE_MAPS_API_KEY"/>
+            android:value="AIzaSyDoK9ANjz95e64YlDQsSv56RNpD91zftQA"/>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

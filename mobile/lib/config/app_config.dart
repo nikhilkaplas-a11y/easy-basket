@@ -8,10 +8,11 @@ class AppConfig {
   
   // Alternative URLs (uncomment if needed):
   // For local development (web only):
+  
   // static const String apiBaseUrl = 'http://localhost:3000/api';
   
   // For Android emulator:
-  // static const String apiBaseUrl = 'http://10.0.2.2:3000/api';
+  //static const String apiBaseUrl = 'http://10.0.2.2:3000/api';
   
   // For physical device on same WiFi (replace with your Mac's IP):
   // static const String apiBaseUrl = 'http://192.168.1.29:3000/api';

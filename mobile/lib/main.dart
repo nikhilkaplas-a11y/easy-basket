@@ -11,6 +11,7 @@ import 'providers/product_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/delivery_provider.dart';
 import 'providers/admin_provider.dart';
+import 'providers/service_area_provider.dart';
 import 'routes/app_router.dart';
 import 'utils/theme.dart';
 import 'services/razorpay_service.dart';
@@ -78,6 +79,9 @@ class MyApp extends StatelessWidget {
           create: (_) => AdminProvider(apiService: ApiService()),
           update: (_, authProvider, previous) =>
               previous ?? AdminProvider(apiService: ApiService()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ServiceAreaProvider(),
         ),
       ],
       child: MaterialApp.router(

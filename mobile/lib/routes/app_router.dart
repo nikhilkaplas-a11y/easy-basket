@@ -20,6 +20,7 @@ import '../screens/profile/profile_screen.dart';
 import '../screens/delivery/delivery_dashboard_screen.dart';
 import '../screens/delivery/delivery_orders_screen.dart';
 import '../screens/delivery/delivery_order_detail_screen.dart';
+import '../screens/delivery/delivery_map_view_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/admin_orders_screen.dart';
 import '../screens/admin/admin_users_screen.dart';
@@ -27,6 +28,8 @@ import '../screens/admin/admin_products_screen.dart';
 import '../screens/admin/admin_categories_screen.dart';
 import '../screens/admin/add_edit_category_screen.dart';
 import '../screens/admin/add_edit_product_screen.dart';
+import '../screens/service_area/service_not_available_screen.dart';
+import '../screens/onboarding/location_detection_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -76,6 +79,14 @@ class AppRouter {
           if (currentLocation.startsWith('/admin/') || currentLocation.startsWith('/delivery/')) {
             return '/home';
           }
+          
+          // Don't redirect if already on location detection or address screens
+          if (currentLocation == '/onboarding/location' || 
+              currentLocation.startsWith('/address')) {
+            return null;
+          }
+          
+          // For login/splash, redirect to home (home screen will check addresses)
           if (isLoginRoute || currentLocation == '/splash') {
             return '/home';
           }
@@ -94,8 +105,25 @@ class AppRouter {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/onboarding/location',
+        builder: (context, state) => const LocationDetectionScreen(),
+      ),
+      GoRoute(
         path: '/home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/service-not-available',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ServiceNotAvailableScreen(
+            pincode: extra?['pincode'] as String?,
+            city: extra?['city'] as String?,
+            state: extra?['state'] as String?,
+            country: extra?['country'] as String?,
+            returnTo: extra?['returnTo'] as String?,
+          );
+        },
       ),
       GoRoute(
         path: '/categories',
@@ -199,6 +227,23 @@ class AppRouter {
         builder: (context, state) {
           final id = int.parse(state.pathParameters['id']!);
           return DeliveryOrderDetailScreen(orderId: id);
+        },
+      ),
+      GoRoute(
+        path: '/delivery/map',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) {
+            return const Scaffold(
+              body: Center(child: Text('Invalid map parameters')),
+            );
+          }
+          return DeliveryMapViewScreen(
+            destinationLat: extra['destinationLat'] as double,
+            destinationLng: extra['destinationLng'] as double,
+            destinationAddress: extra['destinationAddress'] as String,
+            orderId: extra['orderId']?.toString(),
+          );
         },
       ),
       // Admin Routes

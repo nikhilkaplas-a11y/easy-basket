@@ -19,7 +19,7 @@ class DeliveryProvider with ChangeNotifier {
 
   DeliveryProvider({required this.apiService});
 
-  Future<void> fetchOrders({String? status}) async {
+  Future<void> fetchOrders({String? status, String? token}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -30,7 +30,7 @@ class DeliveryProvider with ChangeNotifier {
         endpoint += '?status=$status';
       }
 
-      final response = await apiService.get(endpoint);
+      final response = await apiService.get(endpoint, token: token);
       final List<dynamic> data = response is List ? response : [];
       _orders = data.map((json) => OrderModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
@@ -41,13 +41,13 @@ class DeliveryProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchStats() async {
+  Future<void> fetchStats({String? token}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await apiService.get('/delivery/stats');
+      final response = await apiService.get('/delivery/stats', token: token);
       _stats = response as Map<String, dynamic>;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -74,8 +74,8 @@ class DeliveryProvider with ChangeNotifier {
       );
 
       // Refresh orders after status update
-      await fetchOrders();
-      await fetchStats();
+      await fetchOrders(token: token);
+      await fetchStats(token: token);
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -86,9 +86,9 @@ class DeliveryProvider with ChangeNotifier {
     }
   }
 
-  Future<OrderModel?> getOrderDetails(int orderId) async {
+  Future<OrderModel?> getOrderDetails(int orderId, {String? token}) async {
     try {
-      final response = await apiService.get('/delivery/orders/$orderId');
+      final response = await apiService.get('/delivery/orders/$orderId', token: token);
       return OrderModel.fromJson(response as Map<String, dynamic>);
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -96,7 +96,7 @@ class DeliveryProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchAvailableOrders({String? status}) async {
+  Future<void> fetchAvailableOrders({String? status, String? token}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -107,7 +107,7 @@ class DeliveryProvider with ChangeNotifier {
         endpoint += '?status=$status';
       }
 
-      final response = await apiService.get(endpoint);
+      final response = await apiService.get(endpoint, token: token);
       final List<dynamic> data = response is List ? response : [];
       _availableOrders = data.map((json) => OrderModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
@@ -134,9 +134,9 @@ class DeliveryProvider with ChangeNotifier {
       );
 
       // Refresh available orders and assigned orders
-      await fetchAvailableOrders();
-      await fetchOrders();
-      await fetchStats();
+      await fetchAvailableOrders(token: token);
+      await fetchOrders(token: token);
+      await fetchStats(token: token);
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');

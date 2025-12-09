@@ -189,9 +189,74 @@ class OrderProvider with ChangeNotifier {
         token: token,
       );
       await fetchAddresses(token);
+      _isLoading = false;
+      notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString().replaceAll('Exception: ', '');
+      // Provide more specific error message
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      _error = errorMessage;
+      if (kDebugMode) {
+        print('❌ Error creating address: $errorMessage');
+      }
+      _isLoading = false;
+      notifyListeners();
+      // Re-throw to allow caller to handle token expiration
+      if (errorMessage.contains('Invalid token') || 
+          errorMessage.contains('Authentication required') ||
+          errorMessage.contains('TokenExpiredException')) {
+        rethrow;
+      }
+      return false;
+    }
+  }
+
+  Future<bool> updateAddress({
+    required String token,
+    required int addressId,
+    String? addressLine1,
+    String? addressLine2,
+    String? city,
+    String? state,
+    String? pincode,
+    String? landmark,
+    bool? isDefault,
+    String? latitude,
+    String? longitude,
+    String? tag,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = <String, dynamic>{};
+      if (addressLine1 != null) data['addressLine1'] = addressLine1;
+      if (addressLine2 != null) data['addressLine2'] = addressLine2;
+      if (city != null) data['city'] = city;
+      if (state != null) data['state'] = state;
+      if (pincode != null) data['pincode'] = pincode;
+      if (landmark != null) data['landmark'] = landmark;
+      if (isDefault != null) data['isDefault'] = isDefault;
+      if (latitude != null) data['latitude'] = latitude;
+      if (longitude != null) data['longitude'] = longitude;
+      if (tag != null) data['tag'] = tag;
+
+      await apiService.put(
+        '/addresses/$addressId',
+        data,
+        token: token,
+      );
+      await fetchAddresses(token);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      _error = errorMessage;
+      if (kDebugMode) {
+        print('❌ Error updating address: $errorMessage');
+      }
       _isLoading = false;
       notifyListeners();
       return false;

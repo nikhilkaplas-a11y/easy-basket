@@ -44,13 +44,29 @@ class ApiService {
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
         body: jsonEncode(data),
+      ).timeout(
+        const Duration(seconds: 30), // 30 second timeout for API calls
+        onTimeout: () {
+          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
+        },
       );
 
       return _handleResponse(response);
     } catch (e) {
       // Re-throw if it's already a TokenExpiredException
       if (e is TokenExpiredException) rethrow;
-      // Otherwise wrap in generic exception
+      // Provide more detailed error information
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
+        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
+      }
+      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
+        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
+      }
+      if (errorString.contains('timeout')) {
+        throw Exception('Request timeout: Server took too long to respond');
+      }
+      // Otherwise wrap in generic exception with more context
       throw Exception('Network error: $e');
     }
   }

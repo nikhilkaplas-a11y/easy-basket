@@ -42,8 +42,17 @@ export class AuthController {
         return;
       }
 
+      // Check database connection
+      if (!AppDataSource.isInitialized) {
+        console.error('❌ Database not initialized');
+        res.status(500).json({ message: 'Database connection not available' });
+        return;
+      }
+
+      console.log(`🔍 Verifying OTP for ${phoneNumber}...`);
       const userRepository = AppDataSource.getRepository(User);
       let user = await userRepository.findOneBy({ phoneNumber });
+      console.log(`✅ User lookup completed: ${user ? 'found' : 'not found'}`);
 
       if (!user) {
         user = userRepository.create({ phoneNumber });
@@ -69,6 +78,7 @@ export class AuthController {
       refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 30); // 30 days
 
       // Save refresh token to database
+      console.log(`💾 Saving refresh token for user ${user.id}...`);
       const refreshTokenRepository = AppDataSource.getRepository(RefreshToken);
       const refreshToken = refreshTokenRepository.create({
         token: refreshTokenValue,
@@ -77,6 +87,7 @@ export class AuthController {
         isActive: true,
       });
       await refreshTokenRepository.save(refreshToken);
+      console.log(`✅ Refresh token saved successfully`);
 
       res.json({
         message: 'Login successful',
@@ -91,8 +102,15 @@ export class AuthController {
         },
       });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Internal server error' });
+      console.error('❌ Error in verify endpoint:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      res.status(500).json({ 
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
+      });
     }
   }
 

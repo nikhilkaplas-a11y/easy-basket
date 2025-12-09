@@ -394,12 +394,14 @@ export class AdminController {
       const userRepository = AppDataSource.getRepository(User);
       
       // Use query builder for more control and better null handling
+      // MySQL doesn't support NULLS LAST, so we use ISNULL to put nulls at the end
       const deliveryAgents = await userRepository
         .createQueryBuilder('user')
         .select(['user.id', 'user.name', 'user.phoneNumber', 'user.email'])
         .where('user.role = :role', { role: 'delivery' })
         .andWhere('user.isActive = :isActive', { isActive: true })
-        .orderBy('user.name', 'ASC', 'NULLS LAST')
+        .orderBy('ISNULL(user.name)', 'ASC') // NULLs will be last (ISNULL returns 1 for null, 0 for not null)
+        .addOrderBy('user.name', 'ASC')
         .addOrderBy('user.phoneNumber', 'ASC')
         .getMany();
 

@@ -30,8 +30,12 @@ class _DeliveryOrdersScreenState extends State<DeliveryOrdersScreen> {
 
   void _loadOrders() {
     final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final status = _selectedStatus == 'all' ? null : _selectedStatus;
-    deliveryProvider.fetchOrders(status: status);
+    final token = authProvider.accessToken;
+    if (token != null) {
+      deliveryProvider.fetchOrders(status: status, token: token);
+    }
   }
 
   @override

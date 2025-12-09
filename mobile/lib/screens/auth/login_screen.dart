@@ -125,11 +125,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
-              TextField(
+              TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 maxLength: 10,
-                enabled: !_isOtpSent,
+                enabled: !_isOtpSent && !_isLoading,
+                readOnly: _isOtpSent || _isLoading,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 decoration: InputDecoration(
                   labelText: 'Phone Number',
                   hintText: '9876543210',
@@ -138,7 +142,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   prefixIcon: const Icon(Icons.phone),
                   prefixText: '+91 ',
+                  counterText: '', // Hide character counter
                 ),
+                autofocus: false,
               ),
               if (_isOtpSent) ...[
                 const SizedBox(height: 24),

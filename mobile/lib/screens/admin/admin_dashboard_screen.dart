@@ -43,6 +43,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               adminProvider.fetchStats(token: authProvider.token);
             },
           ),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+                
+                if (confirmed == true && context.mounted) {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  await authProvider.logout();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Text('Logout', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: RefreshIndicator(

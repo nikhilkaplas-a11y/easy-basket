@@ -73,8 +73,14 @@ class AuthProvider with ChangeNotifier {
 
     try {
       await authService.sendOTP(phoneNumber);
+      if (kDebugMode) {
+        print('✅ OTP sent successfully for $phoneNumber');
+      }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
+      if (kDebugMode) {
+        print('❌ Error sending OTP: $_error');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

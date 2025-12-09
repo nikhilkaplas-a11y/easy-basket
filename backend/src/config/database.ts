@@ -10,6 +10,7 @@ import { Category } from '../entities/Category';
 import { Address } from '../entities/Address';
 import { OrderItem } from '../entities/OrderItem';
 import { RefreshToken } from '../entities/RefreshToken';
+import { ServiceArea } from '../entities/ServiceArea';
 
 export const AppDataSource = new DataSource({
   type: 'mysql',
@@ -20,7 +21,12 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'easy_basket',
   synchronize: process.env.NODE_ENV !== 'production', // Auto-sync only in development
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Product, Order, Category, Address, OrderItem, RefreshToken],
+  entities: [User, Product, Order, Category, Address, OrderItem, RefreshToken, ServiceArea],
   subscribers: [],
   migrations: [],
+  extra: {
+    connectionLimit: 10,
+    connectTimeout: 10000, // 10 seconds connection timeout
+    acquireTimeout: 10000, // 10 seconds acquire timeout
+  },
 });

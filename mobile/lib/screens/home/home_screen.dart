@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/service_area_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/category_card.dart';
@@ -19,6 +21,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool _hasCheckedServiceAvailability = false; // Prevent multiple checks
+
   @override
   void initState() {
     super.initState();
@@ -32,9 +36,78 @@ class _HomeScreenState extends State<HomeScreen> {
       
       // Fetch addresses if user is authenticated
       if (authProvider.token != null) {
-        orderProvider.fetchAddresses(authProvider.token!);
+        orderProvider.fetchAddresses(authProvider.token!).then((_) {
+          // If no addresses, redirect to location detection (handled by router)
+          if (orderProvider.addresses.isEmpty && mounted) {
+            context.go('/onboarding/location');
+            return;
+          }
+          // Check service availability for default address after addresses are loaded
+          _checkDefaultAddressServiceAvailability(orderProvider);
+        });
       }
     });
+  }
+
+  /// Check if the default address is serviceable
+  Future<void> _checkDefaultAddressServiceAvailability(OrderProvider orderProvider) async {
+    // Prevent multiple checks
+    if (_hasCheckedServiceAvailability) return;
+    
+    // Only check if we have addresses
+    if (orderProvider.addresses.isEmpty) return;
+    
+    // Find default address
+    final defaultAddress = orderProvider.addresses.firstWhere(
+      (addr) => addr.isDefault,
+      orElse: () => orderProvider.addresses.first,
+    );
+    
+    if (defaultAddress == null) return;
+    
+    _hasCheckedServiceAvailability = true;
+    
+    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+    
+    try {
+      final isAvailable = await serviceAreaProvider.checkServiceAvailability(
+        pincode: defaultAddress.pincode,
+        country: 'India',
+      );
+      
+      if (kDebugMode) {
+        print('🏠 Home screen: Service availability check for default address (${defaultAddress.pincode}): $isAvailable');
+      }
+      
+      if (!isAvailable && mounted) {
+        // Show service not available screen
+        if (kDebugMode) {
+          print('🚫 Default address is not serviceable, showing service not available screen');
+        }
+        
+        // Small delay to ensure home screen is fully rendered
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          // Use context.go to replace home page instead of stacking
+          context.go(
+            '/service-not-available',
+            extra: {
+              'pincode': defaultAddress.pincode,
+              'city': defaultAddress.city,
+              'state': defaultAddress.state,
+              'country': 'India',
+              'returnTo': '/home',
+            },
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error checking service availability on home screen: $e');
+      }
+      // Don't block the user if there's an error checking service availability
+    }
   }
 
   @override
@@ -102,6 +175,9 @@ class _HomeScreenState extends State<HomeScreen> {
           await productProvider.fetchProducts();
           if (authProvider.token != null) {
             await orderProvider.fetchAddresses(authProvider.token!);
+            // Reset check flag and check again after refresh
+            _hasCheckedServiceAvailability = false;
+            _checkDefaultAddressServiceAvailability(orderProvider);
           }
         },
         child: SingleChildScrollView(
@@ -117,61 +193,63 @@ class _HomeScreenState extends State<HomeScreen> {
                           orElse: () => orderProvider.addresses.first,
                         )
                       : null;
+                  final hasNoAddress = orderProvider.addresses.isEmpty;
 
                   return Container(
-                    width: double.infinity,
-                    color: AppTheme.primaryGreen,
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: GestureDetector(
-                      onTap: () => context.push('/addresses'),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            color: AppTheme.white,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  defaultAddress != null
-                                      ? 'Deliver to'
-                                      : 'Add delivery address',
-                                  style: const TextStyle(
-                                    color: AppTheme.white,
-                                    fontSize: 12,
-                                  ),
+                        width: double.infinity,
+                        color: AppTheme.primaryGreen,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: GestureDetector(
+                          onTap: () => context.push('/addresses'),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      defaultAddress != null
+                                          ? 'Deliver to'
+                                          : 'Add delivery address',
+                                      style: TextStyle(
+                                        color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
+                                        fontSize: 12,
+                                        fontWeight: hasNoAddress ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      defaultAddress != null
+                                          ? defaultAddress.addressLine1.length > 40
+                                              ? '${defaultAddress.addressLine1.substring(0, 40)}...'
+                                              : defaultAddress.addressLine1
+                                          : 'Tap to add address',
+                                      style: TextStyle(
+                                        color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  defaultAddress != null
-                                      ? defaultAddress.addressLine1.length > 40
-                                          ? '${defaultAddress.addressLine1.substring(0, 40)}...'
-                                          : defaultAddress.addressLine1
-                                      : 'Tap to add address',
-                                  style: const TextStyle(
-                                    color: AppTheme.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
+                                size: 16,
+                              ),
+                            ],
                           ),
-                          const Icon(
-                            Icons.arrow_forward_ios,
-                            color: AppTheme.white,
-                            size: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                        ),
+                      );
                 },
               ),
               // Search Bar
@@ -283,15 +361,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               // Products Section
-              Consumer<ProductProvider>(
-                builder: (context, provider, _) {
-                  if (provider.isLoading && provider.products.isEmpty) {
+              Consumer2<ProductProvider, OrderProvider>(
+                builder: (context, productProvider, orderProvider, _) {
+                  final hasNoAddress = orderProvider.addresses.isEmpty;
+                  
+                  if (productProvider.isLoading && productProvider.products.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.all(24.0),
                       child: Center(child: CircularProgressIndicator()),
                     );
                   }
-                  if (provider.products.isEmpty) {
+                  if (productProvider.products.isEmpty) {
                     return Container(
                       color: AppTheme.white,
                       padding: const EdgeInsets.all(48.0),
@@ -324,6 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   }
+                  
                   return Container(
                     color: AppTheme.white,
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
@@ -353,6 +434,38 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
+                        // Info message for users without address
+                        if (hasNoAddress)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16, top: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppTheme.primaryGreen.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 20,
+                                  color: AppTheme.primaryGreen,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Add your delivery address to place orders',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.grey,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(height: 16),
                         GridView.builder(
                           shrinkWrap: true,
@@ -363,9 +476,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),
-                          itemCount: provider.products.length > 4 ? 4 : provider.products.length,
+                          itemCount: productProvider.products.length > 4 ? 4 : productProvider.products.length,
                           itemBuilder: (context, index) {
-                            final product = provider.products[index];
+                            final product = productProvider.products[index];
                             return ProductCard(product: product);
                           },
                         ),

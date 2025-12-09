@@ -24,6 +24,7 @@ export class DeliveryController {
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.deliveryAddress', 'deliveryAddress')
+        .leftJoinAndSelect('order.deliveryBoy', 'deliveryBoy')
         .where('order.deliveryBoyId = :deliveryBoyId', { deliveryBoyId })
         .orderBy('order.createdAt', 'DESC');
 
@@ -32,9 +33,13 @@ export class DeliveryController {
       }
 
       const orders = await queryBuilder.getMany();
+      console.log(`✅ Delivery agent ${deliveryBoyId} has ${orders.length} assigned orders`);
+      if (orders.length > 0) {
+        console.log(`   Orders: ${orders.map(o => `#${o.id} (${o.status})`).join(', ')}`);
+      }
       res.json(orders);
     } catch (error) {
-      console.error(error);
+      console.error('❌ Error fetching assigned orders:', error);
       res.status(500).json({ message: 'Error fetching orders' });
     }
   }
