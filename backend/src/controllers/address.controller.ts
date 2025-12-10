@@ -4,6 +4,59 @@ import { Address } from '../entities/Address';
 import { User } from '../entities/User';
 import { AuthRequest } from '../middleware/auth.middleware';
 
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
+// Helper function to calculate string similarity (Levenshtein distance based)
+function calculateStringSimilarity(str1: string, str2: string): number {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const distance = levenshteinDistance(longer, shorter);
+  return (longer.length - distance) / longer.length;
+}
+
+// Levenshtein distance calculation
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+}
+
 export class AddressController {
   static async getUserAddresses(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -65,6 +118,89 @@ export class AddressController {
       }
 
       const addressRepository = AppDataSource.getRepository(Address);
+
+      // Check for duplicate addresses (Blinkit-style: prevent duplicates)
+      // Check by coordinates (if provided) or by address details
+      let existingAddress = null;
+      
+      if (latitude && longitude) {
+        // Check for addresses with same coordinates (within 50 meters tolerance)
+        // Using approximate distance calculation
+        const allAddresses = await addressRepository.find({
+          where: { user: { id: userId } },
+        });
+        
+        for (const addr of allAddresses) {
+          if (addr.latitude && addr.longitude) {
+            const distance = calculateDistance(
+              parseFloat(latitude),
+              parseFloat(longitude),
+              parseFloat(addr.latitude),
+              parseFloat(addr.longitude)
+            );
+            // If within 50 meters, consider it duplicate
+            if (distance < 0.05) { // 0.05 km = 50 meters
+              existingAddress = addr;
+              break;
+            }
+          }
+        }
+      }
+      
+      // If no coordinate match, check by address details (same pincode + similar address)
+      if (!existingAddress) {
+        const similarAddresses = await addressRepository.find({
+          where: {
+            user: { id: userId },
+            pincode: pincode,
+          },
+        });
+        
+        // Check if address line 1 is very similar (fuzzy match)
+        for (const addr of similarAddresses) {
+          const similarity = calculateStringSimilarity(
+            addressLine1.toLowerCase().trim(),
+            addr.addressLine1.toLowerCase().trim()
+          );
+          // If 80% similar, consider it duplicate
+          if (similarity > 0.8) {
+            existingAddress = addr;
+            break;
+          }
+        }
+      }
+
+      // If duplicate found, update it instead of creating new one
+      if (existingAddress) {
+        // Update existing address
+        existingAddress.addressLine1 = addressLine1;
+        existingAddress.addressLine2 = addressLine2;
+        existingAddress.city = city;
+        existingAddress.state = state;
+        existingAddress.pincode = pincode;
+        existingAddress.landmark = landmark;
+        existingAddress.latitude = latitude;
+        existingAddress.longitude = longitude;
+        existingAddress.tag = tag || null;
+        
+        // If setting as default, unset other defaults
+        if (isDefault) {
+          await addressRepository.update(
+            { user: { id: userId } },
+            { isDefault: false }
+          );
+          existingAddress.isDefault = true;
+        } else {
+          existingAddress.isDefault = isDefault || false;
+        }
+        
+        await addressRepository.save(existingAddress);
+        res.status(200).json({
+          ...existingAddress,
+          message: 'Address updated (duplicate prevented)',
+        });
+        return;
+      }
 
       // If setting as default, unset other defaults
       if (isDefault) {

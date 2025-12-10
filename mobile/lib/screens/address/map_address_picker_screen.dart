@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -40,8 +40,13 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
   Future<void> _getCurrentLocation() async {
     setState(() => _isLoading = true);
 
-    // Request location permission
-    final status = await Permission.location.request();
+    // Check permission status first (don't request if already granted - Blinkit style)
+    PermissionStatus status = await Permission.location.status;
+    if (status.isDenied) {
+      // Only request if denied (not permanently denied)
+      status = await Permission.location.request();
+    }
+    
     if (!status.isGranted) {
       setState(() {
         _isLoading = false;
@@ -66,11 +71,23 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
         return;
       }
 
-      // Get current position with best accuracy for instant delivery
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 15),
-      );
+      // Blinkit-style: Get last known position first (instant)
+      Position? position;
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ No last known position: $e');
+        }
+      }
+
+      // If no cached position, get fresh one (fast, low accuracy first)
+      if (position == null) {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low, // Fast initial fix
+          timeLimit: const Duration(seconds: 10),
+        );
+      }
 
       setState(() {
         _currentLat = position.latitude;

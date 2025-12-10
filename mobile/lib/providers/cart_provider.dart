@@ -91,9 +91,7 @@ class CartProvider with ChangeNotifier {
     _addingItems.add(product.id);
     notifyListeners();
     
-    // Simulate a brief delay for better UX (even though it's instant)
-    await Future.delayed(const Duration(milliseconds: 300));
-    
+    // Instant update for better UX (like Blinkit)
     _cartService.addItem(product);
     _addingItems.remove(product.id);
     await _saveCart();
@@ -107,6 +105,7 @@ class CartProvider with ChangeNotifier {
   }
 
   Future<void> updateQuantity(int productId, int quantity) async {
+    // Instant update for smooth UX (like Blinkit)
     _cartService.updateQuantity(productId, quantity);
     await _saveCart();
     notifyListeners();

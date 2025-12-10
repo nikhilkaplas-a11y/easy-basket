@@ -184,7 +184,65 @@ class OrderProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await apiService.post(
+      // Check for duplicate addresses on frontend first (quick check)
+      if (latitude != null && longitude != null) {
+        final existingAddresses = _addresses.where((addr) {
+          if (addr.latitude != null && addr.longitude != null) {
+            // Calculate distance (simple approximation)
+            final lat1 = double.tryParse(latitude);
+            final lng1 = double.tryParse(longitude);
+            final lat2 = double.tryParse(addr.latitude!);
+            final lng2 = double.tryParse(addr.longitude!);
+            
+            if (lat1 != null && lng1 != null && lat2 != null && lng2 != null) {
+              // Simple distance check (within ~50 meters)
+              final latDiff = (lat1 - lat2).abs();
+              final lngDiff = (lng1 - lng2).abs();
+              // Approximate: 0.0005 degrees ≈ 50 meters
+              if (latDiff < 0.0005 && lngDiff < 0.0005) {
+                return true; // Very close, likely duplicate
+              }
+            }
+          }
+          // Also check by pincode and address similarity
+          if (addr.pincode == pincode) {
+            final addr1Lower = addressLine1.toLowerCase().trim();
+            final addr2Lower = addr.addressLine1.toLowerCase().trim();
+            // Simple similarity check
+            if (addr1Lower == addr2Lower || 
+                addr1Lower.contains(addr2Lower) || 
+                addr2Lower.contains(addr1Lower)) {
+              return true; // Similar address
+            }
+          }
+          return false;
+        }).toList();
+        
+        if (existingAddresses.isNotEmpty) {
+          // Duplicate found - update existing instead
+          final existing = existingAddresses.first;
+          final success = await updateAddress(
+            token: token,
+            addressId: existing.id,
+            addressLine1: addressLine1,
+            addressLine2: addressLine2,
+            city: city,
+            state: state,
+            pincode: pincode,
+            landmark: landmark,
+            isDefault: isDefault,
+            latitude: latitude,
+            longitude: longitude,
+            tag: tag,
+          );
+          _isLoading = false;
+          notifyListeners();
+          return success;
+        }
+      }
+      
+      // No duplicate found, create new address
+      final response = await apiService.post(
         '/addresses',
         {
           'addressLine1': addressLine1,

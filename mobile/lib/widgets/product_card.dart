@@ -16,6 +16,7 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
     final isInCart = cartProvider.contains(product.id);
+    final quantity = isInCart ? cartProvider.getQuantity(product.id) : 0;
     final isAdding = cartProvider.isAddingItem(product.id);
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     final responsive = Responsive(context);
@@ -51,16 +52,16 @@ class ProductCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              flex: 3,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            // Image Section - Fixed height
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: SizedBox(
+                height: cardHeight * 0.55, // 55% of card height for image
+                width: double.infinity,
                 child: product.imageUrl != null
                     ? Image.network(
                         product.imageUrl!,
-                        width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: AppTheme.lightGrey,
@@ -73,74 +74,61 @@ class ProductCard extends StatelessWidget {
                       ),
               ),
             ),
-            Flexible(
-              flex: 2,
+            // Content Section - Fixed height with proper spacing
+            Expanded(
               child: Padding(
                 padding: EdgeInsets.all(screenWidth < 360 ? 6.0 : 8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Product Name - Fixed height to ensure visibility
-                    SizedBox(
-                      height: screenWidth < 360 ? 32 : 36,
-                      child: Text(
-                        product.name,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.black,
+                    // Top section: Name and Price
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Product Name - Fixed height to ensure visibility
+                        SizedBox(
+                          height: screenWidth < 360 ? 32 : 36,
+                          child: Text(
+                            product.name,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.black,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        SizedBox(height: screenWidth < 360 ? 2 : 4),
+                        Text(
+                          currencyFormat.format(product.price),
+                          style: TextStyle(
+                            fontSize: priceFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryGreen,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: screenWidth < 360 ? 2 : 4),
-                    Text(
-                      currencyFormat.format(product.price),
-                      style: TextStyle(
-                        fontSize: priceFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryGreen,
-                      ),
-                    ),
-                    SizedBox(height: screenWidth < 360 ? 2 : 4),
-                    // Always show price and button - don't hide details
+                    // Bottom section: Quantity Selector (Blinkit Style) or Add Button
                     SizedBox(
                       width: double.infinity,
-                      child: isInCart
-                          ? OutlinedButton.icon(
-                              onPressed: () => context.push('/cart'),
-                              icon: Icon(Icons.check, size: responsive.iconSize(12)),
-                              label: Text('In Cart', style: TextStyle(fontSize: buttonFontSize)),
-                              style: OutlinedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: screenWidth < 360 ? 4 : 6,
-                                  vertical: screenWidth < 360 ? 4 : 6,
-                                ),
-                                minimumSize: Size(0, screenWidth < 360 ? 26 : 28),
-                                side: const BorderSide(color: AppTheme.primaryGreen),
-                              ),
-                            )
+                      child: quantity > 0
+                          ? _buildQuantitySelector(context, cartProvider, quantity, responsive, screenWidth)
                           : ElevatedButton(
                               onPressed: (product.isAvailable && product.stock > 0 && !isAdding)
                                   ? () async {
                                       await cartProvider.addItem(product);
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('${product.name} added to cart'),
-                                            duration: const Duration(seconds: 1),
-                                            backgroundColor: AppTheme.primaryGreen,
-                                          ),
-                                        );
-                                      }
                                     }
                                   : null,
                               style: ElevatedButton.styleFrom(
                                 padding: EdgeInsets.symmetric(vertical: screenWidth < 360 ? 4 : 6),
                                 backgroundColor: AppTheme.primaryGreen,
                                 minimumSize: Size(0, screenWidth < 360 ? 26 : 28),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                               child: isAdding
                                   ? SizedBox(
@@ -153,9 +141,12 @@ class ProductCard extends StatelessWidget {
                                     )
                                   : Text(
                                       product.isAvailable && product.stock > 0
-                                          ? 'Add to Cart'
+                                          ? 'Add'
                                           : 'Out of Stock',
-                                      style: TextStyle(fontSize: buttonFontSize),
+                                      style: TextStyle(
+                                        fontSize: buttonFontSize,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                             ),
                     ),
@@ -165,6 +156,93 @@ class ProductCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Blinkit-style quantity selector
+  Widget _buildQuantitySelector(
+    BuildContext context,
+    CartProvider cartProvider,
+    int quantity,
+    Responsive responsive,
+    double screenWidth,
+  ) {
+    final buttonSize = screenWidth < 360 ? 24.0 : 28.0;
+    final iconSize = screenWidth < 360 ? 14.0 : 16.0;
+    final fontSize = screenWidth < 360 ? 13.0 : 14.0;
+    final canIncrement = quantity < product.stock && product.isAvailable;
+    final canDecrement = quantity > 0; // Allow decrementing to 0 (removes item)
+
+    return Container(
+      height: screenWidth < 360 ? 28 : 32,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryGreen,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Decrement button
+          GestureDetector(
+            onTap: () async {
+              if (quantity > 1) {
+                await cartProvider.updateQuantity(product.id, quantity - 1);
+              } else {
+                // Remove item when quantity becomes 0
+                await cartProvider.removeItem(product.id);
+              }
+            },
+            child: Container(
+              width: buttonSize,
+              height: buttonSize,
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.remove,
+                size: iconSize,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+          ),
+          // Quantity display
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              quantity.toString(),
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          // Increment button
+          GestureDetector(
+            onTap: canIncrement
+                ? () async {
+                    await cartProvider.updateQuantity(product.id, quantity + 1);
+                  }
+                : null,
+            child: Container(
+              width: buttonSize,
+              height: buttonSize,
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: canIncrement ? Colors.white : Colors.white.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.add,
+                size: iconSize,
+                color: canIncrement ? AppTheme.primaryGreen : AppTheme.grey,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
