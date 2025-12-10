@@ -33,13 +33,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
   void _loadCategoriesAndProducts() {
     final provider = Provider.of<ProductProvider>(context, listen: false);
     
-    // Load categories first to get category name
+    // Always ensure categories are loaded first to get accurate category name
     if (provider.categories.isEmpty) {
       provider.fetchCategories().then((_) {
         _updateCategoryName();
         _loadProducts();
       });
     } else {
+      // Categories already loaded, update name and load products
       _updateCategoryName();
       _loadProducts();
     }
@@ -121,31 +122,43 @@ class _ProductListScreenState extends State<ProductListScreen> {
             String displayTitle = 'All Products';
             
             if (widget.categoryId != null) {
-              // First priority: look up from categories list (always fresh)
+              // First priority: look up from categories list (always fresh and reliable)
               try {
                 final category = provider.categories.firstWhere(
                   (cat) => cat.id == widget.categoryId,
                 );
-                displayTitle = category.name;
-                // Update cached name for consistency
-                if (_categoryName != category.name) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() {
-                        _categoryName = category.name;
-                      });
-                    }
-                  });
+                // Double-check the category ID matches to prevent wrong category display
+                if (category.id == widget.categoryId) {
+                  displayTitle = category.name;
+                  // Update cached name for consistency
+                  if (_categoryName != category.name) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _categoryName = category.name;
+                        });
+                      }
+                    });
+                  }
+                } else {
+                  displayTitle = 'Products';
                 }
               } catch (e) {
-                // Second priority: try to get from products (only if category ID matches)
-                if (provider.products.isNotEmpty) {
-                  // Find a product that belongs to this category
-                  try {
-                    final matchingProduct = provider.products.firstWhere(
-                      (product) => product.category?.id == widget.categoryId,
-                    );
-                    if (matchingProduct.category != null && matchingProduct.category!.id == widget.categoryId) {
+                // Category not found in categories list
+                // Only try to get from products if categories list is empty (not loaded yet)
+                // Otherwise, show generic title to avoid showing wrong category name
+                if (provider.categories.isEmpty && provider.products.isNotEmpty) {
+                  // Find ALL products that belong to this category
+                  final matchingProducts = provider.products.where(
+                    (product) => product.category != null && 
+                                 product.category!.id == widget.categoryId,
+                  ).toList();
+                  
+                  if (matchingProducts.isNotEmpty) {
+                    // Use the category from the first matching product
+                    final matchingProduct = matchingProducts.first;
+                    if (matchingProduct.category != null && 
+                        matchingProduct.category!.id == widget.categoryId) {
                       displayTitle = matchingProduct.category!.name;
                       // Update cached name
                       if (_categoryName != matchingProduct.category!.name) {
@@ -160,10 +173,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     } else {
                       displayTitle = 'Products';
                     }
-                  } catch (e) {
+                  } else {
+                    // No products match this category ID
                     displayTitle = 'Products';
                   }
                 } else {
+                  // Categories list exists but category not found, or no products
+                  // Show generic title to avoid confusion
                   displayTitle = 'Products';
                 }
               }
@@ -197,22 +213,32 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     (cat) => cat.id == widget.categoryId,
                   );
                 } catch (e) {
-                  // If not in categories list, try to get from products (only if category ID matches)
-                  if (provider.products.isNotEmpty) {
-                    // Find a product that belongs to this category
-                    try {
-                      final matchingProduct = provider.products.firstWhere(
-                        (product) => product.category?.id == widget.categoryId,
-                      );
-                      if (matchingProduct.category != null && matchingProduct.category!.id == widget.categoryId) {
+                  // If not in categories list, only try to get from products if categories list is empty
+                  // This prevents showing wrong category when categories list exists but category not found
+                  if (provider.categories.isEmpty && provider.products.isNotEmpty) {
+                    // Find ALL products that belong to this category
+                    final matchingProducts = provider.products.where(
+                      (product) => product.category != null && 
+                                   product.category!.id == widget.categoryId,
+                    ).toList();
+                    
+                    if (matchingProducts.isNotEmpty) {
+                      // Use the category from the first matching product
+                      final matchingProduct = matchingProducts.first;
+                      if (matchingProduct.category != null && 
+                          matchingProduct.category!.id == widget.categoryId) {
                         category = matchingProduct.category;
+                      } else {
+                        // Category doesn't match, skip header
+                        return const SizedBox.shrink();
                       }
-                    } catch (e) {
+                    } else {
                       // No matching product found, skip header
                       return const SizedBox.shrink();
                     }
                   } else {
-                    // No products and category not in list, skip header
+                    // Categories list exists but category not found, or no products
+                    // Skip header to avoid showing wrong category
                     return const SizedBox.shrink();
                   }
                 }

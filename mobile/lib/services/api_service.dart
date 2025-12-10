@@ -4,24 +4,78 @@ import '../config/app_config.dart';
 
 class ApiService {
   static String get baseUrl => AppConfig.apiBaseUrl;
+  
+  // Callback to refresh token when it expires
+  Future<bool> Function()? onTokenExpired;
+  
+  // Prevent multiple simultaneous refresh attempts
+  bool _isRefreshing = false;
+  
+  ApiService({this.onTokenExpired});
 
-  Future<dynamic> get(String endpoint, {String? token}) async {
+  Future<dynamic> get(String endpoint, {String? token, bool retryOnExpired = true, String? Function()? getUpdatedToken}) async {
     try {
       final headers = <String, String>{
         'Content-Type': 'application/json',
       };
       
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
+      String? currentToken = token ?? getUpdatedToken?.call();
+      if (currentToken != null) {
+        headers['Authorization'] = 'Bearer $currentToken';
       }
 
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
+      ).timeout(
+        const Duration(seconds: 30), // 30 second timeout for API calls
+        onTimeout: () {
+          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
+        },
       );
 
       return _handleResponse(response);
+    } on TokenExpiredException catch (e) {
+      // Try to refresh token and retry once
+      if (retryOnExpired && await _handleTokenExpiration()) {
+        // Get updated token and retry
+        final newToken = getUpdatedToken?.call();
+        if (newToken != null && newToken != token) {
+          final headers = <String, String>{
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $newToken',
+          };
+          final response = await http.get(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: headers,
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw Exception('Request timeout: Server took too long to respond.');
+            },
+          );
+          return _handleResponse(response);
+        }
+      }
+      rethrow;
     } catch (e) {
+      // Re-throw if it's already a TokenExpiredException
+      if (e is TokenExpiredException) rethrow;
+      // Provide more detailed error information
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
+        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
+      }
+      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
+        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
+      }
+      if (errorString.contains('timeout')) {
+        throw Exception('Request timeout: Server took too long to respond');
+      }
+      if (errorString.contains('certificate') || errorString.contains('ssl') || errorString.contains('tls')) {
+        throw Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
+      }
+      // Otherwise wrap in generic exception with more context
       throw Exception('Network error: $e');
     }
   }
@@ -89,10 +143,31 @@ class ApiService {
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
         body: jsonEncode(data),
+      ).timeout(
+        const Duration(seconds: 30), // 30 second timeout for API calls
+        onTimeout: () {
+          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
+        },
       );
 
       return _handleResponse(response);
     } catch (e) {
+      // Re-throw if it's already a TokenExpiredException
+      if (e is TokenExpiredException) rethrow;
+      // Provide more detailed error information
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
+        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
+      }
+      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
+        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
+      }
+      if (errorString.contains('timeout')) {
+        throw Exception('Request timeout: Server took too long to respond');
+      }
+      if (errorString.contains('certificate') || errorString.contains('ssl') || errorString.contains('tls')) {
+        throw Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
+      }
       throw Exception('Network error: $e');
     }
   }
@@ -110,10 +185,31 @@ class ApiService {
       final response = await http.delete(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
+      ).timeout(
+        const Duration(seconds: 30), // 30 second timeout for API calls
+        onTimeout: () {
+          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
+        },
       );
 
       return _handleResponse(response);
     } catch (e) {
+      // Re-throw if it's already a TokenExpiredException
+      if (e is TokenExpiredException) rethrow;
+      // Provide more detailed error information
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
+        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
+      }
+      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
+        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
+      }
+      if (errorString.contains('timeout')) {
+        throw Exception('Request timeout: Server took too long to respond');
+      }
+      if (errorString.contains('certificate') || errorString.contains('ssl') || errorString.contains('tls')) {
+        throw Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
+      }
       throw Exception('Network error: $e');
     }
   }
@@ -147,6 +243,28 @@ class ApiService {
       } catch (e) {
         throw Exception('Request failed with status ${response.statusCode}: ${response.body}');
       }
+    }
+  }
+  
+  /// Handle token expiration with automatic refresh
+  Future<bool> _handleTokenExpiration() async {
+    // Prevent multiple simultaneous refresh attempts
+    if (_isRefreshing) {
+      // Wait a bit and check if refresh completed
+      await Future.delayed(const Duration(milliseconds: 500));
+      return !_isRefreshing; // Return true if refresh completed
+    }
+    
+    if (onTokenExpired == null) {
+      return false;
+    }
+    
+    _isRefreshing = true;
+    try {
+      final success = await onTokenExpired!();
+      return success;
+    } finally {
+      _isRefreshing = false;
     }
   }
 }

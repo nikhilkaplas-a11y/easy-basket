@@ -81,12 +81,15 @@ class ProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
+                    // Product Name - Fixed height to ensure visibility
+                    SizedBox(
+                      height: screenWidth < 360 ? 32 : 36,
                       child: Text(
                         product.name,
                         style: TextStyle(
                           fontSize: fontSize,
                           fontWeight: FontWeight.w600,
+                          color: AppTheme.black,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

@@ -19,7 +19,7 @@ class ProfileScreen extends StatelessWidget {
         slivers: [
           // App Bar with Gradient
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 220, // Increased to prevent name cutting
             floating: false,
             pinned: true,
             elevation: 0,
@@ -46,77 +46,65 @@ class ProfileScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Avatar with Edit Button
-                        Stack(
-                          children: [
-                            Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppTheme.white,
-                                border: Border.all(
-                                  color: AppTheme.white,
-                                  width: 4,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 48,
-                                backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
-                                child: Icon(
-                                  Icons.person_rounded,
-                                  size: 50,
-                                  color: AppTheme.primaryGreen,
-                                ),
-                              ),
+                        // Avatar (No Edit Button)
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.white,
+                            border: Border.all(
+                              color: AppTheme.white,
+                              width: 4,
                             ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryGreen,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppTheme.white,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.edit_rounded,
-                                  size: 16,
-                                  color: AppTheme.white,
-                                ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 20,
+                                offset: const Offset(0, 4),
                               ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 48,
+                            backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
+                            child: Icon(
+                              Icons.person_rounded,
+                              size: 50,
+                              color: AppTheme.primaryGreen,
                             ),
-                          ],
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          authProvider.user?.name ?? 'Customer',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.white,
-                            fontFamily: 'RoundedSans',
+                        // Name with proper constraints to prevent cutting
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            authProvider.user?.name ?? 'Customer',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.white,
+                              fontFamily: 'RoundedSans',
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          authProvider.user?.phoneNumber ?? '',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppTheme.white.withOpacity(0.9),
-                            fontFamily: 'RoundedSans',
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            authProvider.user?.phoneNumber ?? '',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppTheme.white.withOpacity(0.9),
+                              fontFamily: 'RoundedSans',
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

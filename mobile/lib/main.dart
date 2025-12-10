@@ -49,36 +49,85 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Create a shared function to set up API service with token refresh
+    ApiService createApiService(AuthProvider authProvider) {
+      final apiService = ApiService();
+      // Set up automatic token refresh callback
+      apiService.onTokenExpired = () async {
+        return await authProvider.refreshAccessToken();
+      };
+      return apiService;
+    }
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(
-            authService: AuthService(apiService: ApiService()),
-            prefs: prefs,
-          ),
+          create: (_) {
+            final apiService = ApiService();
+            final authService = AuthService(apiService: apiService);
+            final authProvider = AuthProvider(
+              authService: authService,
+              prefs: prefs,
+            );
+            // Set up automatic token refresh callback after provider is created
+            // We'll set it up in update callbacks for other providers
+            return authProvider;
+          },
         ),
         ChangeNotifierProvider(
           create: (_) => CartProvider()..initialize(),
         ),
         ChangeNotifierProxyProvider<AuthProvider, ProductProvider>(
           create: (_) => ProductProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) =>
-              previous ?? ProductProvider(apiService: ApiService()),
+          update: (_, authProvider, previous) {
+            if (previous != null) {
+              // Update existing provider's API service callback
+              previous.apiService.onTokenExpired = () async {
+                return await authProvider.refreshAccessToken();
+              };
+              return previous;
+            }
+            return ProductProvider(apiService: createApiService(authProvider));
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, OrderProvider>(
           create: (_) => OrderProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) =>
-              previous ?? OrderProvider(apiService: ApiService()),
+          update: (_, authProvider, previous) {
+            if (previous != null) {
+              // Update existing provider's API service callback
+              previous.apiService.onTokenExpired = () async {
+                return await authProvider.refreshAccessToken();
+              };
+              return previous;
+            }
+            return OrderProvider(apiService: createApiService(authProvider));
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, DeliveryProvider>(
           create: (_) => DeliveryProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) =>
-              previous ?? DeliveryProvider(apiService: ApiService()),
+          update: (_, authProvider, previous) {
+            if (previous != null) {
+              // Update existing provider's API service callback
+              previous.apiService.onTokenExpired = () async {
+                return await authProvider.refreshAccessToken();
+              };
+              return previous;
+            }
+            return DeliveryProvider(apiService: createApiService(authProvider));
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, AdminProvider>(
           create: (_) => AdminProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) =>
-              previous ?? AdminProvider(apiService: ApiService()),
+          update: (_, authProvider, previous) {
+            if (previous != null) {
+              // Update existing provider's API service callback
+              previous.apiService.onTokenExpired = () async {
+                return await authProvider.refreshAccessToken();
+              };
+              return previous;
+            }
+            return AdminProvider(apiService: createApiService(authProvider));
+          },
         ),
         ChangeNotifierProvider(
           create: (_) => ServiceAreaProvider(),

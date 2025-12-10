@@ -842,7 +842,9 @@ class _CategorySliderCard extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 6),
-            Flexible(
+            // Category Name - Fixed height to prevent overlap
+            SizedBox(
+              height: 32, // Fixed height to ensure name doesn't overlap
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(

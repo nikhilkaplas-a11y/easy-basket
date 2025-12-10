@@ -18,13 +18,23 @@ class OrderProvider with ChangeNotifier {
 
   OrderProvider({required this.apiService});
 
-  Future<void> fetchOrders(String token) async {
+  Future<void> fetchOrders(String token, {String? Function()? getUpdatedToken}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await apiService.get('/orders', token: token);
+      if (kDebugMode) {
+        print('🔄 Fetching orders from API...');
+      }
+      
+      // API service will automatically handle token refresh if needed
+      final response = await apiService.get(
+        '/orders', 
+        token: token,
+        getUpdatedToken: getUpdatedToken,
+      );
+      
       // Backend returns array directly: res.json(orders)
       final List<dynamic> data = response is List ? response : [];
       _orders = data.map((json) {
@@ -32,19 +42,21 @@ class OrderProvider with ChangeNotifier {
           return OrderModel.fromJson(json as Map<String, dynamic>);
         } catch (e) {
           if (kDebugMode) {
-            print('Error parsing order: $e');
+            print('❌ Error parsing order: $e');
             print('Order data: $json');
           }
           rethrow;
         }
       }).toList();
       if (kDebugMode) {
-        print('✅ Fetched ${_orders.length} orders');
+        print('✅ Fetched ${_orders.length} orders successfully');
       }
     } catch (e) {
-      _error = e.toString().replaceAll('Exception: ', '');
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      _error = errorMessage;
       if (kDebugMode) {
-        print('❌ Error fetching orders: $_error');
+        print('❌ Error fetching orders: $errorMessage');
+        print('Full error: $e');
       }
     } finally {
       _isLoading = false;

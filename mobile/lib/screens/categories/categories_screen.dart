@@ -6,8 +6,33 @@ import '../../models/category_model.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 
-class CategoriesScreen extends StatelessWidget {
+class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
+
+  @override
+  State<CategoriesScreen> createState() => _CategoriesScreenState();
+}
+
+class _CategoriesScreenState extends State<CategoriesScreen> {
+  bool _hasLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Always refresh categories when screen opens to ensure fresh data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+    });
+  }
+
+  void _loadCategories() {
+    if (_hasLoaded) return;
+    
+    final provider = Provider.of<ProductProvider>(context, listen: false);
+    _hasLoaded = true;
+    // Always fetch fresh categories to avoid stale data
+    provider.fetchCategories();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,22 +88,35 @@ class CategoriesScreen extends StatelessWidget {
           final responsive = Responsive(context);
           final screenWidth = MediaQuery.of(context).size.width;
           final crossAxisCount = responsive.getCategoryGridColumns();
-          // Optimized aspect ratio for icon + name (removed description to prevent overflow)
-          final aspectRatio = screenWidth < 360 ? 0.85 : 0.80;
+          // Optimized aspect ratio for icon + name - increased to prevent overlap
+          // Icon (55px) + spacing (10px) + name (40px) + padding (24px) = ~129px needed
+          // For width ~110px, aspect ratio should be ~0.85
+          final aspectRatio = screenWidth < 360 ? 0.90 : 0.85;
 
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              childAspectRatio: aspectRatio,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: provider.categories.length,
-            itemBuilder: (context, index) {
-              final category = provider.categories[index];
-              return _CategoryCard(category: category);
+          return RefreshIndicator(
+            onRefresh: () async {
+              final provider = Provider.of<ProductProvider>(context, listen: false);
+              await provider.fetchCategories();
             },
+            color: AppTheme.primaryGreen,
+            child: GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                childAspectRatio: aspectRatio,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: provider.categories.length,
+              itemBuilder: (context, index) {
+                final category = provider.categories[index];
+                // Validate category has valid data before displaying
+                if (category.name.isEmpty || category.id <= 0) {
+                  return const SizedBox.shrink();
+                }
+                return _CategoryCard(category: category);
+              },
+            ),
           );
         },
       ),
@@ -113,11 +151,12 @@ class _CategoryCard extends StatelessWidget {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon Section
+              // Icon Section - Fixed size
               Container(
                 width: iconSize,
                 height: iconSize,
@@ -154,21 +193,24 @@ class _CategoryCard extends StatelessWidget {
                       ),
               ),
               const SizedBox(height: 10),
-              // Category Name - Always visible with fixed height
+              // Category Name - Fixed height to prevent overlap
               SizedBox(
-                height: 36, // Fixed height to ensure name is always visible
+                height: 38, // Fixed height to ensure name doesn't overlap
                 child: Center(
-                  child: Text(
-                    category.name,
-                    style: TextStyle(
-                      fontSize: responsive.fontSize(13),
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.black,
-                      fontFamily: 'RoundedSans',
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      category.name.isNotEmpty ? category.name : 'Category',
+                      style: TextStyle(
+                        fontSize: responsive.fontSize(13),
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.black,
+                        fontFamily: 'RoundedSans',
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
