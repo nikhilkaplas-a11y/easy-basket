@@ -23,6 +23,9 @@ export class User {
   @Column({ nullable: true })
   email!: string;
 
+  @Column({ type: 'date', nullable: true })
+  birthday!: Date | null;
+
   @Column({ default: 'customer' }) // customer, admin, delivery
   role!: string;
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../providers/order_provider.dart';
 import '../../utils/theme.dart';
 
 class ServiceNotAvailableScreen extends StatelessWidget {
@@ -8,6 +10,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
   final String? state;
   final String? country;
   final String? returnTo; // Where to return after changing address
+  final bool isOnboarding; // True if this is shown during onboarding (no addresses yet)
 
   const ServiceNotAvailableScreen({
     super.key,
@@ -16,25 +19,34 @@ class ServiceNotAvailableScreen extends StatelessWidget {
     this.state,
     this.country,
     this.returnTo,
+    this.isOnboarding = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Check if user has addresses (to determine if this is onboarding)
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    final hasAddresses = orderProvider.addresses.isNotEmpty;
+    final isOnboardingFlow = isOnboarding || !hasAddresses;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Service Not Available'),
-        automaticallyImplyLeading: true, // Enable back button
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate back or to home
-            if (returnTo != null) {
-              context.go(returnTo!);
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        // During onboarding, don't show back button (user must add address)
+        automaticallyImplyLeading: !isOnboardingFlow,
+        leading: isOnboardingFlow
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  // Navigate back or to home
+                  if (returnTo != null) {
+                    context.go(returnTo!);
+                  } else {
+                    context.go('/home');
+                  }
+                },
+              ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -152,19 +164,26 @@ class ServiceNotAvailableScreen extends StatelessWidget {
               
               const SizedBox(height: 40),
               
-              // Primary Action Button - Change Address (Blinkit style)
+              // Primary Action Button - Add/Change Address
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Navigate to address list to change address
-                    // Use push to maintain navigation stack so back button works
-                    context.push('/addresses');
+                    if (isOnboardingFlow) {
+                      // During onboarding, go directly to add address screen
+                      context.push('/address/add');
+                    } else {
+                      // If user has addresses, go to address list
+                      context.push('/addresses');
+                    }
                   },
-                  icon: const Icon(Icons.location_on, size: 22),
-                  label: const Text(
-                    'Change Address',
-                    style: TextStyle(
+                  icon: Icon(
+                    isOnboardingFlow ? Icons.add_location : Icons.location_on,
+                    size: 22,
+                  ),
+                  label: Text(
+                    isOnboardingFlow ? 'Add Serviceable Address' : 'Change Address',
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -180,34 +199,36 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
               
-              // Secondary Action Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Go back to home - use go to replace current screen
-                    context.go('/home');
-                  },
-                  icon: const Icon(Icons.home_outlined, size: 20),
-                  label: const Text(
-                    'Go to Home',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+              // Only show "Go to Home" button if user already has addresses (not onboarding)
+              if (!isOnboardingFlow) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // Go back to home - use go to replace current screen
+                      context.go('/home');
+                    },
+                    icon: const Icon(Icons.home_outlined, size: 20),
+                    label: const Text(
+                      'Go to Home',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primaryGreen,
-                    side: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryGreen,
+                      side: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
               
               const SizedBox(height: 40),
               

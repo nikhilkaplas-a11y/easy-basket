@@ -5,6 +5,7 @@ import { AppDataSource } from '../config/database';
 import { FCMService } from '../services/fcm.service';
 import { User } from '../entities/User';
 import { RefreshToken } from '../entities/RefreshToken';
+import { AuthRequest } from '../middleware/auth.middleware';
 import jwt from 'jsonwebtoken';
 
 export class AuthController {
@@ -98,6 +99,7 @@ export class AuthController {
           phoneNumber: user.phoneNumber,
           name: user.name,
           email: user.email,
+          birthday: user.birthday ? user.birthday.toISOString().split('T')[0] : null,
           role: user.role,
         },
       });
@@ -114,9 +116,9 @@ export class AuthController {
     }
   }
 
-  static async updateProfile(req: Request, res: Response): Promise<void> {
-    const { name, email, fcmToken } = req.body;
-    const userId = (req as any).user?.id;
+  static async updateProfile(req: AuthRequest, res: Response): Promise<void> {
+    const { name, email, birthday, fcmToken } = req.body;
+    const userId = req.user?.id;
 
     if (!userId) {
       res.status(401).json({ message: 'Authentication required' });
@@ -132,8 +134,16 @@ export class AuthController {
         return;
       }
 
-      if (name) user.name = name;
-      if (email) user.email = email;
+      if (name !== undefined) user.name = name;
+      if (email !== undefined) user.email = email;
+      if (birthday !== undefined) {
+        // Parse birthday string to Date if provided, or set to null to clear
+        if (birthday === null || birthday === '') {
+          user.birthday = null;
+        } else {
+          user.birthday = new Date(birthday);
+        }
+      }
       if (fcmToken) user.fcmToken = fcmToken;
 
       await userRepository.save(user);
@@ -145,6 +155,7 @@ export class AuthController {
           phoneNumber: user.phoneNumber,
           name: user.name,
           email: user.email,
+          birthday: user.birthday ? user.birthday.toISOString().split('T')[0] : null,
           role: user.role,
         },
       });

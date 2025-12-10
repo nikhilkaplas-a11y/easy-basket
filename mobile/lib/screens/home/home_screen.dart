@@ -7,9 +7,9 @@ import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/service_area_provider.dart';
+import '../../services/location_onboarding_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
-import '../../widgets/category_card.dart';
 import '../../widgets/product_card.dart';
 import '../../models/category_model.dart';
 
@@ -36,10 +36,13 @@ class _HomeScreenState extends State<HomeScreen> {
       
       // Fetch addresses if user is authenticated
       if (authProvider.token != null) {
-        orderProvider.fetchAddresses(authProvider.token!).then((_) {
-          // If no addresses, redirect to location detection (handled by router)
+        orderProvider.fetchAddresses(authProvider.token!).then((_) async {
+          // If no addresses, auto-detect location in background (seamless onboarding)
           if (orderProvider.addresses.isEmpty && mounted) {
-            context.go('/onboarding/location');
+            await _autoDetectLocationForNewUser(
+              orderProvider: orderProvider,
+              authProvider: authProvider,
+            );
             return;
           }
           // Check service availability for default address after addresses are loaded
@@ -47,6 +50,74 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
+  }
+
+  /// Auto-detect location for new users (seamless onboarding)
+  /// Only shows screen if service not available
+  Future<void> _autoDetectLocationForNewUser({
+    required OrderProvider orderProvider,
+    required AuthProvider authProvider,
+  }) async {
+    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+    
+    // Auto-detect and save location in background
+    final result = await LocationOnboardingService.autoDetectAndSaveLocation(
+      orderProvider: orderProvider,
+      authProvider: authProvider,
+      serviceAreaProvider: serviceAreaProvider,
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      // Location detected - show edit screen for user to review/refine (Blinkit-style)
+      if (result['addressData'] != null && mounted) {
+        // Navigate to add address screen with pre-filled data
+        context.push(
+          '/address/add',
+          extra: result['addressData'] as Map<String, dynamic>,
+        );
+      } else {
+        // Fallback: if no address data, refresh and show success
+        await orderProvider.fetchAddresses(authProvider.token!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('Location detected! Start shopping now.'),
+                ],
+              ),
+              backgroundColor: AppTheme.primaryGreen,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } else if (result['showScreen'] == true) {
+      if (result['permissionDenied'] == true) {
+        // Permission denied - show permission explanation screen
+        context.go('/onboarding/location-permission');
+      } else {
+        // Service not available - show service not available screen
+        // Mark as onboarding since user has no addresses yet
+        context.go(
+          '/service-not-available',
+          extra: {
+            'pincode': result['pincode'],
+            'city': result['city'],
+            'state': result['state'],
+            'country': result['country'] ?? 'India',
+            'returnTo': '/home',
+            'isOnboarding': true, // Mark as onboarding flow
+          },
+        );
+      }
+    }
+    // If error but don't show screen, user can add address manually via address bar
   }
 
   /// Check if the default address is serviceable
@@ -120,51 +191,125 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         backgroundColor: AppTheme.primaryGreen,
         iconTheme: const IconThemeData(color: AppTheme.white),
-        title: const Text(
-          'Easy Basket',
-          style: TextStyle(
-            color: AppTheme.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Stack(
-              children: [
-                const Icon(Icons.shopping_cart, color: AppTheme.white),
-                if (cartProvider.itemCount > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryYellow,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        '${cartProvider.itemCount}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppTheme.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryGreen,
+                AppTheme.primaryGreen.withOpacity(0.85),
               ],
             ),
-            onPressed: () => context.push('/cart'),
           ),
+        ),
+        title: Row(
+          children: [
+            // Logo/Icon
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppTheme.white.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.shopping_basket_rounded,
+                color: AppTheme.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // App Name with better typography
+            const Text(
+              'Easy Basket',
+              style: TextStyle(
+                color: AppTheme.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // Cart Icon with badge
+          Stack(
+            children: [
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.shopping_cart_rounded,
+                    color: AppTheme.white,
+                    size: 22,
+                  ),
+                ),
+                onPressed: () => context.push('/cart'),
+              ),
+              if (cartProvider.itemCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryYellow,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.white,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      '${cartProvider.itemCount}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          // Profile Icon
           IconButton(
-            icon: const Icon(Icons.person_outline, color: AppTheme.white),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.person_outline_rounded,
+                color: AppTheme.white,
+                size: 22,
+              ),
+            ),
             onPressed: () => context.push('/profile'),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: RefreshIndicator(
@@ -195,90 +340,198 @@ class _HomeScreenState extends State<HomeScreen> {
                       : null;
                   final hasNoAddress = orderProvider.addresses.isEmpty;
 
+                  // Address Bar - Clean & Elegant Design (Blinkit/Zomato Style)
                   return Container(
-                        width: double.infinity,
-                        color: AppTheme.primaryGreen,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        child: GestureDetector(
-                          onTap: () => context.push('/addresses'),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      defaultAddress != null
-                                          ? 'Deliver to'
-                                          : 'Add delivery address',
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    decoration: BoxDecoration(
+                      color: hasNoAddress
+                          ? Colors.orange.shade50
+                          : AppTheme.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: hasNoAddress
+                            ? Colors.orange.shade200
+                            : AppTheme.primaryGreen.withOpacity(0.2),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: GestureDetector(
+                      onTap: () {
+                        if (hasNoAddress) {
+                          context.push('/address/add');
+                        } else {
+                          context.push('/addresses');
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          // Location Icon
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: hasNoAddress
+                                  ? Colors.orange.shade100
+                                  : AppTheme.primaryGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.location_on_rounded,
+                              color: hasNoAddress
+                                  ? Colors.orange.shade700
+                                  : AppTheme.primaryGreen,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Address Text
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (defaultAddress != null && defaultAddress.tag != null)
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryGreen.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      defaultAddress.tag!.toUpperCase(),
                                       style: TextStyle(
-                                        color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
-                                        fontSize: 12,
-                                        fontWeight: hasNoAddress ? FontWeight.bold : FontWeight.normal,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primaryGreen,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      defaultAddress != null
-                                          ? defaultAddress.addressLine1.length > 40
-                                              ? '${defaultAddress.addressLine1.substring(0, 40)}...'
-                                              : defaultAddress.addressLine1
-                                          : 'Tap to add address',
+                                  ),
+                                Text(
+                                  defaultAddress != null
+                                      ? defaultAddress.addressLine1.length > 45
+                                          ? '${defaultAddress.addressLine1.substring(0, 45)}...'
+                                          : defaultAddress.addressLine1
+                                      : 'Add delivery address',
+                                  style: TextStyle(
+                                    color: hasNoAddress
+                                        ? Colors.orange.shade900
+                                        : AppTheme.black,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.1,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (defaultAddress != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      '${defaultAddress.city}, ${defaultAddress.state}',
                                       style: TextStyle(
-                                        color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        color: AppTheme.grey,
+                                        fontWeight: FontWeight.w400,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: hasNoAddress ? AppTheme.primaryYellow : AppTheme.white,
-                                size: 16,
-                              ),
-                            ],
+                                  )
+                                else if (hasNoAddress)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      'Required to place orders',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange.shade700,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
+                          const SizedBox(width: 8),
+                          // Arrow Icon
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: hasNoAddress
+                                ? Colors.orange.shade700
+                                : AppTheme.primaryGreen,
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 },
               ),
-              // Search Bar
+              // Search Bar - Premium Design
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 color: AppTheme.white,
                 child: GestureDetector(
                   onTap: () => context.push('/products'),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                     decoration: BoxDecoration(
-                      color: AppTheme.lightGrey,
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.lightGrey.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppTheme.lightGrey.withOpacity(0.5),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.search, color: AppTheme.grey),
-                        const SizedBox(width: 12),
+                        Icon(
+                          Icons.search_rounded,
+                          color: AppTheme.grey.withOpacity(0.7),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Text(
                             'Search for products...',
                             style: TextStyle(
-                              color: AppTheme.grey,
-                              fontSize: 16,
+                              color: AppTheme.grey.withOpacity(0.8),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                         ),
-                        Icon(Icons.mic, color: AppTheme.grey, size: 20),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.mic_rounded,
+                            color: AppTheme.primaryGreen,
+                            size: 18,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -411,29 +664,62 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Featured Products',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.black,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () => context.push('/products'),
-                              child: const Text(
-                                'View All',
-                                style: TextStyle(
-                                  color: AppTheme.primaryGreen,
-                                  fontWeight: FontWeight.w600,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 4,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryGreen,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Featured Products',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.black,
+                                        fontFamily: 'RoundedSans',
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
+                                TextButton(
+                                  onPressed: () => context.push('/products'),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'View All',
+                                        style: TextStyle(
+                                          color: AppTheme.primaryGreen,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 14,
+                                        color: AppTheme.primaryGreen,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
                         // Info message for users without address
                         if (hasNoAddress)
                           Container(

@@ -21,6 +21,7 @@ class LocationDetectionScreen extends StatefulWidget {
 
 class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
   bool _isDetecting = true;
+  bool _isRefining = false; // Track if we're refining location in background
   bool _hasError = false;
   String? _errorMessage;
   String? _detectedCity;
@@ -36,6 +37,12 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
     _detectLocation();
   }
 
+  /// Optimized location detection - like Blinkit (fast and smooth)
+  /// Strategy:
+  /// 1. Use last known position first (instant)
+  /// 2. Show location immediately
+  /// 3. Refine in background with better accuracy
+  /// 4. Check service availability in parallel (non-blocking)
   Future<void> _detectLocation() async {
     setState(() {
       _isDetecting = true;
@@ -75,27 +82,74 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
         return;
       }
 
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      // STEP 1: Get last known position FIRST (instant, no waiting)
+      // This gives us immediate location to show user
+      Position? lastPosition;
+      try {
+        lastPosition = await Geolocator.getLastKnownPosition();
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ No last known position: $e');
+        }
+      }
 
-      _latitude = position.latitude;
-      _longitude = position.longitude;
+      // STEP 2: If we have last known position, show it immediately
+      if (lastPosition != null) {
+        _latitude = lastPosition.latitude;
+        _longitude = lastPosition.longitude;
+        
+        // Get address from last known position (fast, shows immediately)
+        _processLocationData(lastPosition.latitude, lastPosition.longitude, isInitial: true);
+        
+        // STEP 3: Refine location in background (non-blocking)
+        // Use lower accuracy for speed, then refine if needed
+        _refineLocationInBackground();
+      } else {
+        // No last known position, get fresh location
+        // Use LOW accuracy first for speed (like Blinkit)
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low, // Fast, good enough for initial detection
+          timeLimit: const Duration(seconds: 5), // Shorter timeout
+        );
 
-      // Get address from coordinates
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        
+        // Process and show immediately
+        await _processLocationData(position.latitude, position.longitude, isInitial: true);
+        
+        // Refine in background if needed
+        _refineLocationInBackground();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error detecting location: $e');
+      }
+      setState(() {
+        _isDetecting = false;
+        _hasError = true;
+        _errorMessage = 'Error detecting location. Please try again or add address manually.';
+      });
+    }
+  }
+
+  /// Process location data and update UI immediately
+  Future<void> _processLocationData(double lat, double lng, {bool isInitial = false}) async {
+    try {
+      // Get address from coordinates (this is the slow part, but we show loading)
       List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
+        lat,
+        lng,
       );
 
       if (placemarks.isEmpty) {
-        setState(() {
-          _isDetecting = false;
-          _hasError = true;
-          _errorMessage = 'Could not detect your location. Please add address manually.';
-        });
+        if (isInitial) {
+          setState(() {
+            _isDetecting = false;
+            _hasError = true;
+            _errorMessage = 'Could not detect your location. Please add address manually.';
+          });
+        }
         return;
       }
 
@@ -129,32 +183,88 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
           ? addressParts.join(', ')
           : (city ?? 'Your Location');
 
+      // Update UI immediately (user sees location right away)
       setState(() {
         _detectedCity = city;
         _detectedState = state;
         _detectedPincode = pincode;
         _addressLine1 = addressLine1;
+        _latitude = lat;
+        _longitude = lng;
         _isDetecting = false;
       });
 
-      // Check service availability for detected pincode
-      if (pincode != null && pincode.isNotEmpty) {
+      // Check service availability in background (non-blocking)
+      if (pincode != null && pincode.isNotEmpty && mounted) {
         final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
-        await serviceAreaProvider.checkServiceAvailability(
+        // Don't await - let it run in background
+        serviceAreaProvider.checkServiceAvailability(
           pincode: pincode,
           country: 'India',
-        );
+        ).catchError((e) {
+          if (kDebugMode) {
+            print('⚠️ Service check error (non-blocking): $e');
+          }
+        });
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error detecting location: $e');
+        print('❌ Error processing location: $e');
       }
-      setState(() {
-        _isDetecting = false;
-        _hasError = true;
-        _errorMessage = 'Error detecting location. Please try again or add address manually.';
-      });
+      if (isInitial) {
+        setState(() {
+          _isDetecting = false;
+          _hasError = true;
+          _errorMessage = 'Error processing location. Please try again.';
+        });
+      }
     }
+  }
+
+  /// Refine location in background with better accuracy (non-blocking)
+  void _refineLocationInBackground() {
+    if (!mounted) return;
+    
+    setState(() => _isRefining = true);
+    
+    // Run in background without blocking UI
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
+      
+      try {
+        // Get more accurate position in background
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium, // Better accuracy, but still fast
+          timeLimit: const Duration(seconds: 8),
+        );
+
+        // Only update if significantly different (avoid unnecessary updates)
+        if (_latitude != null && _longitude != null) {
+          final distance = Geolocator.distanceBetween(
+            _latitude!,
+            _longitude!,
+            position.latitude,
+            position.longitude,
+          );
+          
+          // Only update if moved more than 100 meters (significant change)
+          if (distance > 100) {
+            await _processLocationData(position.latitude, position.longitude, isInitial: false);
+          }
+        } else {
+          await _processLocationData(position.latitude, position.longitude, isInitial: false);
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Background refinement failed (non-critical): $e');
+        }
+        // Don't show error - initial location is good enough
+      } finally {
+        if (mounted) {
+          setState(() => _isRefining = false);
+        }
+      }
+    });
   }
 
   Future<void> _confirmAndSave() async {
@@ -304,14 +414,21 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
               if (_isDetecting)
                 Column(
                   children: [
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                    // Smooth, non-jumpy loading indicator
+                    const SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                        strokeWidth: 3,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Please wait while we detect your delivery area',
+                      'Detecting your location...',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.grey,
+                            fontSize: 14,
                           ),
                       textAlign: TextAlign.center,
                     ),
@@ -431,6 +548,16 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                                     ],
                                   ),
                                 ),
+                                // Show subtle indicator if refining in background
+                                if (_isRefining)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                                    ),
+                                  ),
                               ],
                             ),
                           ],

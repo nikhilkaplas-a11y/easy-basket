@@ -124,7 +124,12 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile({String? name, String? email, String? fcmToken}) async {
+  Future<void> updateProfile({
+    String? name,
+    String? email,
+    DateTime? birthday,
+    String? fcmToken,
+  }) async {
     if (_accessToken == null) return;
 
     _isLoading = true;
@@ -136,6 +141,7 @@ class AuthProvider with ChangeNotifier {
         token: _accessToken!,
         name: name,
         email: email,
+        birthday: birthday != null ? birthday.toIso8601String().split('T')[0] : null,
         fcmToken: fcmToken,
       );
       final userJsonString = jsonEncode(_user!.toJson());

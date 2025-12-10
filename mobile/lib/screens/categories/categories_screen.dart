@@ -113,10 +113,9 @@ class _CategoryCard extends StatelessWidget {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.all(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
             children: [
               // Icon Section
               Container(
@@ -125,6 +124,13 @@ class _CategoryCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryGreen.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: category.imageUrl != null
                     ? ClipRRect(
@@ -135,32 +141,35 @@ class _CategoryCard extends StatelessWidget {
                           height: iconSize,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Icon(
-                            Icons.category,
+                            Icons.category_rounded,
                             size: responsive.iconSize(28),
                             color: AppTheme.primaryGreen,
                           ),
                         ),
                       )
                     : Icon(
-                        Icons.category,
+                        Icons.category_rounded,
                         size: responsive.iconSize(28),
                         color: AppTheme.primaryGreen,
                       ),
               ),
-              const SizedBox(height: 8),
-              // Category Name - Always visible
-              Flexible(
-                child: Text(
-                  category.name,
-                  style: TextStyle(
-                    fontSize: responsive.fontSize(12),
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.black,
-                    fontFamily: 'RoundedSans',
+              const SizedBox(height: 10),
+              // Category Name - Always visible with fixed height
+              SizedBox(
+                height: 36, // Fixed height to ensure name is always visible
+                child: Center(
+                  child: Text(
+                    category.name,
+                    style: TextStyle(
+                      fontSize: responsive.fontSize(13),
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.black,
+                      fontFamily: 'RoundedSans',
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

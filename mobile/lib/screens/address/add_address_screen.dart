@@ -9,7 +9,10 @@ import '../../utils/theme.dart';
 import 'map_address_picker_screen.dart';
 
 class AddAddressScreen extends StatefulWidget {
-  const AddAddressScreen({super.key});
+  // Optional pre-filled data for auto-detected addresses (Blinkit-style)
+  final Map<String, dynamic>? preFilledData;
+
+  const AddAddressScreen({super.key, this.preFilledData});
 
   @override
   State<AddAddressScreen> createState() => _AddAddressScreenState();
@@ -41,6 +44,59 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     {'value': 'office', 'label': 'Office', 'icon': Icons.work, 'color': Colors.orange},
     {'value': 'other', 'label': 'Other', 'icon': Icons.location_on, 'color': Colors.purple},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill data if provided (from auto-detection)
+    if (widget.preFilledData != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _preFillAddressData(widget.preFilledData!);
+      });
+    }
+  }
+
+  void _preFillAddressData(Map<String, dynamic> data) {
+    setState(() {
+      if (data['addressLine1'] != null) {
+        _addressLine1Controller.text = data['addressLine1'] as String;
+      }
+      if (data['addressLine2'] != null) {
+        _addressLine2Controller.text = data['addressLine2'] as String;
+      }
+      if (data['city'] != null) {
+        _cityController.text = data['city'] as String;
+      }
+      if (data['state'] != null) {
+        _stateController.text = data['state'] as String;
+      }
+      if (data['pincode'] != null) {
+        _pincodeController.text = data['pincode'] as String;
+      }
+      if (data['landmark'] != null) {
+        _landmarkController.text = data['landmark'] as String;
+      }
+      if (data['latitude'] != null) {
+        _latitude = data['latitude'] as String;
+      }
+      if (data['longitude'] != null) {
+        _longitude = data['longitude'] as String;
+      }
+      if (data['selectedAddressText'] != null) {
+        _selectedAddressText = data['selectedAddressText'] as String;
+      }
+      if (data['tag'] != null) {
+        _selectedTag = data['tag'] as String;
+      }
+      if (data['isDefault'] == true) {
+        _isDefault = true;
+      }
+      // Skip to details step if data is pre-filled (Blinkit-style)
+      if (data['skipToDetails'] == true) {
+        _currentStep = 1; // Go directly to details step
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -413,6 +469,30 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 ],
               ),
             ),
+
+            // Auto-detected Address Banner (Blinkit-style)
+            if (widget.preFilledData != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: Colors.blue.shade50,
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.blue.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'We detected your location! Please review and refine the details below.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Content
             Expanded(

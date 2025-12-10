@@ -75,11 +75,13 @@ class AuthService {
     required String token,
     String? name,
     String? email,
+    String? birthday,
     String? fcmToken,
   }) async {
     final data = <String, dynamic>{};
     if (name != null) data['name'] = name;
     if (email != null) data['email'] = email;
+    if (birthday != null) data['birthday'] = birthday;
     if (fcmToken != null) data['fcmToken'] = fcmToken;
 
     final response = await apiService.put('/auth/profile', data, token: token);

@@ -91,40 +91,47 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.lightGrey.withOpacity(0.3),
+      backgroundColor: AppTheme.white, // Changed from lightGrey.withOpacity(0.3) to white
       appBar: AppBar(
         elevation: 0,
+        backgroundColor: AppTheme.white,
+        iconTheme: const IconThemeData(color: AppTheme.black),
         title: Text(
           'Order #${order.id}',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontFamily: 'RoundedSans',
+            color: AppTheme.black,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.black),
           onPressed: () => context.pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Status Header Card
-            _buildStatusHeader(order),
-            const SizedBox(height: 16),
-            // Order Timeline
-            _buildOrderTimeline(order),
-            const SizedBox(height: 16),
-            // Order Items
-            _buildOrderItems(order, currencyFormat),
-            const SizedBox(height: 16),
-            // Delivery Address
-            _buildDeliveryAddress(order),
-            const SizedBox(height: 16),
-            // Payment & Order Summary
-            _buildPaymentSummary(order, currencyFormat),
-            const SizedBox(height: 16),
-          ],
+      body: Container(
+        color: AppTheme.white, // Clean white background instead of grey
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 16), // Add bottom padding
+          child: Column(
+            children: [
+              // Status Header Card
+              _buildStatusHeader(order),
+              const SizedBox(height: 12),
+              // Order Timeline
+              _buildOrderTimeline(order),
+              const SizedBox(height: 12),
+              // Order Items
+              _buildOrderItems(order, currencyFormat),
+              const SizedBox(height: 12),
+              // Delivery Address
+              _buildDeliveryAddress(order),
+              const SizedBox(height: 12),
+              // Payment & Order Summary
+              _buildPaymentSummary(order, currencyFormat),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );
@@ -136,12 +143,23 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
         gradient: LinearGradient(
           colors: [
-            statusColor.withOpacity(0.2),
-            statusColor.withOpacity(0.05),
+            statusColor.withOpacity(0.12),
+            statusColor.withOpacity(0.04),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -213,9 +231,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
           ),
         ],
       ),
@@ -298,9 +317,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
           ),
         ],
       ),
@@ -326,8 +346,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.lightGrey.withOpacity(0.3),
+                  color: AppTheme.lightGrey.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.lightGrey.withOpacity(0.5),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -446,9 +470,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
           ),
         ],
       ),
@@ -473,9 +498,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.lightGrey.withOpacity(0.3),
+              color: AppTheme.primaryGreen.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.lightGrey),
+              border: Border.all(
+                color: AppTheme.primaryGreen.withOpacity(0.2),
+                width: 1.5,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,9 +551,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
           ),
         ],
       ),

@@ -224,15 +224,22 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 final productCount = provider.products.length;
                 
                 return Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withOpacity(0.05),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: AppTheme.lightGrey.withOpacity(0.3),
-                        width: 1,
-                      ),
+                    color: AppTheme.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withOpacity(0.2),
+                      width: 1.5,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
@@ -315,19 +322,28 @@ class _ProductListScreenState extends State<ProductListScreen> {
               },
             ),
           // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search products...',
                 hintStyle: TextStyle(
-                  color: AppTheme.grey.withOpacity(0.5),
+                  color: AppTheme.grey.withOpacity(0.6),
+                  fontSize: 15,
                 ),
-                prefixIcon: const Icon(Icons.search, color: AppTheme.grey),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppTheme.grey.withOpacity(0.7),
+                  size: 22,
+                ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: AppTheme.grey),
+                        icon: Icon(
+                          Icons.clear_rounded,
+                          color: AppTheme.grey,
+                          size: 20,
+                        ),
                         onPressed: () {
                           _searchController.clear();
                           _searchProducts('');
@@ -335,12 +351,29 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: AppTheme.lightGrey.withOpacity(0.3),
+                fillColor: AppTheme.lightGrey.withOpacity(0.6),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppTheme.lightGrey.withOpacity(0.5),
+                    width: 1,
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppTheme.lightGrey.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppTheme.primaryGreen,
+                    width: 1.5,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               ),
               onChanged: _searchProducts,
             ),

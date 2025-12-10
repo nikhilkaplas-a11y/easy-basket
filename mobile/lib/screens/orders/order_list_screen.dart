@@ -510,18 +510,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
-      backgroundColor: AppTheme.lightGrey.withOpacity(0.3),
+      backgroundColor: AppTheme.white, // Clean white background
       appBar: AppBar(
         elevation: 0,
+        backgroundColor: AppTheme.white,
+        iconTheme: const IconThemeData(color: AppTheme.black),
         title: const Text(
           'My Orders',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontFamily: 'RoundedSans',
+            color: AppTheme.black,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.black),
           onPressed: () => context.go('/home'),
         ),
       ),
@@ -669,15 +672,16 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final statusIcon = _getStatusIcon(order.status);
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
           ),
         ],
       ),

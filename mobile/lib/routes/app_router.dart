@@ -17,6 +17,7 @@ import '../screens/payment/payment_status_screen.dart';
 import '../screens/orders/order_tracking_screen.dart';
 import '../screens/orders/order_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/edit_profile_screen.dart';
 import '../screens/delivery/delivery_dashboard_screen.dart';
 import '../screens/delivery/delivery_orders_screen.dart';
 import '../screens/delivery/delivery_order_detail_screen.dart';
@@ -30,6 +31,7 @@ import '../screens/admin/add_edit_category_screen.dart';
 import '../screens/admin/add_edit_product_screen.dart';
 import '../screens/service_area/service_not_available_screen.dart';
 import '../screens/onboarding/location_detection_screen.dart';
+import '../screens/onboarding/location_permission_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -80,13 +82,14 @@ class AppRouter {
             return '/home';
           }
           
-          // Don't redirect if already on location detection or address screens
-          if (currentLocation == '/onboarding/location' || 
-              currentLocation.startsWith('/address')) {
+          // Don't redirect if already on address or onboarding screens
+          if (currentLocation.startsWith('/address') || 
+              currentLocation == '/service-not-available' ||
+              currentLocation.startsWith('/onboarding/')) {
             return null;
           }
           
-          // For login/splash, redirect to home (home screen will check addresses)
+          // For login/splash, redirect to home (home screen will auto-detect location if needed)
           if (isLoginRoute || currentLocation == '/splash') {
             return '/home';
           }
@@ -109,6 +112,10 @@ class AppRouter {
         builder: (context, state) => const LocationDetectionScreen(),
       ),
       GoRoute(
+        path: '/onboarding/location-permission',
+        builder: (context, state) => const LocationPermissionScreen(),
+      ),
+      GoRoute(
         path: '/home',
         builder: (context, state) => const HomeScreen(),
       ),
@@ -122,6 +129,7 @@ class AppRouter {
             state: extra?['state'] as String?,
             country: extra?['country'] as String?,
             returnTo: extra?['returnTo'] as String?,
+            isOnboarding: extra?['isOnboarding'] as bool? ?? false,
           );
         },
       ),
@@ -155,7 +163,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/address/add',
-        builder: (context, state) => const AddAddressScreen(),
+        builder: (context, state) {
+          final preFilledData = state.extra as Map<String, dynamic>?;
+          return AddAddressScreen(preFilledData: preFilledData);
+        },
       ),
       GoRoute(
         path: '/address/map-picker',
@@ -209,6 +220,10 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/profile/edit',
+        builder: (context, state) => const EditProfileScreen(),
       ),
       // Delivery Routes
       GoRoute(
