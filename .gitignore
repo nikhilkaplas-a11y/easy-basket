@@ -14,6 +14,13 @@ mobile/.env
 .env.local
 .env.production
 .env.development
+# Backup files (may contain secrets)
+*.env.bak
+*.env.backup
+*.bak
+*.bak2
+*.bak3
+*.bak4
 
 # Build outputs
 backend/dist/
