@@ -129,6 +129,19 @@ class AuthProvider with ChangeNotifier {
         print('User logged in with role: ${_user!.role}');
       }
 
+      // Try to ensure FCM token is sent to backend (if notification service is initialized)
+      if (!kIsWeb) {
+        try {
+          final notificationService = NotificationService();
+          // Small delay to ensure notification service has context
+          Future.delayed(const Duration(milliseconds: 500), () {
+            notificationService.ensureTokenSent();
+          });
+        } catch (e) {
+          debugPrint('⚠️ Could not ensure FCM token sent: $e');
+        }
+      }
+
       _isLoading = false;
       notifyListeners();
       return true;

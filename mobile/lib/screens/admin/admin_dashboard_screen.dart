@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 
@@ -98,7 +100,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
           ),
           PopupMenuButton<String>(
             onSelected: (value) async {
-              if (value == 'logout') {
+              if (value == 'refresh_fcm') {
+                if (kIsWeb) return;
+                
+                try {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+                  
+                  // Initialize or refresh notification service
+                  await NotificationService().initialize(
+                    context: context,
+                    adminProvider: adminProvider,
+                    authProvider: authProvider,
+                  );
+                  
+                  // Ensure token is sent
+                  await NotificationService().ensureTokenSent();
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('FCM token refreshed and sent to backend'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('Error refreshing FCM token: $e');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error refreshing FCM token: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              } else if (value == 'logout') {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -130,6 +168,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
               }
             },
             itemBuilder: (context) => [
+              if (!kIsWeb)
+                PopupMenuItem(
+                  value: 'refresh_fcm',
+                  child: const Row(
+                    children: [
+                      Icon(Icons.notifications_active, size: 20),
+                      SizedBox(width: 8),
+                      Text('Refresh FCM Token'),
+                    ],
+                  ),
+                ),
               const PopupMenuItem(
                 value: 'logout',
                 child: Row(

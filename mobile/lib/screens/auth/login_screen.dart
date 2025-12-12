@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../providers/auth_provider.dart';
+import '../../providers/admin_provider.dart';
+import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -70,6 +73,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success) {
       if (mounted) {
+        // Initialize notification service after successful login (mobile only)
+        if (!kIsWeb) {
+          try {
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+            
+            debugPrint('📱 [LOGIN] Initializing notification service after login...');
+            await NotificationService().initialize(
+              context: context,
+              adminProvider: adminProvider,
+              authProvider: authProvider,
+            );
+            debugPrint('✅ [LOGIN] Notification service initialized');
+          } catch (e) {
+            debugPrint('❌ [LOGIN] Error initializing notification service: $e');
+          }
+        }
+        
         // Let router handle redirect based on user role
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final userRole = authProvider.user?.role;

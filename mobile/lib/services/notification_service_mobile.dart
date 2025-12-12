@@ -27,8 +27,34 @@ class NotificationService {
   BuildContext? _context;
   AdminProvider? _adminProvider;
   AuthProvider? _authProvider;
+  bool _isInitialized = false;
 
   String? get fcmToken => _fcmToken;
+  
+  /// Manually trigger FCM token generation and send to backend
+  /// Useful when notification service was initialized before login
+  Future<void> ensureTokenSent() async {
+    if (kIsWeb) return;
+    
+    try {
+      if (!_isInitialized) {
+        debugPrint('⚠️ [FCM] Service not initialized, cannot ensure token');
+        return;
+      }
+      
+      if (_fcmToken == null) {
+        debugPrint('📱 [FCM] Token not generated, generating now...');
+        await _getFCMToken();
+      } else if (_authProvider?.token != null) {
+        debugPrint('📤 [FCM] Token exists, sending to backend...');
+        await _sendTokenToBackend(_fcmToken!);
+      } else {
+        debugPrint('⚠️ [FCM] Token exists but auth token not available');
+      }
+    } catch (e) {
+      debugPrint('❌ [FCM] Error ensuring token sent: $e');
+    }
+  }
 
   /// Initialize Firebase Messaging
   Future<void> initialize({
@@ -38,6 +64,18 @@ class NotificationService {
   }) async {
     if (kIsWeb) {
       debugPrint('⚠️ FCM not supported on web');
+      return;
+    }
+
+    // Prevent multiple initializations
+    if (_isInitialized) {
+      debugPrint('⚠️ [FCM] Service already initialized, skipping...');
+      // But still update context and providers in case they changed
+      _context = context;
+      _adminProvider = adminProvider;
+      _authProvider = authProvider;
+      // Ensure token is sent if it wasn't before
+      await ensureTokenSent();
       return;
     }
 
@@ -96,12 +134,15 @@ class NotificationService {
         _firebaseMessaging.onTokenRefresh.listen(_onTokenRefresh);
         debugPrint('✅ [FCM] Token refresh listener registered');
         
+        _isInitialized = true;
         debugPrint('✅ [FCM] Initialization complete');
       } else {
         debugPrint('⚠️ [FCM] Permission not granted: ${settings.authorizationStatus}');
+        _isInitialized = true; // Mark as initialized even if permission denied
       }
     } catch (e) {
-      debugPrint('❌ Error initializing FCM: $e');
+      debugPrint('❌ [FCM] Error initializing: $e');
+      _isInitialized = true; // Mark as initialized even on error to prevent retry loops
     }
   }
 
