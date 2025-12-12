@@ -205,66 +205,100 @@ class NotificationService {
 
   /// Handle foreground messages (app is open)
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('📱 Foreground message received: ${message.messageId}');
+    debugPrint('📱 [FCM] Foreground message received: ${message.messageId}');
+    debugPrint('📱 [FCM] Title: ${message.notification?.title}');
+    debugPrint('📱 [FCM] Body: ${message.notification?.body}');
+    debugPrint('📱 [FCM] Data: ${message.data}');
     
-    if (_context == null || !_context!.mounted) return;
-
-    // Show in-app notification
-    final notification = message.notification;
-    if (notification != null) {
-      ScaffoldMessenger.of(_context!).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.notifications, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      notification.title ?? 'New Notification',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (notification.body != null)
-                      Text(
-                        notification.body!,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'View',
-            textColor: Colors.white,
-            onPressed: () => _navigateToOrders(message.data),
-          ),
-        ),
-      );
+    // Always refresh admin data if admin is logged in (even without context)
+    if (_authProvider?.user?.role == 'admin') {
+      debugPrint('📱 [FCM] Refreshing admin data...');
+      _refreshAdminData();
     }
 
-    // Auto-refresh if admin is logged in
-    if (_authProvider?.user?.role == 'admin') {
-      _refreshAdminData();
+    // Try to show notification if context is available
+    if (_context != null && _context!.mounted) {
+      debugPrint('📱 [FCM] Context available, showing SnackBar...');
+      // Show in-app notification
+      final notification = message.notification;
+      if (notification != null) {
+        try {
+          ScaffoldMessenger.of(_context!).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.notifications, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          notification.title ?? 'New Notification',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        if (notification.body != null)
+                          Text(
+                            notification.body!,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'View',
+                textColor: Colors.white,
+                onPressed: () => _navigateToOrders(message.data),
+              ),
+            ),
+          );
+          debugPrint('✅ [FCM] SnackBar shown successfully');
+        } catch (e) {
+          debugPrint('❌ [FCM] Error showing SnackBar: $e');
+        }
+      }
+    } else {
+      debugPrint('⚠️ [FCM] Context not available or not mounted, skipping SnackBar');
+      debugPrint('⚠️ [FCM] Context is null: ${_context == null}');
+      if (_context != null) {
+        debugPrint('⚠️ [FCM] Context mounted: ${_context!.mounted}');
+      }
     }
   }
 
   /// Handle message when app is opened from notification
   void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint('📱 App opened from notification: ${message.messageId}');
-    debugPrint('Data: ${message.data}');
+    debugPrint('📱 [FCM] Message opened app: ${message.messageId}');
+    debugPrint('📱 [FCM] Title: ${message.notification?.title}');
+    debugPrint('📱 [FCM] Body: ${message.notification?.body}');
+    debugPrint('📱 [FCM] Data: ${message.data}');
 
-    // Navigate to orders page
+    // Always refresh admin data if admin is logged in
+    if (_authProvider?.user?.role == 'admin') {
+      debugPrint('📱 [FCM] Refreshing admin data...');
+      _refreshAdminData();
+    }
+
+    // Navigate to orders page if context is available
     if (_context != null && _context!.mounted) {
+      debugPrint('📱 [FCM] Context available, navigating to orders...');
       _navigateToOrders(message.data);
       // Refresh data after navigation
       Future.delayed(const Duration(milliseconds: 500), () {
         _refreshAdminData();
+      });
+    } else {
+      debugPrint('⚠️ [FCM] Context not available, will navigate when context is ready');
+      // Try to navigate after a delay if context becomes available
+      Future.delayed(const Duration(seconds: 1), () {
+        if (_context != null && _context!.mounted) {
+          _navigateToOrders(message.data);
+        }
       });
     }
   }
@@ -289,13 +323,28 @@ class NotificationService {
 
   /// Refresh admin data when notification received
   void _refreshAdminData() {
-    if (_authProvider?.token == null || _adminProvider == null) return;
-
-    // Refresh stats
-    _adminProvider!.fetchStats(token: _authProvider!.token);
+    if (_authProvider?.token == null) {
+      debugPrint('⚠️ [FCM] Cannot refresh: Auth token is null');
+      return;
+    }
     
-    // Refresh orders
-    _adminProvider!.fetchOrders(token: _authProvider!.token);
+    if (_adminProvider == null) {
+      debugPrint('⚠️ [FCM] Cannot refresh: AdminProvider is null');
+      return;
+    }
+
+    debugPrint('🔄 [FCM] Refreshing admin stats and orders...');
+    try {
+      // Refresh stats
+      _adminProvider!.fetchStats(token: _authProvider!.token);
+      debugPrint('✅ [FCM] Stats refresh triggered');
+      
+      // Refresh orders
+      _adminProvider!.fetchOrders(token: _authProvider!.token);
+      debugPrint('✅ [FCM] Orders refresh triggered');
+    } catch (e) {
+      debugPrint('❌ [FCM] Error refreshing admin data: $e');
+    }
   }
 
   /// Update context and providers (call when navigating)
