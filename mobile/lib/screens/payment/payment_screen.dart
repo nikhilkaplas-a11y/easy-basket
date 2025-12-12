@@ -344,15 +344,17 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       await _processRazorpayPayment(order.id, cartProvider.totalAmount, authProvider.token!);
     } else if (_selectedPaymentMethod == 'cash') {
       // Cash on Delivery - order already created
+      // For COD, show order confirmation (not payment success)
       if (mounted) {
         // Refresh orders before navigating
         await orderProvider.fetchOrders(authProvider.token!);
         
-        // Navigate to payment status page FIRST (before clearing cart to avoid showing zero)
+        // Navigate to order confirmation page (not payment status)
+        // Use orderPlaced status to show appropriate UI
         if (mounted) {
           context.go('/payment/status', extra: {
-            'status': PaymentStatus.success,
-            'message': 'Order placed successfully! Pay on delivery.',
+            'status': PaymentStatus.orderPlaced, // Use orderPlaced instead of success
+            'message': 'Your order has been placed successfully! Please keep cash ready for delivery.',
             'orderId': order.id,
           });
           

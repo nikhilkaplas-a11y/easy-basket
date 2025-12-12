@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -15,24 +16,66 @@ class AdminOrdersScreen extends StatefulWidget {
   State<AdminOrdersScreen> createState() => _AdminOrdersScreenState();
 }
 
-class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
+class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindingObserver {
   String _selectedStatus = 'all';
   final _scrollController = ScrollController();
+  Timer? _refreshTimer;
+  bool _isScreenActive = true;
+  DateTime? _lastRefreshTime;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedStatus = widget.status ?? 'all';
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadOrders();
+      _startAutoRefresh();
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Pause auto-refresh when app goes to background
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _isScreenActive = false;
+      _refreshTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _isScreenActive = true;
+      // Refresh immediately when app comes to foreground
+      _loadOrders();
+      _startAutoRefresh();
+    }
+  }
+
+  void _startAutoRefresh() {
+    // Cancel existing timer
+    _refreshTimer?.cancel();
+    
+    // Start new timer - refresh every 20 seconds (more frequent for orders page)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
+      if (_isScreenActive && mounted) {
+        final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        
+        if (authProvider.accessToken != null) {
+          // Silent refresh - no loading indicator
+          final status = _selectedStatus == 'all' ? null : _selectedStatus;
+          adminProvider.fetchOrders(status: status, token: authProvider.accessToken, loadMore: false);
+          _lastRefreshTime = DateTime.now();
+        }
+      }
+    });
   }
 
   void _onScroll() {
@@ -51,6 +94,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final status = _selectedStatus == 'all' ? null : _selectedStatus;
     adminProvider.fetchOrders(status: status, token: authProvider.accessToken);
+    _lastRefreshTime = DateTime.now();
   }
 
   Future<void> _updateOrderStatus(int orderId, String newStatus, {int? deliveryBoyId}) async {

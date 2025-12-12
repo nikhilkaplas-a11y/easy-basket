@@ -503,7 +503,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     final aspectRatio = screenWidth < 360 ? 0.58 : screenWidth < 400 ? 0.60 : 0.63;
                     
                     return GridView.builder(
-                      padding: responsive.padding,
+                      padding: EdgeInsets.only(
+                        left: responsive.padding.left,
+                        right: responsive.padding.right,
+                        top: responsive.padding.top,
+                        bottom: MediaQuery.of(context).padding.bottom + 24, // Add safe area bottom + extra padding
+                      ),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
                         childAspectRatio: aspectRatio,

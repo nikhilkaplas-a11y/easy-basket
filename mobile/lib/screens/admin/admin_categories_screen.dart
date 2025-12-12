@@ -251,6 +251,7 @@ class _CategoryCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Use min to prevent overflow
                 children: [
                   Row(
                     children: [
@@ -263,8 +264,11 @@ class _CategoryCard extends StatelessWidget {
                             color: category.isActive ? AppTheme.black : AppTheme.grey,
                             decoration: category.isActive ? null : TextDecoration.lineThrough,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -284,34 +288,44 @@ class _CategoryCard extends StatelessWidget {
                   ),
                   if (category.description != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      category.description!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.grey,
+                    Flexible(
+                      child: Text(
+                        category.description!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.grey,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
               ),
             ),
-            // Actions
+            // Actions - Use Column with mainAxisSize.min
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: Icon(
                     category.isActive ? Icons.visibility_off : Icons.visibility,
                     color: Colors.blue,
+                    size: 20,
                   ),
                   onPressed: onToggleStatus,
                   tooltip: category.isActive ? 'Deactivate' : 'Activate',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                   onPressed: onDelete,
                   tooltip: 'Delete',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),

@@ -6,6 +6,7 @@ enum PaymentStatus {
   success,
   failed,
   pending,
+  orderPlaced, // For COD orders - order placed but payment pending
 }
 
 class PaymentStatusScreen extends StatefulWidget {
@@ -44,6 +45,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         return Colors.red;
       case PaymentStatus.pending:
         return Colors.orange;
+      case PaymentStatus.orderPlaced:
+        return AppTheme.primaryGreen; // Use app theme color for order confirmation
     }
   }
 
@@ -55,6 +58,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         return Icons.error;
       case PaymentStatus.pending:
         return Icons.pending;
+      case PaymentStatus.orderPlaced:
+        return Icons.shopping_bag_rounded; // Shopping bag for order placed
     }
   }
 
@@ -66,6 +71,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         return 'Payment Failed';
       case PaymentStatus.pending:
         return 'Payment Pending';
+      case PaymentStatus.orderPlaced:
+        return 'Order Placed!'; // Clear title for COD orders
     }
   }
 
@@ -80,13 +87,34 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Status Icon
+                // Status Icon with gradient for order placed
                 Container(
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: _getStatusColor().withOpacity(0.1),
+                    gradient: widget.status == PaymentStatus.orderPlaced
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _getStatusColor().withOpacity(0.2),
+                              _getStatusColor().withOpacity(0.1),
+                            ],
+                          )
+                        : null,
+                    color: widget.status == PaymentStatus.orderPlaced
+                        ? null
+                        : _getStatusColor().withOpacity(0.1),
                     shape: BoxShape.circle,
+                    boxShadow: widget.status == PaymentStatus.orderPlaced
+                        ? [
+                            BoxShadow(
+                              color: _getStatusColor().withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Icon(
                     _getStatusIcon(),
@@ -103,6 +131,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: _getStatusColor(),
+                    fontFamily: 'RoundedSans',
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -111,12 +140,67 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 // Message
                 Text(
                   widget.message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey,
+                    color: widget.status == PaymentStatus.orderPlaced
+                        ? AppTheme.grey
+                        : Colors.grey,
+                    fontFamily: 'RoundedSans',
+                    height: 1.5,
                   ),
                   textAlign: TextAlign.center,
                 ),
+                
+                // COD-specific info card
+                if (widget.status == PaymentStatus.orderPlaced) ...[
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.orange.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.money_rounded,
+                          color: Colors.orange.shade700,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cash on Delivery',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade700,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Please keep exact change ready',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange.shade600,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 
                 // Order ID if available

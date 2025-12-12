@@ -88,10 +88,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           final responsive = Responsive(context);
           final screenWidth = MediaQuery.of(context).size.width;
           final crossAxisCount = responsive.getCategoryGridColumns();
-          // Optimized aspect ratio for icon + name - increased to prevent overlap
-          // Icon (55px) + spacing (10px) + name (40px) + padding (24px) = ~129px needed
-          // For width ~110px, aspect ratio should be ~0.85
-          final aspectRatio = screenWidth < 360 ? 0.90 : 0.85;
+          // Optimized aspect ratio for icon + name
+          // Icon (55px) + spacing (10px) + name (44px for 2 lines) + padding (24px) = ~133px needed
+          // For width ~110px, aspect ratio should be ~0.88 to allow proper text wrapping
+          final aspectRatio = screenWidth < 360 ? 0.92 : 0.88;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -193,9 +193,9 @@ class _CategoryCard extends StatelessWidget {
                       ),
               ),
               const SizedBox(height: 10),
-              // Category Name - Fixed height to prevent overlap
+              // Category Name - Fixed height to ensure visibility
               SizedBox(
-                height: 38, // Fixed height to ensure name doesn't overlap
+                height: 44, // Fixed height for 2 lines of text (22px per line)
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -206,10 +206,12 @@ class _CategoryCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: AppTheme.black,
                         fontFamily: 'RoundedSans',
+                        height: 1.2, // Line height for better readability
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      softWrap: true, // Enable text wrapping
                     ),
                   ),
                 ),

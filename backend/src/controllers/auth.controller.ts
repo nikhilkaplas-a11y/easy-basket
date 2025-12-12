@@ -61,8 +61,12 @@ export class AuthController {
       } else {
         // Update FCM token if provided
         if (fcmToken) {
+          console.log(`📱 [AUTH] Updating FCM token for user ${user.id} (${user.phoneNumber})`);
           user.fcmToken = fcmToken;
           await userRepository.save(user);
+          console.log(`✅ [AUTH] FCM token updated successfully`);
+        } else {
+          console.log(`⚠️ [AUTH] No FCM token provided for user ${user.id}`);
         }
       }
 
@@ -144,7 +148,11 @@ export class AuthController {
           user.birthday = new Date(birthday);
         }
       }
-      if (fcmToken) user.fcmToken = fcmToken;
+      if (fcmToken) {
+        console.log(`📱 [AUTH] Updating FCM token via profile update for user ${userId}`);
+        user.fcmToken = fcmToken;
+        console.log(`✅ [AUTH] FCM token updated via profile update`);
+      }
 
       await userRepository.save(user);
 

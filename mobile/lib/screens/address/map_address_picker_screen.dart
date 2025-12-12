@@ -89,17 +89,34 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
         );
       }
 
+      // Ensure we have a valid position
+      if (position == null) {
+        setState(() {
+          _isLoading = false;
+          _selectedAddress = 'Unable to get location';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to get your location. Please try again.')),
+          );
+        }
+        return;
+      }
+
+      // At this point, position is guaranteed to be non-null
+      final validPosition = position;
       setState(() {
-        _currentLat = position.latitude;
-        _currentLng = position.longitude;
-        _selectedLat = position.latitude;
-        _selectedLng = position.longitude;
+        _currentLat = validPosition.latitude;
+        _currentLng = validPosition.longitude;
+        _selectedLat = validPosition.latitude;
+        _selectedLng = validPosition.longitude;
         _isLoading = false;
       });
 
       // Move map to current location
-      if (_mapController != null) {
-        await _mapController!.animateCamera(
+      final mapController = _mapController;
+      if (mapController != null) {
+        await mapController.animateCamera(
           CameraUpdate.newLatLngZoom(
             LatLng(_selectedLat, _selectedLng),
             17.0, // Zoom level for street view

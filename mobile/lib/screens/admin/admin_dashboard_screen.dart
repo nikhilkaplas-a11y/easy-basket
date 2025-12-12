@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -13,16 +14,68 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> with WidgetsBindingObserver {
+  Timer? _refreshTimer;
+  bool _isScreenActive = true;
+  DateTime? _lastRefreshTime;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      if (authProvider.token != null) {
-        adminProvider.fetchStats(token: authProvider.token);
+      _loadInitialData();
+      _startAutoRefresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Pause auto-refresh when app goes to background
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _isScreenActive = false;
+      _refreshTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _isScreenActive = true;
+      // Refresh immediately when app comes to foreground
+      _loadInitialData();
+      _startAutoRefresh();
+    }
+  }
+
+  void _loadInitialData() {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    if (authProvider.token != null) {
+      adminProvider.fetchStats(token: authProvider.token);
+      _lastRefreshTime = DateTime.now();
+    }
+  }
+
+  void _startAutoRefresh() {
+    // Cancel existing timer
+    _refreshTimer?.cancel();
+    
+    // Start new timer - refresh every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_isScreenActive && mounted) {
+        final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        
+        if (authProvider.token != null) {
+          // Silent refresh - no loading indicator
+          adminProvider.fetchStats(token: authProvider.token);
+          _lastRefreshTime = DateTime.now();
+        }
       }
     });
   }
@@ -107,12 +160,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Overview',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Overview',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          // Last refresh indicator
+                          if (_lastRefreshTime != null)
+                            Text(
+                              'Updated ${_formatLastRefresh(_lastRefreshTime!)}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.grey.withOpacity(0.7),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       GridView.count(
@@ -265,6 +332,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
+
+  String _formatLastRefresh(DateTime lastRefresh) {
+    final now = DateTime.now();
+    final difference = now.difference(lastRefresh);
+    
+    if (difference.inSeconds < 60) {
+      return 'just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return '${difference.inHours}h ago';
+    }
+  }
 }
 
 class _StatCard extends StatelessWidget {
@@ -287,25 +367,34 @@ class _StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min, // Use min to prevent overflow
           children: [
             Icon(icon, size: 32, color: color),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
+            Flexible(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.grey,
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.grey,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -336,17 +425,22 @@ class _ActionCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min, // Use min to prevent overflow
             children: [
               Icon(icon, size: 32, color: color),
               const SizedBox(height: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),

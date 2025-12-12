@@ -34,12 +34,13 @@ export class FCMService {
     data?: Record<string, string>
   ): Promise<boolean> {
     if (!this.initialized) {
-      console.warn('FCM not initialized, skipping notification');
+      console.warn('⚠️ [FCM] FCM not initialized, skipping notification');
       return false;
     }
 
     try {
-      await admin.messaging().send({
+      console.log(`📤 [FCM] Sending notification to token: ${fcmToken.substring(0, 20)}...`);
+      const response = await admin.messaging().send({
         token: fcmToken,
         notification: {
           title,
@@ -47,9 +48,16 @@ export class FCMService {
         },
         data: data || {},
       });
+      console.log(`✅ [FCM] Notification sent successfully. Message ID: ${response}`);
       return true;
-    } catch (error) {
-      console.error('Error sending FCM notification:', error);
+    } catch (error: any) {
+      console.error('❌ [FCM] Error sending notification:', error);
+      if (error.code) {
+        console.error(`❌ [FCM] Error code: ${error.code}`);
+      }
+      if (error.message) {
+        console.error(`❌ [FCM] Error message: ${error.message}`);
+      }
       return false;
     }
   }
@@ -76,19 +84,41 @@ export class FCMService {
     body: string,
     data?: Record<string, string>
   ): Promise<number> {
+    console.log(`📤 [FCM] Sending notification to role: ${role}`);
+    console.log(`📤 [FCM] Title: ${title}, Body: ${body}`);
+    
+    if (!this.initialized) {
+      console.warn('⚠️ [FCM] FCM not initialized, skipping notification');
+      return 0;
+    }
+
     const userRepository = AppDataSource.getRepository(User);
     const users = await userRepository.find({
       where: { role, isActive: true },
     });
 
+    console.log(`📤 [FCM] Found ${users.length} ${role} users`);
+    
     let successCount = 0;
+    let tokenCount = 0;
+    
     for (const user of users) {
       if (user.fcmToken) {
+        tokenCount++;
+        console.log(`📤 [FCM] Sending to user ${user.id} (${user.phoneNumber}), token: ${user.fcmToken.substring(0, 20)}...`);
         const sent = await this.sendNotification(user.fcmToken, title, body, data);
-        if (sent) successCount++;
+        if (sent) {
+          successCount++;
+          console.log(`✅ [FCM] Notification sent successfully to user ${user.id}`);
+        } else {
+          console.error(`❌ [FCM] Failed to send notification to user ${user.id}`);
+        }
+      } else {
+        console.warn(`⚠️ [FCM] User ${user.id} (${user.phoneNumber}) has no FCM token`);
       }
     }
 
+    console.log(`📤 [FCM] Summary: ${successCount}/${tokenCount} notifications sent successfully`);
     return successCount;
   }
 }

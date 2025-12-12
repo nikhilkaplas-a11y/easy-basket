@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show ChangeNotifier, kDebugMode, debugPrint, kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../models/user_model.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -93,7 +94,22 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await authService.verifyOTP(phoneNumber, otp, fcmToken: fcmToken);
+      // Get FCM token if not provided (for push notifications)
+      String? tokenToSend = fcmToken;
+      if (tokenToSend == null && !kIsWeb) {
+        try {
+          final notificationService = NotificationService();
+          tokenToSend = notificationService.fcmToken;
+          // If still null, try to get it
+          if (tokenToSend == null) {
+            // Will be sent later when notification service initializes
+          }
+        } catch (e) {
+          debugPrint('⚠️ Could not get FCM token: $e');
+        }
+      }
+
+      final result = await authService.verifyOTP(phoneNumber, otp, fcmToken: tokenToSend);
       _accessToken = result['accessToken'] as String;
       _refreshToken = result['refreshToken'] as String;
       _user = result['user'] as UserModel;

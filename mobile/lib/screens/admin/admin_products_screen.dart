@@ -243,93 +243,122 @@ class _ProductCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Use min to prevent overflow
                 children: [
-                  Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (product.description != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      product.description!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.grey,
+                  // Product Name - Flexible to prevent overflow
+                  Flexible(
+                    child: Text(
+                      product.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        currencyFormat.format(product.price),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '/ ${product.unit}',
+                  ),
+                  if (product.description != null) ...[
+                    const SizedBox(height: 4),
+                    Flexible(
+                      child: Text(
+                        product.description!,
                         style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.grey,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  // Price Row - Use Flexible to prevent horizontal overflow
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          currencyFormat.format(product.price),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryGreen,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4), // Reduced spacing
+                      Flexible(
+                        child: Text(
+                          '/ ${product.unit}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.grey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
+                  // Availability Row
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         product.isAvailable ? Icons.check_circle : Icons.cancel,
-                        size: 16,
+                        size: 14, // Reduced size
                         color: product.isAvailable ? Colors.green : Colors.red,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        product.isAvailable ? 'Available' : 'Unavailable',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: product.isAvailable ? Colors.green : Colors.red,
+                      Flexible(
+                        child: Text(
+                          product.isAvailable ? 'Available' : 'Unavailable',
+                          style: TextStyle(
+                            fontSize: 11, // Reduced size
+                            color: product.isAvailable ? Colors.green : Colors.red,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   if (product.category != null) ...[
                     const SizedBox(height: 4),
-                    Chip(
-                      label: Text(
-                        product.category!.name,
-                        style: const TextStyle(fontSize: 10),
+                    Flexible(
+                      child: Chip(
+                        label: Text(
+                          product.category!.name,
+                          style: const TextStyle(fontSize: 10),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
                       ),
-                      padding: EdgeInsets.zero,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ],
                 ],
               ),
             ),
-            // Actions
+            // Actions - Use Column with mainAxisSize.min
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
                   onPressed: onEdit,
                   tooltip: 'Edit',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                   onPressed: onDelete,
                   tooltip: 'Delete',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),

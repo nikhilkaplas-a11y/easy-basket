@@ -42,9 +42,10 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 60, bottom: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         // Avatar (No Edit Button)
                         Container(
@@ -76,9 +77,8 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Name with proper constraints to prevent cutting
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        // Name with proper constraints to prevent overflow
+                        Flexible(
                           child: Text(
                             authProvider.user?.name ?? 'Customer',
                             style: const TextStyle(
@@ -93,19 +93,17 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            authProvider.user?.phoneNumber ?? '',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppTheme.white.withOpacity(0.9),
-                              fontFamily: 'RoundedSans',
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        // Phone number
+                        Text(
+                          authProvider.user?.phoneNumber ?? '',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppTheme.white.withOpacity(0.9),
+                            fontFamily: 'RoundedSans',
                           ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

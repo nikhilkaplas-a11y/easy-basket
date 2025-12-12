@@ -124,12 +124,14 @@ export class OrderController {
       }
 
       // Send notification to admin
-      await FCMService.sendNotificationToRole(
+      console.log(`📤 [ORDER] Sending notification to admin for order #${order.id}`);
+      const notificationCount = await FCMService.sendNotificationToRole(
         'admin',
         'New Order Received',
         `Order #${order.id} for ₹${totalAmount}`,
         { orderId: order.id.toString(), type: 'new_order' }
       );
+      console.log(`📤 [ORDER] Notification sent to ${notificationCount} admin user(s)`);
 
       res.status(201).json({
         order,
