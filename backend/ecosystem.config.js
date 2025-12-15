@@ -1,3 +1,7 @@
+const path = require('path');
+// Load .env file from the same directory as this config file
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 module.exports = {
   apps: [{
     name: 'easy-basket-api',
@@ -6,7 +10,22 @@ module.exports = {
     exec_mode: 'cluster', // Enable cluster mode for load balancing
     env: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: 3000,
+      // Load AWS S3 credentials from .env file
+      AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+      AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
+      AWS_REGION: process.env.AWS_REGION || 'eu-north-1',
+      // Load other env vars from .env
+      DB_HOST: process.env.DB_HOST,
+      DB_PORT: process.env.DB_PORT,
+      DB_USER: process.env.DB_USER,
+      DB_PASS: process.env.DB_PASS,
+      DB_NAME: process.env.DB_NAME,
+      JWT_SECRET: process.env.JWT_SECRET,
+      RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
+      RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+      FIREBASE_SERVICE_ACCOUNT: process.env.FIREBASE_SERVICE_ACCOUNT,
     },
     // Auto-restart settings
     autorestart: true,

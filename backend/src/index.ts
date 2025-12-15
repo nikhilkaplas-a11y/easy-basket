@@ -68,15 +68,29 @@ AppDataSource.initialize()
     console.log(`📊 Database: ${process.env.DB_NAME || 'easy_basket'}`);
     console.log(`🌐 Host: ${process.env.DB_HOST || 'localhost'}`);
     
-    // Check S3 initialization status
+    // Check S3 initialization status with detailed debugging
     console.log('');
+    console.log('🔍 Checking AWS S3 configuration...');
+    console.log(`   AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   AWS_S3_BUCKET_NAME: ${process.env.AWS_S3_BUCKET_NAME ? `✅ Set (${process.env.AWS_S3_BUCKET_NAME})` : '❌ Missing'}`);
+    console.log(`   AWS_REGION: ${process.env.AWS_REGION || 'eu-north-1 (default)'}`);
+    
     if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET_NAME) {
       console.log('✅ AWS S3 credentials configured');
       console.log(`📦 S3 Bucket: ${process.env.AWS_S3_BUCKET_NAME}`);
       console.log(`🌍 S3 Region: ${process.env.AWS_REGION || 'eu-north-1'}`);
     } else {
+      console.log('');
       console.log('⚠️  AWS S3 not configured - Image upload will be disabled');
-      console.log('💡 To enable image upload, add these to your .env file:');
+      console.log('');
+      console.log('💡 Troubleshooting:');
+      console.log('   1. Check if .env file exists in backend directory');
+      console.log('   2. Verify .env file contains all required variables');
+      console.log('   3. If using PM2, check ecosystem.config.js for env vars');
+      console.log('   4. Restart PM2 after updating .env: pm2 restart all');
+      console.log('');
+      console.log('📝 Required variables:');
       console.log('   AWS_ACCESS_KEY_ID=your_access_key_id');
       console.log('   AWS_SECRET_ACCESS_KEY=your_secret_access_key');
       console.log('   AWS_S3_BUCKET_NAME=your-bucket-name');
