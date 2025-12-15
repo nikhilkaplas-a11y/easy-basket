@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { AppDataSource } from './config/database';
+import { S3Service } from './services/s3.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.routes';
@@ -16,7 +17,13 @@ import serviceAreaRoutes from './routes/serviceArea.routes';
 import uploadRoutes from './routes/upload.routes';
 import variantRoutes from './routes/variant.routes';
 
+// Load environment variables FIRST before importing any modules that use them
 dotenv.config();
+
+
+// Re-initialize S3Service after dotenv.config() to ensure env vars are loaded
+// (S3Service.initialize() is called on module load, but env vars might not be ready)
+S3Service.initialize();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,6 +67,23 @@ AppDataSource.initialize()
     console.log('✅ Database connected successfully');
     console.log(`📊 Database: ${process.env.DB_NAME || 'easy_basket'}`);
     console.log(`🌐 Host: ${process.env.DB_HOST || 'localhost'}`);
+    
+    // Check S3 initialization status
+    console.log('');
+    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET_NAME) {
+      console.log('✅ AWS S3 credentials configured');
+      console.log(`📦 S3 Bucket: ${process.env.AWS_S3_BUCKET_NAME}`);
+      console.log(`🌍 S3 Region: ${process.env.AWS_REGION || 'eu-north-1'}`);
+    } else {
+      console.log('⚠️  AWS S3 not configured - Image upload will be disabled');
+      console.log('💡 To enable image upload, add these to your .env file:');
+      console.log('   AWS_ACCESS_KEY_ID=your_access_key_id');
+      console.log('   AWS_SECRET_ACCESS_KEY=your_secret_access_key');
+      console.log('   AWS_S3_BUCKET_NAME=your-bucket-name');
+      console.log('   AWS_REGION=eu-north-1 (optional)');
+    }
+    console.log('');
+    
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
     });
