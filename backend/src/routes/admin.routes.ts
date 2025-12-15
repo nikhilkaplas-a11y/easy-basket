@@ -9,6 +9,7 @@ router.use(authorize('admin'));
 
 router.get('/dashboard', AdminController.getDashboardStats);
 router.get('/orders', AdminController.getAllOrders);
+router.get('/orders/:id', AdminController.getOrderById);
 router.put('/orders/:id/status', AdminController.updateOrderStatus);
 router.get('/users', AdminController.getAllUsers);
 router.get('/delivery-agents', AdminController.getDeliveryAgents);

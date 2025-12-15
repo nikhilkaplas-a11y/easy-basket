@@ -1,4 +1,5 @@
 import 'category_model.dart';
+import 'product_variant_model.dart';
 
 class ProductModel {
   final int id;
@@ -10,6 +11,11 @@ class ProductModel {
   final int stock;
   final bool isAvailable;
   final String? unit;
+  final bool hasVariants;
+  final String? baseUnit;
+  final double? minQuantity;
+  final double? maxQuantity;
+  final List<ProductVariantModel>? variants;
 
   ProductModel({
     required this.id,
@@ -21,6 +27,11 @@ class ProductModel {
     required this.stock,
     required this.isAvailable,
     this.unit,
+    this.hasVariants = false,
+    this.baseUnit,
+    this.minQuantity,
+    this.maxQuantity,
+    this.variants,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -36,6 +47,33 @@ class ProductModel {
       priceValue = 0.0;
     }
     
+    // Parse variants if they exist
+    List<ProductVariantModel>? variants;
+    if (json['variants'] != null && json['variants'] is List) {
+      variants = (json['variants'] as List)
+          .map((v) => ProductVariantModel.fromJson(v as Map<String, dynamic>))
+          .toList();
+    }
+    
+    // Handle minQuantity and maxQuantity
+    double? minQuantity;
+    if (json['minQuantity'] != null) {
+      if (json['minQuantity'] is String) {
+        minQuantity = double.tryParse(json['minQuantity'] as String);
+      } else if (json['minQuantity'] is num) {
+        minQuantity = (json['minQuantity'] as num).toDouble();
+      }
+    }
+    
+    double? maxQuantity;
+    if (json['maxQuantity'] != null) {
+      if (json['maxQuantity'] is String) {
+        maxQuantity = double.tryParse(json['maxQuantity'] as String);
+      } else if (json['maxQuantity'] is num) {
+        maxQuantity = (json['maxQuantity'] as num).toDouble();
+      }
+    }
+    
     return ProductModel(
       id: json['id'] as int,
       name: json['name'] as String,
@@ -48,6 +86,11 @@ class ProductModel {
       stock: json['stock'] is int ? json['stock'] as int : (json['stock'] as num?)?.toInt() ?? 0,
       isAvailable: json['isAvailable'] as bool? ?? true,
       unit: json['unit'] as String? ?? 'piece',
+      hasVariants: json['hasVariants'] as bool? ?? false,
+      baseUnit: json['baseUnit'] as String?,
+      minQuantity: minQuantity,
+      maxQuantity: maxQuantity,
+      variants: variants,
     );
   }
 
@@ -62,6 +105,11 @@ class ProductModel {
       'stock': stock,
       'isAvailable': isAvailable,
       'unit': unit,
+      'hasVariants': hasVariants,
+      'baseUnit': baseUnit,
+      'minQuantity': minQuantity,
+      'maxQuantity': maxQuantity,
+      'variants': variants?.map((v) => v.toJson()).toList(),
     };
   }
 }

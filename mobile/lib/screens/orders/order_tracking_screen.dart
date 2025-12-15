@@ -394,6 +394,18 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          // Show variant label if present
+                          if (item.variant != null || item.displayLabel != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              item.displayLabel ?? item.variant?.label ?? '',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.grey,
+                                fontFamily: 'RoundedSans',
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Row(
                             children: [
@@ -413,10 +425,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                   ),
                                 ),
                               ),
-                              if (item.product.unit != null) ...[
+                              if (item.unit != null || (item.variant == null && item.product.unit != null)) ...[
                                 const SizedBox(width: 8),
                                 Text(
-                                  '• ${item.product.unit}',
+                                  '• ${item.unit ?? item.product.unit}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppTheme.grey,

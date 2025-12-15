@@ -1,12 +1,19 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../models/product_model.dart';
 import '../../models/category_model.dart';
 import '../../utils/theme.dart';
+import '../../widgets/image_picker_widget.dart';
+import '../../widgets/image_name_input_widget.dart';
+import '../../widgets/variant_management_dialog.dart';
+import '../../services/image_upload_service.dart';
 
 class AddEditProductScreen extends StatefulWidget {
   final ProductModel? product;
@@ -25,11 +32,16 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _priceController = TextEditingController();
   final _stockController = TextEditingController();
   final _imageUrlController = TextEditingController();
+  final _imageNameController = TextEditingController();
+  XFile? _selectedImage;
+  bool _isUploadingImage = false;
+  double _uploadProgress = 0.0;
   int? _selectedCategoryId;
   String _selectedUnit = 'piece';
   bool _isAvailable = true;
   bool _isLoading = false;
   List<CategoryModel> _categories = [];
+  final ImageUploadService _imageUploadService = ImageUploadService();
 
   final List<String> _units = ['piece', 'kg', 'g', 'liter', 'ml', 'pack', 'dozen'];
 
@@ -40,12 +52,16 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   void initState() {
     super.initState();
     _product = widget.product;
-    _loadCategories();
-    if (_product != null) {
-      _loadProductData();
-    } else if (widget.productId != null) {
-      _loadProduct();
-    }
+    
+    // Defer async operations to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+      if (_product != null) {
+        _loadProductData();
+      } else if (widget.productId != null) {
+        _loadProduct();
+      }
+    });
   }
 
   Future<void> _loadProduct() async {
@@ -71,6 +87,11 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       _selectedCategoryId = _product!.category?.id;
       _selectedUnit = _product!.unit ?? 'piece';
       _isAvailable = _product!.isAvailable;
+      
+      // Auto-fill image name from product name
+      if (_imageNameController.text.isEmpty) {
+        _imageNameController.text = _product!.name.toLowerCase().replaceAll(' ', '-');
+      }
     }
   }
 
@@ -81,18 +102,338 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     _priceController.dispose();
     _stockController.dispose();
     _imageUrlController.dispose();
+    _imageNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _uploadImage() async {
+    if (_selectedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an image first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Need product ID for upload - if creating new product, save it first
+    int? productId = _product?.id;
+    
+    if (productId == null) {
+      // Create product first if it doesn't exist
+      if (!_formKey.currentState!.validate() || _selectedCategoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill in all required fields first'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Create product first
+      setState(() => _isLoading = true);
+      
+      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      if (authProvider.token == null) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication required')),
+        );
+        return;
+      }
+
+      final price = double.tryParse(_priceController.text.trim());
+      final stock = int.tryParse(_stockController.text.trim()) ?? 0;
+
+      if (price == null || price <= 0) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid price')),
+        );
+        return;
+      }
+
+      final success = await adminProvider.createProduct(
+        token: authProvider.token!,
+        name: _nameController.text.trim(),
+        price: price,
+        categoryId: _selectedCategoryId!,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        imageUrl: null, // Will be set after upload
+        stock: stock,
+        unit: _selectedUnit,
+      );
+
+      setState(() => _isLoading = false);
+
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(adminProvider.error ?? 'Failed to create product')),
+        );
+        return;
+      }
+
+      // Get the newly created product ID
+      await adminProvider.fetchProducts(token: authProvider.token!);
+      final newProduct = adminProvider.products.firstWhere(
+        (p) => p.name == _nameController.text.trim(),
+        orElse: () => adminProvider.products.last,
+      );
+      productId = newProduct.id;
+      _product = newProduct;
+    }
+
+    setState(() {
+      _isUploadingImage = true;
+      _uploadProgress = 0.0;
+    });
+
+    try {
+      // Compress image
+      final compressedBytes = await _imageUploadService.compressImage(_selectedImage!);
+      if (compressedBytes == null) {
+        throw Exception('Failed to compress image');
+      }
+
+      // Get auth token
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.token == null) {
+        throw Exception('Authentication required');
+      }
+
+      // Upload to backend
+      setState(() => _uploadProgress = 0.3);
+      
+      final result = await _imageUploadService.uploadImage(
+        imageBytes: compressedBytes,
+        type: 'product',
+        id: productId!,
+        adminName: _imageNameController.text.trim().isNotEmpty
+            ? _imageNameController.text.trim()
+            : null,
+        entityName: _nameController.text.trim(),
+        token: authProvider.token!,
+      );
+
+      setState(() => _uploadProgress = 1.0);
+
+      if (result != null && result['url'] != null) {
+        // Update image URL in controller
+        _imageUrlController.text = result['url'] as String;
+        
+        // Update product with new image URL
+        await _updateProductImageUrl(result['url'] as String);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Image uploaded successfully!'),
+                ],
+              ),
+              backgroundColor: AppTheme.primaryGreen,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Upload failed: No URL returned');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isUploadingImage = false;
+        _uploadProgress = 0.0;
+      });
+    }
+  }
+
+  Future<void> _updateProductImageUrl(String imageUrl) async {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    if (authProvider.token == null || _product == null) return;
+
+    try {
+      await adminProvider.updateProduct(
+        token: authProvider.token!,
+        productId: _product!.id,
+        name: _nameController.text.trim(),
+        price: double.parse(_priceController.text.trim()),
+        categoryId: _selectedCategoryId,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        imageUrl: imageUrl,
+        stock: int.tryParse(_stockController.text.trim()) ?? 0,
+        unit: _selectedUnit,
+        isAvailable: _isAvailable,
+      );
+    } catch (e) {
+      debugPrint('Error updating product image URL: $e');
+    }
   }
 
   Future<void> _loadCategories() async {
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Load all categories (including subcategories)
     await productProvider.fetchCategories();
-    setState(() {
-      _categories = productProvider.categories;
-      if (_selectedCategoryId == null && _categories.isNotEmpty) {
-        _selectedCategoryId = _categories.first.id;
+    
+    // Also fetch all categories from admin provider to get subcategories
+    if (authProvider.token != null) {
+      await adminProvider.fetchCategories(token: authProvider.token);
+    }
+    
+    // Combine categories: top-level + subcategories
+    final allCategories = <CategoryModel>[];
+    final addedIds = <int>{};
+    
+    // Add top-level categories from product provider
+    for (var category in productProvider.categories) {
+      if (!addedIds.contains(category.id)) {
+        allCategories.add(category);
+        addedIds.add(category.id);
       }
+      
+      // Add subcategories if they exist
+      if (category.hasSubcategories && category.subcategories != null) {
+        for (var subcategory in category.subcategories!) {
+          if (!addedIds.contains(subcategory.id)) {
+            allCategories.add(subcategory);
+            addedIds.add(subcategory.id);
+          }
+        }
+      }
+    }
+    
+    // Also check admin provider categories for any missing ones
+    for (var category in adminProvider.categories) {
+      // Check if already added
+      if (!addedIds.contains(category.id)) {
+        allCategories.add(category);
+        addedIds.add(category.id);
+      }
+      
+      // Add subcategories
+      if (category.hasSubcategories && category.subcategories != null) {
+        for (var subcategory in category.subcategories!) {
+          if (!addedIds.contains(subcategory.id)) {
+            allCategories.add(subcategory);
+            addedIds.add(subcategory.id);
+          }
+        }
+      }
+    }
+    
+    // Sort categories: top-level first, then subcategories grouped under parents
+    allCategories.sort((a, b) {
+      if (a.isTopLevel && b.isSubcategory) return -1;
+      if (a.isSubcategory && b.isTopLevel) return 1;
+      if (a.isSubcategory && b.isSubcategory) {
+        // Group subcategories by parent
+        final aParentId = a.parentCategoryId ?? 0;
+        final bParentId = b.parentCategoryId ?? 0;
+        if (aParentId != bParentId) return aParentId.compareTo(bParentId);
+      }
+      return a.name.compareTo(b.name);
     });
+    
+    if (mounted) {
+      setState(() {
+        _categories = allCategories;
+        if (_selectedCategoryId == null && _categories.isNotEmpty) {
+          _selectedCategoryId = _categories.first.id;
+        }
+      });
+    }
+    
+    debugPrint('Loaded ${allCategories.length} categories (${allCategories.where((c) => c.isTopLevel).length} top-level, ${allCategories.where((c) => c.isSubcategory).length} subcategories)');
+    
+    // If we still don't have subcategories, try fetching them for each parent category
+    // Do this after the initial setState to avoid setState during build
+    if (allCategories.where((c) => c.isSubcategory).isEmpty && authProvider.token != null && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        
+        debugPrint('No subcategories found in loaded categories, fetching individually...');
+        final newSubcategories = <CategoryModel>[];
+        final newAddedIds = <int>{...addedIds};
+        
+        for (var category in allCategories.where((c) => c.isTopLevel)) {
+          try {
+            final response = await adminProvider.apiService.get(
+              '/categories/${category.id}/subcategories',
+              token: authProvider.token,
+            );
+            
+            if (response is Map<String, dynamic> && response.containsKey('subcategories')) {
+              final List<dynamic> data = response['subcategories'] as List? ?? [];
+              for (var subJson in data) {
+                try {
+                  final subcategory = CategoryModel.fromJson(subJson as Map<String, dynamic>);
+                  if (!newAddedIds.contains(subcategory.id)) {
+                    newSubcategories.add(subcategory);
+                    newAddedIds.add(subcategory.id);
+                  }
+                } catch (e) {
+                  debugPrint('Error parsing subcategory: $e');
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Error fetching subcategories for ${category.name}: $e');
+          }
+        }
+        
+        if (newSubcategories.isNotEmpty && mounted) {
+          // Sort new subcategories
+          newSubcategories.sort((a, b) {
+            final aParentId = a.parentCategoryId ?? 0;
+            final bParentId = b.parentCategoryId ?? 0;
+            if (aParentId != bParentId) return aParentId.compareTo(bParentId);
+            return a.name.compareTo(b.name);
+          });
+          
+          // Insert subcategories after their parent categories
+          final updatedCategories = <CategoryModel>[];
+          for (var category in allCategories) {
+            updatedCategories.add(category);
+            if (category.isTopLevel) {
+              // Add subcategories for this parent
+              final parentSubs = newSubcategories
+                  .where((sub) => sub.parentCategoryId == category.id)
+                  .toList();
+              updatedCategories.addAll(parentSubs);
+            }
+          }
+          
+          setState(() {
+            _categories = updatedCategories;
+          });
+          
+          debugPrint('Added ${newSubcategories.length} subcategories');
+        }
+      });
+    }
   }
 
   Future<void> _saveProduct() async {
@@ -213,11 +554,27 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                 labelText: 'Category *',
                 prefixIcon: Icon(Icons.category),
                 border: OutlineInputBorder(),
+                helperText: 'Select a category or subcategory',
               ),
               items: _categories.map((category) {
+                // Build display name: show parent > subcategory if it's a subcategory
+                String displayName = category.name;
+                if (category.isSubcategory && category.parentCategory != null) {
+                  displayName = '${category.parentCategory!.name} > ${category.name}';
+                }
+                
                 return DropdownMenuItem<int>(
                   value: category.id,
-                  child: Text(category.name),
+                  child: Text(
+                    displayName,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: category.isSubcategory ? FontWeight.w500 : FontWeight.normal,
+                      color: category.isSubcategory ? AppTheme.primaryGreen : AppTheme.black,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 );
               }).toList(),
               onChanged: (value) => setState(() => _selectedCategoryId = value),
@@ -302,17 +659,182 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               onChanged: (value) => setState(() => _selectedUnit = value!),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _imageUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Image URL',
-                prefixIcon: Icon(Icons.image),
-                border: OutlineInputBorder(),
-                helperText: 'Enter a URL for the product image',
+            
+            // Image Upload Section
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppTheme.lightGrey),
               ),
-              keyboardType: TextInputType.url,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.image, color: AppTheme.primaryGreen, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Product Image',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Image Picker
+                    ImagePickerWidget(
+                      selectedImage: _selectedImage,
+                      currentImageUrl: _product?.imageUrl,
+                      onImageSelected: (image) {
+                        setState(() {
+                          _selectedImage = image;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Image Name Input (for filename)
+                    ImageNameInputWidget(
+                      controller: _imageNameController,
+                      entityName: _nameController.text.trim().isNotEmpty
+                          ? _nameController.text.trim()
+                          : null,
+                      entityId: _product?.id,
+                      type: 'product',
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Upload Button (show if image selected)
+                    if (_selectedImage != null) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isUploadingImage ? null : _uploadImage,
+                          icon: _isUploadingImage
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Icon(Icons.cloud_upload),
+                          label: Text(_isUploadingImage ? 'Uploading...' : 'Upload Image'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      if (_isUploadingImage) ...[
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(
+                          value: _uploadProgress,
+                          backgroundColor: AppTheme.lightGrey,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                        ),
+                      ],
+                    ],
+                    
+                    // Or Manual URL Input (fallback)
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Or enter image URL manually:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _imageUrlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Image URL',
+                        prefixIcon: Icon(Icons.link, size: 20),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      ),
+                      keyboardType: TextInputType.url,
+                    ),
+                  ],
+                ),
+              ),
             ),
             if (_product != null) ...[
+              const SizedBox(height: 16),
+              // Variant Management Section
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: AppTheme.lightGrey),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.inventory_2, color: AppTheme.primaryGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Product Variants',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Add quantity/weight options (e.g., 250g, 1kg, 2kg, 5kg)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => VariantManagementDialog(
+                                productId: _product!.id,
+                                productName: _product!.name,
+                              ),
+                            );
+                            if (result == true) {
+                              // Refresh product data if needed
+                              _loadProduct();
+                            }
+                          },
+                          icon: const Icon(Icons.add_circle_outline),
+                          label: const Text('Manage Variants'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryGreen,
+                            side: BorderSide(color: AppTheme.primaryGreen),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               SwitchListTile(
                 title: const Text('Available'),

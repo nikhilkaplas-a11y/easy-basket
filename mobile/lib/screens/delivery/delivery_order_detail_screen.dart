@@ -548,7 +548,11 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
                                 )
                               : const Icon(Icons.image),
                           title: Text(item.product.name),
-                          subtitle: Text('Qty: ${item.quantity} x ${currencyFormat.format(item.price)}'),
+                          subtitle: Text(
+                            item.displayLabel != null
+                                ? '${item.displayLabel} x ${currencyFormat.format(item.price)}'
+                                : 'Qty: ${item.quantity} x ${currencyFormat.format(item.price)}',
+                          ),
                           trailing: Text(
                             currencyFormat.format(item.total),
                             style: const TextStyle(

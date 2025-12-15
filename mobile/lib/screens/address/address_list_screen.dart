@@ -345,7 +345,20 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                 ),
                                 trailing: _isFromCheckout
                                     ? null
-                                    : const Icon(Icons.chevron_right, color: AppTheme.grey),
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, size: 20),
+                                            color: AppTheme.primaryGreen,
+                                            onPressed: () {
+                                              context.push('/address/edit', extra: address);
+                                            },
+                                            tooltip: 'Edit address',
+                                          ),
+                                          const Icon(Icons.chevron_right, color: AppTheme.grey),
+                                        ],
+                                      ),
                               ),
                             ),
                           );

@@ -764,9 +764,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            childAspectRatio: 0.65, // Reduced to give more vertical space
+                            childAspectRatio: MediaQuery.of(context).size.width < 400 ? 0.56 : 0.58, // Reduced to prevent overflow
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),
@@ -966,7 +966,12 @@ class _CategorySliderCard extends StatelessWidget {
     final fontSize = responsive.fontSize(11);
     
     return GestureDetector(
-      onTap: () => context.push('/products?categoryId=${category.id}'),
+      onTap: () {
+        // Always navigate to category screen - it will handle subcategories
+        context.push('/categories/${category.id}/products', extra: {
+          'parentCategoryName': category.name,
+        });
+      },
       child: Container(
         width: 90,
         height: 100,

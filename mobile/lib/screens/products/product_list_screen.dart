@@ -499,8 +499,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     final responsive = Responsive(context);
                     final crossAxisCount = responsive.getGridColumns();
                     final screenWidth = MediaQuery.of(context).size.width;
-                    // Calculate aspect ratio based on screen size - reduced to prevent overlap
-                    final aspectRatio = screenWidth < 360 ? 0.58 : screenWidth < 400 ? 0.60 : 0.63;
+                    // Calculate aspect ratio based on screen size - optimized for mobile Chrome
+                    final aspectRatio = screenWidth < 360 ? 0.54 : screenWidth < 400 ? 0.56 : 0.58;
                     
                     return GridView.builder(
                       padding: EdgeInsets.only(

@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
 import { OrderItem } from '../entities/OrderItem';
 import { Product } from '../entities/Product';
+import { ProductVariant } from '../entities/ProductVariant';
 import { Address } from '../entities/Address';
 import { User } from '../entities/User';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -50,6 +51,7 @@ export class OrderController {
       }
 
       const productRepository = AppDataSource.getRepository(Product);
+      const variantRepository = AppDataSource.getRepository(ProductVariant);
       let totalAmount = 0;
       const orderItems: OrderItem[] = [];
 
@@ -67,21 +69,76 @@ export class OrderController {
           return;
         }
 
-        if (product.stock < item.quantity) {
-          res.status(400).json({
-            message: `Insufficient stock for ${product.name}. Available: ${product.stock}`,
+        // Handle variant if provided
+        let variant: ProductVariant | null = null;
+        let itemPrice: number;
+        let itemUnit: string;
+        let itemStock: number;
+        let displayLabel: string;
+
+        if (item.variantId) {
+          // Fetch and validate variant
+          variant = await variantRepository.findOne({
+            where: { id: item.variantId },
+            relations: ['product'],
           });
-          return;
+
+          if (!variant) {
+            res.status(404).json({ message: `Variant ${item.variantId} not found` });
+            return;
+          }
+
+          if (variant.product.id !== product.id) {
+            res.status(400).json({ message: `Variant ${item.variantId} does not belong to product ${item.productId}` });
+            return;
+          }
+
+          if (!variant.isAvailable) {
+            res.status(400).json({ message: `Variant ${variant.label} is not available` });
+            return;
+          }
+
+          if (variant.stock < item.quantity) {
+            res.status(400).json({
+              message: `Insufficient stock for ${variant.label}. Available: ${variant.stock}`,
+            });
+            return;
+          }
+
+          itemPrice = variant.price;
+          itemUnit = variant.unit;
+          itemStock = variant.stock;
+          displayLabel = item.quantity > 1 
+            ? `${item.quantity} × ${variant.label}`
+            : variant.label;
+        } else {
+          // No variant - use product price and stock
+          if (product.stock < item.quantity) {
+            res.status(400).json({
+              message: `Insufficient stock for ${product.name}. Available: ${product.stock}`,
+            });
+            return;
+          }
+
+          itemPrice = product.price;
+          itemUnit = product.unit || 'piece';
+          itemStock = product.stock;
+          displayLabel = item.quantity > 1 
+            ? `${item.quantity} × ${product.name}`
+            : product.name;
         }
 
-        const itemTotal = product.price * item.quantity;
+        const itemTotal = itemPrice * item.quantity;
         totalAmount += itemTotal;
 
         const orderItem = new OrderItem();
         orderItem.product = product;
+        orderItem.variant = variant;
         orderItem.quantity = item.quantity;
-        orderItem.price = product.price;
+        orderItem.unit = itemUnit;
+        orderItem.price = itemPrice;
         orderItem.total = itemTotal;
+        orderItem.displayLabel = displayLabel;
 
         orderItems.push(orderItem);
       }
@@ -100,12 +157,22 @@ export class OrderController {
 
       await orderRepository.save(order);
 
-      // Update product stock
+      // Update product/variant stock
       for (const item of items) {
-        const product = await productRepository.findOneBy({ id: item.productId });
-        if (product) {
-          product.stock -= item.quantity;
-          await productRepository.save(product);
+        if (item.variantId) {
+          // Update variant stock
+          const variant = await variantRepository.findOneBy({ id: item.variantId });
+          if (variant) {
+            variant.stock -= item.quantity;
+            await variantRepository.save(variant);
+          }
+        } else {
+          // Update product stock
+          const product = await productRepository.findOneBy({ id: item.productId });
+          if (product) {
+            product.stock -= item.quantity;
+            await productRepository.save(product);
+          }
         }
       }
 
@@ -155,7 +222,7 @@ export class OrderController {
       const orderRepository = AppDataSource.getRepository(Order);
       const orders = await orderRepository.find({
         where: { user: { id: userId } },
-        relations: ['user', 'items', 'items.product', 'deliveryAddress', 'deliveryBoy'],
+        relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
         order: { createdAt: 'DESC' },
       });
 
@@ -179,7 +246,7 @@ export class OrderController {
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
         where: { id: Number(id), user: { id: userId } },
-        relations: ['user', 'items', 'items.product', 'deliveryAddress', 'deliveryBoy'],
+        relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
       });
 
       if (!order) {

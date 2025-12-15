@@ -5,8 +5,8 @@ import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../models/product_model.dart';
-import '../../models/category_model.dart';
 import '../../utils/theme.dart';
+import '../../widgets/variant_management_dialog.dart';
 import 'package:intl/intl.dart';
 
 class AdminProductsScreen extends StatefulWidget {
@@ -175,6 +175,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                             _loadProducts();
                           }
                         },
+                        onRefresh: _loadProducts,
                       );
                     },
                   ),
@@ -198,12 +199,14 @@ class _ProductCard extends StatelessWidget {
   final NumberFormat currencyFormat;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
+  final VoidCallback? onRefresh;
 
   const _ProductCard({
     required this.product,
     required this.currencyFormat,
     required this.onDelete,
     required this.onEdit,
+    this.onRefresh,
   });
 
   @override
@@ -243,59 +246,58 @@ class _ProductCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min, // Use min to prevent overflow
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Product Name - Flexible to prevent overflow
-                  Flexible(
-                    child: Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                  // Product Name
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (product.description != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      product.description!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.grey,
+                        height: 1.2,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  if (product.description != null) ...[
-                    const SizedBox(height: 4),
-                    Flexible(
-                      child: Text(
-                        product.description!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.grey,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
                   ],
-                  const SizedBox(height: 8),
-                  // Price Row - Use Flexible to prevent horizontal overflow
+                  const SizedBox(height: 6),
+                  // Price Row
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
                         child: Text(
                           currencyFormat.format(product.price),
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryGreen,
+                            height: 1.1,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 4), // Reduced spacing
-                      Flexible(
-                        child: Text(
-                          '/ ${product.unit}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.grey,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: 4),
+                      Text(
+                        '/ ${product.unit}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.grey,
+                          height: 1.1,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -306,35 +308,32 @@ class _ProductCard extends StatelessWidget {
                     children: [
                       Icon(
                         product.isAvailable ? Icons.check_circle : Icons.cancel,
-                        size: 14, // Reduced size
+                        size: 13,
                         color: product.isAvailable ? Colors.green : Colors.red,
                       ),
                       const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          product.isAvailable ? 'Available' : 'Unavailable',
-                          style: TextStyle(
-                            fontSize: 11, // Reduced size
-                            color: product.isAvailable ? Colors.green : Colors.red,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        product.isAvailable ? 'Available' : 'Unavailable',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: product.isAvailable ? Colors.green : Colors.red,
+                          height: 1.1,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                   if (product.category != null) ...[
                     const SizedBox(height: 4),
-                    Flexible(
-                      child: Chip(
-                        label: Text(
-                          product.category!.name,
-                          style: const TextStyle(fontSize: 10),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
+                    Chip(
+                      label: Text(
+                        product.category!.name,
+                        style: const TextStyle(fontSize: 9, height: 1.1),
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ],
@@ -344,6 +343,25 @@ class _ProductCard extends StatelessWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                IconButton(
+                  icon: const Icon(Icons.inventory_2, color: Colors.orange, size: 20),
+                  onPressed: () async {
+                      final result = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => VariantManagementDialog(
+                        productId: product.id,
+                        productName: product.name,
+                      ),
+                    );
+                    if (result == true && onRefresh != null) {
+                      onRefresh!();
+                    }
+                  },
+                  tooltip: 'Manage Variants',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
+                ),
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
                   onPressed: onEdit,

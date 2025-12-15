@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/product_provider.dart';
 import '../../models/category_model.dart';
 import '../../utils/theme.dart';
@@ -89,9 +91,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           final screenWidth = MediaQuery.of(context).size.width;
           final crossAxisCount = responsive.getCategoryGridColumns();
           // Optimized aspect ratio for icon + name
-          // Icon (55px) + spacing (10px) + name (44px for 2 lines) + padding (24px) = ~133px needed
-          // For width ~110px, aspect ratio should be ~0.88 to allow proper text wrapping
-          final aspectRatio = screenWidth < 360 ? 0.92 : 0.88;
+          // Icon (45px) + spacing (4px) + name (30px for 2 lines) + padding (16px) = ~95px needed
+          // For width ~53px (on small screens), aspect ratio needs to be higher
+          final aspectRatio = screenWidth < 360 ? 1.15 : 1.1;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -133,11 +135,24 @@ class _CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final responsive = Responsive(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    // Reduced icon size to fit in available space
-    final iconSize = screenWidth < 360 ? 50.0 : 55.0;
+    // Optimized icon size to fit in available space - smaller for tight constraints
+    final iconSize = screenWidth < 360 ? 42.0 : 45.0;
 
     return GestureDetector(
-      onTap: () => context.push('/products?categoryId=${category.id}'),
+      onTap: () async {
+        // Debug: Check category subcategories
+        debugPrint('🔵 Tapped category: ${category.name} (ID: ${category.id})');
+        debugPrint('🔵 Has subcategories: ${category.hasSubcategories}');
+        debugPrint('🔵 Subcategories: ${category.subcategories}');
+        debugPrint('🔵 Subcategories count: ${category.subcategories?.length ?? 0}');
+        
+        // Always navigate to category screen first - it will check for subcategories
+        // This ensures we always show the Blinkit-style layout if subcategories exist
+        debugPrint('🔵 Navigating to category screen: /categories/${category.id}/products');
+        context.push('/categories/${category.id}/products', extra: {
+          'parentCategoryName': category.name,
+        });
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -151,7 +166,7 @@ class _CategoryCard extends StatelessWidget {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -162,57 +177,66 @@ class _CategoryCard extends StatelessWidget {
                 height: iconSize,
                 decoration: BoxDecoration(
                   color: AppTheme.primaryGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
                       color: AppTheme.primaryGreen.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ],
                 ),
                 child: category.imageUrl != null
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          category.imageUrl!,
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: category.imageUrl!,
                           width: iconSize,
                           height: iconSize,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
+                          placeholder: (context, url) => Container(
+                            color: AppTheme.primaryGreen.withOpacity(0.1),
+                            child: Center(
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Icon(
                             Icons.category_rounded,
-                            size: responsive.iconSize(28),
+                            size: responsive.iconSize(22),
                             color: AppTheme.primaryGreen,
                           ),
+                          fadeInDuration: const Duration(milliseconds: 300),
                         ),
                       )
                     : Icon(
                         Icons.category_rounded,
-                        size: responsive.iconSize(28),
+                        size: responsive.iconSize(22),
                         color: AppTheme.primaryGreen,
                       ),
               ),
-              const SizedBox(height: 10),
-              // Category Name - Fixed height to ensure visibility
-              SizedBox(
-                height: 44, // Fixed height for 2 lines of text (22px per line)
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      category.name.isNotEmpty ? category.name : 'Category',
-                      style: TextStyle(
-                        fontSize: responsive.fontSize(13),
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.black,
-                        fontFamily: 'RoundedSans',
-                        height: 1.2, // Line height for better readability
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: true, // Enable text wrapping
+              const SizedBox(height: 4),
+              // Category Name - Flexible height with minimal spacing
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    category.name.isNotEmpty ? category.name : 'Category',
+                    style: TextStyle(
+                      fontSize: responsive.fontSize(11),
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.black,
+                      height: 1.1,
                     ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),

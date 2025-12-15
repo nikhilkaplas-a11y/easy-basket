@@ -304,9 +304,16 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       return;
     }
 
-    final items = cartProvider.items.map((item) => {
-      'productId': item.product.id,
-      'quantity': item.quantity,
+    final items = cartProvider.items.map((item) {
+      final itemMap = <String, dynamic>{
+        'productId': item.product.id,
+        'quantity': item.quantity,
+      };
+      // Include variantId if item has a variant
+      if (item.variant != null) {
+        itemMap['variantId'] = item.variant!.id;
+      }
+      return itemMap;
     }).toList();
 
     // First create the order in our system

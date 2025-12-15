@@ -11,6 +11,7 @@ import { Address } from '../entities/Address';
 import { OrderItem } from '../entities/OrderItem';
 import { RefreshToken } from '../entities/RefreshToken';
 import { ServiceArea } from '../entities/ServiceArea';
+import { ProductVariant } from '../entities/ProductVariant';
 
 export const AppDataSource = new DataSource({
   type: 'mysql',
@@ -19,14 +20,13 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'root',
   password: process.env.DB_PASS || 'password',
   database: process.env.DB_NAME || 'easy_basket',
-  synchronize: process.env.NODE_ENV !== 'production', // Auto-sync only in development
+  synchronize: false, // Disabled to prevent index drop errors with foreign keys. Schema is already correct.
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Product, Order, Category, Address, OrderItem, RefreshToken, ServiceArea],
+  entities: [User, Product, Order, Category, Address, OrderItem, RefreshToken, ServiceArea, ProductVariant],
   subscribers: [],
   migrations: [],
   extra: {
     connectionLimit: 10,
     connectTimeout: 10000, // 10 seconds connection timeout
-    acquireTimeout: 10000, // 10 seconds acquire timeout
   },
 });

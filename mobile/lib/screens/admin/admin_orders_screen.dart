@@ -335,9 +335,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                             return const SizedBox.shrink();
                           }
                           final order = adminProvider.orders[index];
-                          return _OrderCard(
-                            order: order,
-                            onStatusUpdate: _updateOrderStatus,
+                          return InkWell(
+                            onTap: () {
+                              context.push('/admin/orders/${order.id}');
+                            },
+                            child: _OrderCard(
+                              order: order,
+                              onStatusUpdate: _updateOrderStatus,
+                            ),
                           );
                         },
                       ),
@@ -390,6 +395,10 @@ class _OrderCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: _getStatusColor(order.status).withOpacity(0.2),
@@ -447,15 +456,81 @@ class _OrderCard extends StatelessWidget {
                 // Order Items
                 const Text(
                   'Items:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                const SizedBox(height: 8),
-                ...order.items.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '${item.product.name} x ${item.quantity} = ${currencyFormat.format(item.total)}',
-                      ),
-                    )),
+                const SizedBox(height: 12),
+                ...order.items.asMap().entries.map((entry) {
+                  final item = entry.value;
+                  final hasVariant = item.variant != null;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: hasVariant 
+                          ? AppTheme.primaryGreen.withOpacity(0.05)
+                          : AppTheme.lightGrey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: hasVariant
+                          ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.3))
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.product.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              if (hasVariant) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.inventory_2,
+                                      size: 12,
+                                      color: AppTheme.primaryGreen,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      item.displayLabel ?? item.variant!.label,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.primaryGreen,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 4),
+                              Text(
+                                'Qty: ${item.quantity}${item.unit != null ? " • ${item.unit}" : ""}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          currencyFormat.format(item.total),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryGreen,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 // Address
                 Row(

@@ -236,9 +236,9 @@ export class AuthController {
     }
   }
 
-  static async logout(req: Request, res: Response): Promise<void> {
+  static async logout(req: AuthRequest, res: Response): Promise<void> {
     const { refreshToken } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
     try {
       if (refreshToken) {

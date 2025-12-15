@@ -8,9 +8,12 @@ import '../screens/home/home_screen.dart';
 import '../screens/products/product_list_screen.dart';
 import '../screens/products/product_detail_screen.dart';
 import '../screens/categories/categories_screen.dart';
+import '../screens/categories/subcategory_selection_screen.dart';
+import '../screens/categories/category_with_subcategories_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/address/address_list_screen.dart';
 import '../screens/address/add_address_screen.dart';
+import '../screens/address/edit_address_screen.dart';
 import '../screens/address/map_address_picker_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_status_screen.dart';
@@ -24,11 +27,13 @@ import '../screens/delivery/delivery_order_detail_screen.dart';
 import '../screens/delivery/delivery_map_view_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/admin_orders_screen.dart';
+import '../screens/admin/admin_order_detail_screen.dart';
 import '../screens/admin/admin_users_screen.dart';
 import '../screens/admin/admin_products_screen.dart';
 import '../screens/admin/admin_categories_screen.dart';
 import '../screens/admin/add_edit_category_screen.dart';
 import '../screens/admin/add_edit_product_screen.dart';
+import '../models/address_model.dart';
 import '../screens/service_area/service_not_available_screen.dart';
 import '../screens/onboarding/location_detection_screen.dart';
 import '../screens/onboarding/location_permission_screen.dart';
@@ -138,6 +143,28 @@ class AppRouter {
         builder: (context, state) => const CategoriesScreen(),
       ),
       GoRoute(
+        path: '/categories/:id/subcategories',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          final extra = state.extra as Map<String, dynamic>?;
+          return SubcategorySelectionScreen(
+            parentCategoryId: id,
+            parentCategoryName: extra?['parentCategoryName'] as String? ?? 'Category',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/categories/:id/products',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          final extra = state.extra as Map<String, dynamic>?;
+          return CategoryWithSubcategoriesScreen(
+            parentCategoryId: id,
+            parentCategoryName: extra?['parentCategoryName'] as String? ?? 'Category',
+          );
+        },
+      ),
+      GoRoute(
         path: '/products',
         builder: (context, state) {
           final categoryId = state.uri.queryParameters['categoryId'];
@@ -166,6 +193,13 @@ class AppRouter {
         builder: (context, state) {
           final preFilledData = state.extra as Map<String, dynamic>?;
           return AddAddressScreen(preFilledData: preFilledData);
+        },
+      ),
+      GoRoute(
+        path: '/address/edit',
+        builder: (context, state) {
+          final address = state.extra as AddressModel;
+          return EditAddressScreen(address: address);
         },
       ),
       GoRoute(
@@ -274,6 +308,13 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/admin/orders/:id',
+        builder: (context, state) {
+          final orderId = int.parse(state.pathParameters['id']!);
+          return AdminOrderDetailScreen(orderId: orderId);
+        },
+      ),
+      GoRoute(
         path: '/admin/users',
         builder: (context, state) {
           final role = state.uri.queryParameters['role'];
@@ -290,7 +331,12 @@ class AppRouter {
       ),
       GoRoute(
         path: '/admin/categories/add',
-        builder: (context, state) => const AddEditCategoryScreen(),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return AddEditCategoryScreen(
+            parentCategoryId: extra?['parentCategoryId'] as int?,
+          );
+        },
       ),
       GoRoute(
         path: '/admin/categories/:id/edit',

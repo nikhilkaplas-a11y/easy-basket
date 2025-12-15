@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/cart_service.dart';
 import '../models/product_model.dart';
+import '../models/product_variant_model.dart';
 
 class CartProvider with ChangeNotifier {
   final CartService _cartService = CartService();
@@ -41,14 +42,20 @@ class CartProvider with ChangeNotifier {
             final productJson = itemData['product'] as Map<String, dynamic>;
             final product = ProductModel.fromJson(productJson);
             final quantity = itemData['quantity'] as int;
+            ProductVariantModel? variant;
             
-            // Add item with quantity
+            // Load variant if present
+            if (itemData['variant'] != null) {
+              variant = ProductVariantModel.fromJson(itemData['variant'] as Map<String, dynamic>);
+            }
+            
+            // Add item with quantity and variant
             for (int i = 0; i < quantity; i++) {
-              _cartService.addItem(product);
+              _cartService.addItem(product, variant: variant);
             }
             // Adjust quantity if needed (in case it was > 1)
             if (quantity > 1) {
-              _cartService.updateQuantity(product.id, quantity);
+              _cartService.updateQuantity(product.id, quantity, variantId: variant?.id);
             }
           } catch (e) {
             if (kDebugMode) {
@@ -76,6 +83,7 @@ class CartProvider with ChangeNotifier {
       final cartData = _cartService.items.map((item) => {
         'product': item.product.toJson(),
         'quantity': item.quantity,
+        if (item.variant != null) 'variant': item.variant!.toJson(),
       }).toList();
 
       final cartJson = jsonEncode(cartData);
@@ -87,26 +95,26 @@ class CartProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addItem(ProductModel product) async {
+  Future<void> addItem(ProductModel product, {ProductVariantModel? variant}) async {
     _addingItems.add(product.id);
     notifyListeners();
     
     // Instant update for better UX (like Blinkit)
-    _cartService.addItem(product);
+    _cartService.addItem(product, variant: variant);
     _addingItems.remove(product.id);
     await _saveCart();
     notifyListeners();
   }
 
-  Future<void> removeItem(int productId) async {
-    _cartService.removeItem(productId);
+  Future<void> removeItem(int productId, {int? variantId}) async {
+    _cartService.removeItem(productId, variantId: variantId);
     await _saveCart();
     notifyListeners();
   }
 
-  Future<void> updateQuantity(int productId, int quantity) async {
+  Future<void> updateQuantity(int productId, int quantity, {int? variantId}) async {
     // Instant update for smooth UX (like Blinkit)
-    _cartService.updateQuantity(productId, quantity);
+    _cartService.updateQuantity(productId, quantity, variantId: variantId);
     await _saveCart();
     notifyListeners();
   }
@@ -120,12 +128,12 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  bool contains(int productId) {
-    return _cartService.contains(productId);
+  bool contains(int productId, {int? variantId}) {
+    return _cartService.contains(productId, variantId: variantId);
   }
 
-  int getQuantity(int productId) {
-    return _cartService.getQuantity(productId);
+  int getQuantity(int productId, {int? variantId}) {
+    return _cartService.getQuantity(productId, variantId: variantId);
   }
 }
 

@@ -5,8 +5,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
 } from 'typeorm';
 import { Category } from './Category';
+import { ProductVariant } from './ProductVariant';
 
 @Entity()
 export class Product {
@@ -19,6 +21,10 @@ export class Product {
   @Column('text', { nullable: true })
   description!: string;
 
+  /**
+   * Base price - used when no variants exist or as fallback
+   * If variants exist, this can be the price for the default variant
+   */
   @Column('decimal', { precision: 10, scale: 2 })
   price!: number;
 
@@ -28,14 +34,57 @@ export class Product {
   @ManyToOne(() => Category, (category) => category.products)
   category!: Category;
 
+  /**
+   * Base stock - used when no variants exist
+   * If variants exist, stock is tracked per variant
+   */
   @Column({ default: 0 })
-  stock!: number; // Inventory quantity
+  stock!: number;
 
   @Column({ default: true })
   isAvailable!: boolean;
 
+  /**
+   * Base unit - used when no variants exist
+   * Examples: 'kg', 'piece', 'pack', etc.
+   */
   @Column({ nullable: true })
-  unit!: string; // kg, piece, pack, etc.
+  unit!: string;
+
+  /**
+   * Whether this product has variants (quantity options)
+   * If true, customers can select from different quantities/weights
+   */
+  @Column({ default: false })
+  hasVariants!: boolean;
+
+  /**
+   * Base unit for quantity calculations
+   * For pulses: 'kg' (so 250g = 0.25, 1kg = 1.0)
+   */
+  @Column({ nullable: true })
+  baseUnit!: string;
+
+  /**
+   * Minimum quantity allowed (in base unit)
+   * For pulses: 0.25 (250g minimum)
+   */
+  @Column('decimal', { precision: 10, scale: 3, nullable: true })
+  minQuantity!: number | null;
+
+  /**
+   * Maximum quantity allowed (in base unit)
+   * For pulses: 5 (5kg maximum)
+   */
+  @Column('decimal', { precision: 10, scale: 3, nullable: true })
+  maxQuantity!: number | null;
+
+  /**
+   * Product variants (quantity/weight options)
+   * Example: 250g, 500g, 1kg, 2kg, 5kg for pulses
+   */
+  @OneToMany(() => ProductVariant, (variant) => variant.product, { cascade: true })
+  variants!: ProductVariant[];
 
   @CreateDateColumn()
   createdAt!: Date;

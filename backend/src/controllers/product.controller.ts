@@ -11,6 +11,7 @@ export class ProductController {
       const queryBuilder = productRepository
         .createQueryBuilder('product')
         .leftJoinAndSelect('product.category', 'category')
+        .leftJoinAndSelect('product.variants', 'variants')
         .where('product.isAvailable = :isAvailable', { isAvailable: true });
 
       if (categoryId) {
@@ -24,6 +25,19 @@ export class ProductController {
       }
 
       const products = await queryBuilder.getMany();
+      
+      // Sort variants by displayOrder for each product
+      products.forEach(product => {
+        if (product.variants) {
+          product.variants.sort((a, b) => {
+            if (a.displayOrder !== b.displayOrder) {
+              return a.displayOrder - b.displayOrder;
+            }
+            return a.quantity - b.quantity;
+          });
+        }
+      });
+      
       res.json(products);
     } catch (error) {
       console.error(error);
@@ -37,12 +51,22 @@ export class ProductController {
       const productRepository = AppDataSource.getRepository(Product);
       const product = await productRepository.findOne({
         where: { id: Number(id) },
-        relations: ['category'],
+        relations: ['category', 'variants'],
       });
 
       if (!product) {
         res.status(404).json({ message: 'Product not found' });
         return;
+      }
+
+      // Sort variants by displayOrder
+      if (product.variants) {
+        product.variants.sort((a, b) => {
+          if (a.displayOrder !== b.displayOrder) {
+            return a.displayOrder - b.displayOrder;
+          }
+          return a.quantity - b.quantity;
+        });
       }
 
       res.json(product);

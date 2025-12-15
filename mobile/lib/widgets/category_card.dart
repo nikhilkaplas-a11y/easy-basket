@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/category_model.dart';
 import '../utils/theme.dart';
 
@@ -11,7 +12,12 @@ class CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/products?categoryId=${category.id}'),
+      onTap: () {
+        // Always navigate to category screen - it will handle subcategories
+        context.push('/categories/${category.id}/products', extra: {
+          'parentCategoryName': category.name,
+        });
+      },
       child: Container(
         width: 110,
         margin: const EdgeInsets.only(right: 12),
@@ -47,16 +53,26 @@ class CategoryCard extends StatelessWidget {
               child: category.imageUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        category.imageUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: category.imageUrl!,
                         width: 70,
                         height: 70,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
+                        placeholder: (context, url) => Container(
+                          color: AppTheme.primaryGreen.withOpacity(0.1),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
                           Icons.category,
                           size: 40,
                           color: AppTheme.primaryGreen,
                         ),
+                        fadeInDuration: const Duration(milliseconds: 300),
                       ),
                     )
                   : const Icon(

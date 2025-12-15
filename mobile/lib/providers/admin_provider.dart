@@ -4,6 +4,7 @@ import '../models/order_model.dart';
 import '../models/user_model.dart';
 import '../models/product_model.dart';
 import '../models/category_model.dart';
+import '../models/product_variant_model.dart';
 
 class AdminProvider with ChangeNotifier {
   final ApiService apiService;
@@ -180,8 +181,15 @@ class AdminProvider with ChangeNotifier {
         token: token,
       );
 
-      await fetchOrders(token: token);
-      await fetchStats(token: token);
+      // Update the order in the list if it exists
+      final orderIndex = _orders.indexWhere((o) => o.id == orderId);
+      if (orderIndex >= 0) {
+        // Fetch updated order to refresh the list
+        await fetchOrders(token: token);
+      } else {
+        // If order not in list, just refresh stats
+        await fetchStats(token: token);
+      }
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -431,6 +439,8 @@ class AdminProvider with ChangeNotifier {
     required String name,
     String? description,
     String? imageUrl,
+    int? parentCategoryId,
+    int? displayOrder,
   }) async {
     _isLoading = true;
     _error = null;
@@ -440,6 +450,8 @@ class AdminProvider with ChangeNotifier {
       final data = <String, dynamic>{'name': name};
       if (description != null) data['description'] = description;
       if (imageUrl != null) data['imageUrl'] = imageUrl;
+      if (parentCategoryId != null) data['parentCategoryId'] = parentCategoryId;
+      if (displayOrder != null) data['displayOrder'] = displayOrder;
 
       await apiService.post('/categories', data, token: token);
       await fetchCategories(token: token);
@@ -460,6 +472,8 @@ class AdminProvider with ChangeNotifier {
     String? description,
     String? imageUrl,
     bool? isActive,
+    int? parentCategoryId,
+    int? displayOrder,
   }) async {
     _isLoading = true;
     _error = null;
@@ -471,6 +485,12 @@ class AdminProvider with ChangeNotifier {
       if (description != null) data['description'] = description;
       if (imageUrl != null) data['imageUrl'] = imageUrl;
       if (isActive != null) data['isActive'] = isActive;
+      if (parentCategoryId != null) data['parentCategoryId'] = parentCategoryId;
+      if (parentCategoryId == null && data.containsKey('parentCategoryId')) {
+        // Explicitly set to null to remove parent
+        data['parentCategoryId'] = null;
+      }
+      if (displayOrder != null) data['displayOrder'] = displayOrder;
 
       await apiService.put('/categories/$categoryId', data, token: token);
       await fetchCategories(token: token);
@@ -526,6 +546,138 @@ class AdminProvider with ChangeNotifier {
       if (kDebugMode) {
         print('❌ Error fetching delivery agents: $_error');
       }
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Variant Management Methods
+  Future<List<ProductVariantModel>> fetchProductVariants({
+    required String token,
+    required int productId,
+  }) async {
+    _error = null;
+    try {
+      // Use admin endpoint for authenticated requests
+      final response = await apiService.get('/admin/products/$productId/variants', token: token);
+      if (response is Map<String, dynamic> && response.containsKey('variants')) {
+        final List<dynamic> data = response['variants'] as List? ?? [];
+        return data.map((json) => ProductVariantModel.fromJson(json as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      print('❌ Error fetching variants: $_error');
+      return [];
+    }
+  }
+
+  Future<bool> createVariant({
+    required String token,
+    required int productId,
+    required double quantity,
+    required String unit,
+    required String label,
+    required double price,
+    int? stock,
+    bool? isAvailable,
+    double? minQuantity,
+    double? maxQuantity,
+    int? displayOrder,
+    bool? isDefault,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = <String, dynamic>{
+        'quantity': quantity,
+        'unit': unit,
+        'label': label,
+        'price': price,
+      };
+      if (stock != null) data['stock'] = stock;
+      if (isAvailable != null) data['isAvailable'] = isAvailable;
+      if (minQuantity != null) data['minQuantity'] = minQuantity;
+      if (maxQuantity != null) data['maxQuantity'] = maxQuantity;
+      if (displayOrder != null) data['displayOrder'] = displayOrder;
+      if (isDefault != null) data['isDefault'] = isDefault;
+
+      final response = await apiService.post('/admin/products/$productId/variants', data, token: token);
+      
+      // Check if response indicates success
+      if (response != null) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      print('❌ Error creating variant: $_error');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateVariant({
+    required String token,
+    required int variantId,
+    double? quantity,
+    String? unit,
+    String? label,
+    double? price,
+    int? stock,
+    bool? isAvailable,
+    double? minQuantity,
+    double? maxQuantity,
+    int? displayOrder,
+    bool? isDefault,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = <String, dynamic>{};
+      if (quantity != null) data['quantity'] = quantity;
+      if (unit != null) data['unit'] = unit;
+      if (label != null) data['label'] = label;
+      if (price != null) data['price'] = price;
+      if (stock != null) data['stock'] = stock;
+      if (isAvailable != null) data['isAvailable'] = isAvailable;
+      if (minQuantity != null) data['minQuantity'] = minQuantity;
+      if (maxQuantity != null) data['maxQuantity'] = maxQuantity;
+      if (displayOrder != null) data['displayOrder'] = displayOrder;
+      if (isDefault != null) data['isDefault'] = isDefault;
+
+      await apiService.put('/admin/variants/$variantId', data, token: token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteVariant({
+    required String token,
+    required int variantId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await apiService.delete('/admin/variants/$variantId', token: token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();

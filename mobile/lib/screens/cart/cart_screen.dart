@@ -237,8 +237,20 @@ class CartScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
+                  // Show variant label if present
+                  if (item.variant != null) ...[
+                    Text(
+                      item.variant!.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.grey,
+                        fontFamily: 'RoundedSans',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
                   Text(
-                    currencyFormat.format(item.product.price),
+                    currencyFormat.format(item.variant?.price ?? item.product.price),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -246,17 +258,17 @@ class CartScreen extends StatelessWidget {
                       fontFamily: 'RoundedSans',
                     ),
                   ),
-                  if (item.product.unit != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Per ${item.product.unit}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.grey,
-                        fontFamily: 'RoundedSans',
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.variant != null 
+                        ? 'Per ${item.variant!.unit}'
+                        : (item.product.unit != null ? 'Per ${item.product.unit}' : ''),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.grey,
+                      fontFamily: 'RoundedSans',
                     ),
-                  ],
+                  ),
                   const SizedBox(height: 12),
                   // Quantity Selector (Blinkit-style)
                   _buildQuantitySelector(context, item, cartProvider),
@@ -286,7 +298,8 @@ class CartScreen extends StatelessWidget {
     CartProvider cartProvider,
   ) {
     final quantity = item.quantity;
-    final canIncrement = quantity < item.product.stock && item.product.isAvailable;
+    final maxStock = item.variant?.stock ?? item.product.stock;
+    final canIncrement = quantity < maxStock && (item.variant?.isAvailable ?? item.product.isAvailable);
     final buttonSize = 28.0;
 
     return Container(
@@ -303,9 +316,16 @@ class CartScreen extends StatelessWidget {
           GestureDetector(
             onTap: () async {
               if (quantity > 1) {
-                await cartProvider.updateQuantity(item.product.id, quantity - 1);
+                await cartProvider.updateQuantity(
+                  item.product.id, 
+                  quantity - 1,
+                  variantId: item.variant?.id,
+                );
               } else {
-                await cartProvider.removeItem(item.product.id);
+                await cartProvider.removeItem(
+                  item.product.id,
+                  variantId: item.variant?.id,
+                );
               }
             },
             child: Container(
@@ -339,7 +359,11 @@ class CartScreen extends StatelessWidget {
           GestureDetector(
             onTap: canIncrement
                 ? () async {
-                    await cartProvider.updateQuantity(item.product.id, quantity + 1);
+                    await cartProvider.updateQuantity(
+                      item.product.id, 
+                      quantity + 1,
+                      variantId: item.variant?.id,
+                    );
                   }
                 : null,
             child: Container(
@@ -377,7 +401,7 @@ class CartScreen extends StatelessWidget {
           ),
         ),
         content: Text(
-          'Remove ${item.product.name} from cart?',
+          'Remove ${item.product.name}${item.variant != null ? " (${item.variant!.label})" : ""} from cart?',
           style: const TextStyle(
             fontFamily: 'RoundedSans',
           ),
@@ -395,7 +419,7 @@ class CartScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              cartProvider.removeItem(item.product.id);
+              cartProvider.removeItem(item.product.id, variantId: item.variant?.id);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

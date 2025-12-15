@@ -23,6 +23,7 @@ export class DeliveryController {
         .leftJoinAndSelect('order.user', 'user')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('items.variant', 'variant')
         .leftJoinAndSelect('order.deliveryAddress', 'deliveryAddress')
         .leftJoinAndSelect('order.deliveryBoy', 'deliveryBoy')
         .where('order.deliveryBoyId = :deliveryBoyId', { deliveryBoyId })

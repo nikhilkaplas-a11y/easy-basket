@@ -21,6 +21,7 @@ export class AdminController {
         .leftJoinAndSelect('order.user', 'user')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('items.variant', 'variant')
         .leftJoinAndSelect('order.deliveryAddress', 'deliveryAddress')
         .leftJoinAndSelect('order.deliveryBoy', 'deliveryBoy')
         .orderBy('order.createdAt', 'DESC');
@@ -44,6 +45,28 @@ export class AdminController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching orders' });
+    }
+  }
+
+  static async getOrderById(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOne({
+        where: { id: Number(id) },
+        relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
+      });
+
+      if (!order) {
+        res.status(404).json({ message: 'Order not found' });
+        return;
+      }
+
+      res.json(order);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error fetching order' });
     }
   }
 

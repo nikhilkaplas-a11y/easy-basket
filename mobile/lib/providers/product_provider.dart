@@ -86,11 +86,29 @@ class ProductProvider with ChangeNotifier {
   }
 
   Future<ProductModel?> fetchProductById(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
     try {
       final response = await apiService.get('/products/$id');
-      return ProductModel.fromJson(response as Map<String, dynamic>);
+      final product = ProductModel.fromJson(response as Map<String, dynamic>);
+      
+      // Add or update product in the list
+      final existingIndex = _products.indexWhere((p) => p.id == id);
+      if (existingIndex >= 0) {
+        _products[existingIndex] = product;
+      } else {
+        _products.add(product);
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return product;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
       return null;
     }
   }

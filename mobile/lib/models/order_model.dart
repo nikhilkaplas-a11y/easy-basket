@@ -1,20 +1,27 @@
 import 'user_model.dart';
 import 'address_model.dart';
 import 'product_model.dart';
+import 'product_variant_model.dart';
 
 class OrderItemModel {
   final int id;
   final ProductModel product;
+  final ProductVariantModel? variant; // Variant if product has variants
   final int quantity;
   final double price;
   final double total;
+  final String? unit; // Unit of measurement
+  final String? displayLabel; // Display label (e.g., "2 × 1 kg")
 
   OrderItemModel({
     required this.id,
     required this.product,
+    this.variant,
     required this.quantity,
     required this.price,
     required this.total,
+    this.unit,
+    this.displayLabel,
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
@@ -29,12 +36,32 @@ class OrderItemModel {
       }
     }
 
+    // Helper to parse quantity (can be int or decimal, but we store as int)
+    int parseQuantity(dynamic value) {
+      if (value is int) {
+        return value;
+      } else if (value is num) {
+        return value.toInt();
+      } else if (value is String) {
+        // Handle string like "1.000" or "1"
+        final parsed = double.tryParse(value);
+        return parsed?.toInt() ?? 0;
+      } else {
+        return 0;
+      }
+    }
+
     return OrderItemModel(
       id: json['id'] as int,
       product: ProductModel.fromJson(json['product'] as Map<String, dynamic>),
-      quantity: json['quantity'] as int,
+      variant: json['variant'] != null
+          ? ProductVariantModel.fromJson(json['variant'] as Map<String, dynamic>)
+          : null,
+      quantity: parseQuantity(json['quantity']),
       price: parseDouble(json['price']),
       total: parseDouble(json['total']),
+      unit: json['unit'] as String?,
+      displayLabel: json['displayLabel'] as String?,
     );
   }
 }

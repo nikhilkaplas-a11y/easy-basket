@@ -7,6 +7,7 @@ const router = Router();
 // Public routes
 router.get('/', CategoryController.getAllCategories);
 router.get('/:id', CategoryController.getCategoryById);
+router.get('/:id/subcategories', CategoryController.getSubcategories);
 
 // Admin routes
 router.post('/', authenticate, authorize('admin'), CategoryController.createCategory);
