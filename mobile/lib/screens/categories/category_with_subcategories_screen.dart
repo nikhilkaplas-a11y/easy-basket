@@ -187,29 +187,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
     
     return Column(
       children: [
-        // Search bar
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search products...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: AppTheme.lightGrey.withOpacity(0.3),
-            ),
-            onChanged: (query) {
-              final productProvider = Provider.of<ProductProvider>(context, listen: false);
-              productProvider.fetchProducts(
-                categoryId: widget.parentCategoryId,
-                search: query.isEmpty ? null : query,
-              );
-            },
-          ),
-        ),
-        // Products grid
+        // Products grid - No search bar for cleaner UI
         Expanded(
           child: _isLoadingProducts
               ? const Center(child: CircularProgressIndicator())
@@ -239,7 +217,8 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                         ),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: screenWidth < 400 ? 0.62 : 0.65, // Adjusted for side-positioned button
+                          // More granular aspect ratio for better text rendering on small screens
+                          childAspectRatio: screenWidth < 360 ? 0.62 : screenWidth < 400 ? 0.64 : 0.67,
                           crossAxisSpacing: screenWidth < 360 ? 8 : 12,
                           mainAxisSpacing: screenWidth < 360 ? 8 : 12,
                         ),
@@ -256,8 +235,8 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
 
   Widget _buildSideBySideView(bool isMobile) {
     // Blinkit-style: Side-by-side layout for both mobile and desktop
-    // Mobile: Narrower sidebar, Desktop: Wider sidebar
-    final sidebarWidth = isMobile ? 100.0 : 250.0;
+    // Mobile: Compact sidebar to give more space to products
+    final sidebarWidth = isMobile ? 80.0 : 200.0;
     
     return Row(
       children: [
@@ -284,8 +263,8 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                       onTap: () => _onSubcategorySelected(subcategory.id),
                       child: Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 6 : 12,
-                          vertical: isMobile ? 10 : 14,
+                          horizontal: isMobile ? 4 : 8,
+                          vertical: isMobile ? 6 : 10,
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
@@ -299,10 +278,10 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Subcategory Image
+                            // Subcategory Image - More compact
                             Container(
-                              width: isMobile ? 50 : 60,
-                              height: isMobile ? 50 : 60,
+                              width: isMobile ? 40 : 50,
+                              height: isMobile ? 40 : 50,
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? Colors.white.withOpacity(0.2)
@@ -311,11 +290,11 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                               ),
                               child: subcategory.imageUrl != null
                                   ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(isMobile ? 8 : 12),
+                                      borderRadius: BorderRadius.circular(isMobile ? 6 : 10),
                                       child: CachedNetworkImage(
                                         imageUrl: subcategory.imageUrl!,
-                                        width: isMobile ? 50 : 60,
-                                        height: isMobile ? 50 : 60,
+                                        width: isMobile ? 40 : 50,
+                                        height: isMobile ? 40 : 50,
                                         fit: BoxFit.cover,
                                         placeholder: (context, url) => Container(
                                           color: AppTheme.primaryGreen.withOpacity(0.1),
@@ -333,16 +312,16 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                                           ),
                                         ),
                                         errorWidget: (context, url, error) => Icon(
-                                          Icons.category,
-                                          size: isMobile ? 24 : 28,
-                                          color: isSelected ? Colors.white : AppTheme.primaryGreen,
-                                        ),
+                                      Icons.category,
+                                      size: isMobile ? 20 : 24,
+                                      color: isSelected ? Colors.white : AppTheme.primaryGreen,
+                                    ),
                                         fadeInDuration: const Duration(milliseconds: 300),
                                       ),
                                     )
                                   : Icon(
                                       Icons.category,
-                                      size: isMobile ? 24 : 28,
+                                      size: isMobile ? 20 : 24,
                                       color: isSelected ? Colors.white : AppTheme.primaryGreen,
                                     ),
                             ),
@@ -367,21 +346,21 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                                 ),
                               ),
                             ],
-                            // Mobile: Show name below image in smaller text
+                            // Mobile: Show name below image in smaller text - More compact
                             if (isMobile) ...[
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 2),
                               Flexible(
                                 child: Text(
                                   subcategory.name,
                                   style: TextStyle(
-                                    fontSize: 9,
+                                    fontSize: 8,
                                     fontWeight: isSelected
                                         ? FontWeight.bold
                                         : FontWeight.normal,
                                     color: isSelected
                                         ? Colors.white
                                         : AppTheme.black,
-                                    height: 1.1,
+                                    height: 1.0,
                                   ),
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
@@ -399,41 +378,9 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
             ],
           ),
         ),
-        // Right side - Products with search
+        // Right side - Products (no search bar for cleaner UI)
         Expanded(
-          child: Column(
-            children: [
-              // Search bar
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search products...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: AppTheme.lightGrey.withOpacity(0.3),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    isDense: isMobile,
-                  ),
-                  onChanged: (query) {
-                    final productProvider = Provider.of<ProductProvider>(context, listen: false);
-                    final categoryId = _selectedSubcategoryId ?? widget.parentCategoryId;
-                    productProvider.fetchProducts(
-                      categoryId: categoryId,
-                      search: query.isEmpty ? null : query,
-                    );
-                  },
-                ),
-              ),
-              // Products grid
-              Expanded(
-                child: _buildProductsGrid(showSearchBar: false),
-              ),
-            ],
-          ),
+          child: _buildProductsGrid(showSearchBar: false),
         ),
       ],
     );
@@ -446,7 +393,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     // Adjust grid columns based on available width (accounting for sidebar)
-    final sidebarWidth = isMobile ? 100.0 : 250.0;
+    final sidebarWidth = isMobile ? 80.0 : 200.0;
     final availableWidth = screenWidth - sidebarWidth;
     final crossAxisCount = isMobile 
         ? 2 
@@ -483,7 +430,8 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                   ),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio: screenWidth < 400 ? 0.62 : 0.65, // Adjusted for side-positioned button
+                    // More granular aspect ratio for better text rendering on small screens
+                    childAspectRatio: screenWidth < 360 ? 0.62 : screenWidth < 400 ? 0.64 : 0.67,
                     crossAxisSpacing: screenWidth < 360 ? 8 : 12,
                     mainAxisSpacing: screenWidth < 360 ? 8 : 12,
                   ),

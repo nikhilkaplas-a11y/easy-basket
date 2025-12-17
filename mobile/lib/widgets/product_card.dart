@@ -69,7 +69,7 @@ class ProductCard extends StatelessWidget {
             children: [
             // Image Section with Discount Badge - Use Expanded with flex
             Expanded(
-              flex: 52, // 52% of available space
+              flex: 55, // 55% of available space (reduced from 60% to give more space to content)
               child: Stack(
                 children: [
                   ClipRRect(
@@ -127,36 +127,40 @@ class ProductCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Content Section - Use Expanded with flex
+            // Content Section - Use Expanded with flex (increased to ensure product name is visible)
             Expanded(
-              flex: 48, // 48% of available space
+              flex: 45, // 45% of available space (increased from 40% to ensure product name visibility)
               child: ClipRect(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth < 360 ? 4.0 : 6.0,
-                    vertical: screenWidth < 360 ? 4.0 : 6.0,
+                    horizontal: screenWidth < 360 ? 4.0 : 5.0,
+                    vertical: screenWidth < 360 ? 3.0 : 4.0,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Product Name - Compact
-                      _buildProductName(nameFontSize, screenWidth),
-                      SizedBox(height: screenWidth < 360 ? 1 : 2),
-                      // Weight/Unit Display
+                      // Product Name - Must be visible with proper ellipsis (Blinkit style)
+                      Expanded(
+                        flex: 2, // Give more space to product name
+                        child: _buildProductName(nameFontSize, screenWidth),
+                      ),
+                      SizedBox(height: screenWidth < 360 ? 0.5 : 1),
+                      // Weight/Unit Display - Optional, can be removed if space is tight
                       if (product.unit != null || (product.hasVariants && product.variants != null && product.variants!.isNotEmpty))
-                        Text(
-                          _getWeightDisplay(),
-                          style: TextStyle(
-                            fontSize: screenWidth < 360 ? 8 : 9,
-                            color: AppTheme.grey,
-                            fontWeight: FontWeight.w400,
+                        Flexible(
+                          child: Text(
+                            _getWeightDisplay(),
+                            style: TextStyle(
+                              fontSize: screenWidth < 360 ? 7.5 : 8.5,
+                              color: AppTheme.grey,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      SizedBox(height: screenWidth < 360 ? 2 : 3),
+                      SizedBox(height: screenWidth < 360 ? 1 : 2),
                       // Price and ADD Button in same row (Blinkit style) - Saves space
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -196,53 +200,21 @@ class ProductCard extends StatelessWidget {
     return 0; // Placeholder - no discount by default
   }
 
-  // Build product name with brand extraction
+  // Build product name - Consistent dark color (Blinkit style) with proper ellipsis
   Widget _buildProductName(double fontSize, double screenWidth) {
     final name = product.name;
-    // Try to extract brand name (first part before space or common patterns)
-    String displayName = name;
-    String? brandName;
-    
-    // Simple brand extraction (can be enhanced)
-    final parts = name.split(' ');
-    if (parts.length > 2) {
-      // Assume first 2 words might be brand
-      brandName = parts.take(2).join(' ');
-      displayName = parts.skip(2).join(' ');
-    } else if (parts.length > 1) {
-      brandName = parts.first;
-      displayName = parts.skip(1).join(' ');
-    }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (brandName != null)
-          Text(
-            brandName,
-            style: TextStyle(
-              fontSize: fontSize - 1,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.grey,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        Flexible(
-          child: Text(
-            displayName,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.black,
-              height: 1.15, // Tighter line height
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+    return Text(
+      name,
+      style: TextStyle(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w600,
+        color: AppTheme.black,
+        height: 1.1, // Tighter line height for better fit
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      softWrap: true, // Enable text wrapping
     );
   }
 

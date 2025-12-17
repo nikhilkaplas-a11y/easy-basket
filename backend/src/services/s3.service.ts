@@ -12,7 +12,7 @@ export class S3Service {
   static initialize(): void {
     const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-    const region = process.env.AWS_REGION || 'eu-north-1';
+    const region = process.env.AWS_REGION || 'ap-south-1'; // Mumbai, India - better for Indian users
     const bucketName = process.env.AWS_S3_BUCKET_NAME;
 
     if (!accessKeyId || !secretAccessKey) {

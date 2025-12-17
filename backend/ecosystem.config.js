@@ -15,7 +15,7 @@ module.exports = {
       AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
       AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
       AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
-      AWS_REGION: process.env.AWS_REGION || 'eu-north-1',
+      AWS_REGION: process.env.AWS_REGION || 'ap-south-1', // Mumbai, India - better for Indian users
       // Load other env vars from .env
       DB_HOST: process.env.DB_HOST,
       DB_PORT: process.env.DB_PORT,

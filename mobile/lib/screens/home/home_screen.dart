@@ -766,7 +766,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            childAspectRatio: MediaQuery.of(context).size.width < 400 ? 0.56 : 0.58, // Reduced to prevent overflow
+                            childAspectRatio: MediaQuery.of(context).size.width < 400 ? 0.68 : 0.70, // Increased to reduce white space below image
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),

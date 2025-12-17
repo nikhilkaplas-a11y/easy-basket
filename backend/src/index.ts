@@ -16,6 +16,7 @@ import productRoutes from './routes/product.routes';
 import serviceAreaRoutes from './routes/serviceArea.routes';
 import uploadRoutes from './routes/upload.routes';
 import variantRoutes from './routes/variant.routes';
+import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 
 // Load environment variables FIRST before importing any modules that use them
 dotenv.config();
@@ -36,6 +37,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
+app.use(RequestTimingMiddleware.handle);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -74,12 +76,12 @@ AppDataSource.initialize()
     console.log(`   AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID ? '✅ Set' : '❌ Missing'}`);
     console.log(`   AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`);
     console.log(`   AWS_S3_BUCKET_NAME: ${process.env.AWS_S3_BUCKET_NAME ? `✅ Set (${process.env.AWS_S3_BUCKET_NAME})` : '❌ Missing'}`);
-    console.log(`   AWS_REGION: ${process.env.AWS_REGION || 'eu-north-1 (default)'}`);
+    console.log(`   AWS_REGION: ${process.env.AWS_REGION || 'ap-south-1 (Mumbai, India - default)'}`);
     
     if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET_NAME) {
       console.log('✅ AWS S3 credentials configured');
       console.log(`📦 S3 Bucket: ${process.env.AWS_S3_BUCKET_NAME}`);
-      console.log(`🌍 S3 Region: ${process.env.AWS_REGION || 'eu-north-1'}`);
+      console.log(`🌍 S3 Region: ${process.env.AWS_REGION || 'ap-south-1 (Mumbai, India)'}`);
     } else {
       console.log('');
       console.log('⚠️  AWS S3 not configured - Image upload will be disabled');
@@ -94,7 +96,7 @@ AppDataSource.initialize()
       console.log('   AWS_ACCESS_KEY_ID=your_access_key_id');
       console.log('   AWS_SECRET_ACCESS_KEY=your_secret_access_key');
       console.log('   AWS_S3_BUCKET_NAME=your-bucket-name');
-      console.log('   AWS_REGION=eu-north-1 (optional)');
+      console.log('   AWS_REGION=ap-south-1 (Mumbai, India - optional, default)');
     }
     console.log('');
     
