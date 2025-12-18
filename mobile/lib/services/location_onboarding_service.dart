@@ -28,7 +28,7 @@ class LocationOnboardingService {
       // Check current permission status first
       final currentStatus = await Permission.location.status;
       
-      // Request location permission
+      // Request location permission with permanently denied handling
       PermissionStatus status;
       if (currentStatus.isDenied) {
         status = await Permission.location.request();
@@ -37,11 +37,13 @@ class LocationOnboardingService {
       }
       
       if (!status.isGranted) {
+        final isPermanentlyDenied = status.isPermanentlyDenied || await Permission.location.isPermanentlyDenied;
         return {
           'success': false,
           'error': 'Location permission denied',
           'showScreen': true, // Show permission explanation screen
           'permissionDenied': true,
+          'permissionPermanentlyDenied': isPermanentlyDenied,
         };
       }
 
@@ -65,19 +67,35 @@ class LocationOnboardingService {
         }
       }
 
-      // If no last known position, get fresh one (fast, low accuracy)
+      // If no last known position, get fresh one (fast, low accuracy) with fallback
       if (position == null) {
-        position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.low,
-          timeLimit: const Duration(seconds: 5),
-        );
+        try {
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 5),
+          );
+        } catch (_) {
+          // Fallback: medium accuracy with slightly longer timeout
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.medium,
+            timeLimit: const Duration(seconds: 10),
+          );
+        }
       }
 
-      // Get address from coordinates
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      // Get address from coordinates with timeout and graceful fallback
+      List<Placemark> placemarks = [];
+      try {
+        placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        ).timeout(const Duration(seconds: 6));
+      } catch (_) {
+        placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+      }
 
       if (placemarks.isEmpty) {
         return {
@@ -182,4 +200,3 @@ class LocationOnboardingService {
     }
   }
 }
-

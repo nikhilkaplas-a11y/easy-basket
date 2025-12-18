@@ -221,17 +221,14 @@ class ProductCard extends StatelessWidget {
   // Get weight/unit display
   String _getWeightDisplay() {
     if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-      // Show first variant's label or range
       final availableVariants = product.variants!.where((v) => v.isAvailable).toList();
       if (availableVariants.isNotEmpty) {
-        final firstVariant = availableVariants.first;
-        if (availableVariants.length == 1) {
-          return firstVariant.label;
-        } else {
-          // Show range
-          availableVariants.sort((a, b) => a.quantity.compareTo(b.quantity));
-          return '${availableVariants.first.label} - ${availableVariants.last.label}';
-        }
+        availableVariants.sort((a, b) {
+          final priceComp = a.price.compareTo(b.price);
+          if (priceComp != 0) return priceComp;
+          return a.quantity.compareTo(b.quantity);
+        });
+        return availableVariants.first.label;
       }
     }
     // Fallback to product unit
@@ -247,47 +244,9 @@ class ProductCard extends StatelessWidget {
       // Get available variants
       final availableVariants = product.variants!.where((v) => v.isAvailable).toList();
       if (availableVariants.isNotEmpty) {
-        // Sort by price to get min and max
+        // Sort by price to get min
         availableVariants.sort((a, b) => a.price.compareTo(b.price));
         final minPrice = availableVariants.first.price;
-        final maxPrice = availableVariants.last.price;
-        
-        // If all variants have same price, show single price
-        if (minPrice == maxPrice) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  currencyFormat.format(minPrice),
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
-                  ),
-                ),
-              ),
-              if (hasDiscount)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    currencyFormat.format(minPrice * 1.2), // Placeholder original price
-                    style: TextStyle(
-                      fontSize: fontSize - 3,
-                      color: AppTheme.grey,
-                      decoration: TextDecoration.lineThrough,
-                    ),
-                  ),
-                ),
-            ],
-          );
-        }
-        
-        // Show price range
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -296,7 +255,7 @@ class ProductCard extends StatelessWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                '${currencyFormat.format(minPrice)} - ${currencyFormat.format(maxPrice)}',
+                currencyFormat.format(minPrice),
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: FontWeight.bold,
@@ -304,6 +263,19 @@ class ProductCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (hasDiscount)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  currencyFormat.format(minPrice * 1.2),
+                  style: TextStyle(
+                    fontSize: fontSize - 3,
+                    color: AppTheme.grey,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+              ),
           ],
         );
       }
@@ -374,10 +346,8 @@ class ProductCard extends StatelessWidget {
         child: InkWell(
           onTap: (isAvailable && !isAdding)
               ? () async {
-                  // For products with variants, navigate to detail page to select variant
-                  // For products without variants, add directly to cart
                   if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                    context.push('/product/${product.id}');
+                    await _showVariantBottomSheet(context);
                   } else {
                     await cartProvider.addItem(product);
                   }
@@ -397,31 +367,35 @@ class ProductCard extends StatelessWidget {
                 ),
               )
             : variantCount > 1
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'ADD',
-                        style: TextStyle(
-                          fontSize: screenWidth < 360 ? 11 : 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.0,
-                          letterSpacing: 0.2,
+                ? FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'ADD',
+                          style: TextStyle(
+                            fontSize: screenWidth < 360 ? 11 : 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.0,
+                            letterSpacing: 0.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        '$variantCount options',
-                        style: TextStyle(
-                          fontSize: screenWidth < 360 ? 8.5 : 9.5,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.95),
-                          height: 1.0,
+                        const SizedBox(height: 1),
+                        Text(
+                          '$variantCount options',
+                          style: TextStyle(
+                            fontSize: screenWidth < 360 ? 8.5 : 9.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.95),
+                            height: 1.0,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   )
                 : Text(
                     (product.hasVariants && product.variants != null && product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
@@ -470,9 +444,8 @@ class ProductCard extends StatelessWidget {
           // Decrement button
           GestureDetector(
             onTap: () async {
-              // For products with variants, navigate to detail page
               if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                context.push('/product/${product.id}');
+                await _showVariantBottomSheet(context);
                 return;
               }
               
@@ -516,15 +489,14 @@ class ProductCard extends StatelessWidget {
           GestureDetector(
             onTap: canIncrement
                 ? () async {
-                    // For products with variants, navigate to detail page
                     if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                      context.push('/product/${product.id}');
+                      await _showVariantBottomSheet(context);
                       return;
                     }
                     await cartProvider.updateQuantity(product.id, quantity + 1);
                   }
                 : (product.hasVariants && product.variants != null && product.variants!.isNotEmpty)
-                    ? () => context.push('/product/${product.id}')
+                    ? () async => _showVariantBottomSheet(context)
                     : null,
             child: Container(
               width: buttonSize,
@@ -544,6 +516,226 @@ class ProductCard extends StatelessWidget {
         ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showVariantBottomSheet(BuildContext context) async {
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+    final variants = (product.variants ?? [])
+        .where((v) => v.isAvailable)
+        .toList()
+      ..sort((a, b) {
+        final priceComp = a.price.compareTo(b.price);
+        if (priceComp != 0) return priceComp;
+        return a.displayOrder.compareTo(b.displayOrder);
+      });
+
+    if (variants.isEmpty) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final screenWidth = MediaQuery.of(ctx).size.width;
+        final titleStyle = TextStyle(
+          fontSize: screenWidth < 360 ? 14 : 16,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.black,
+        );
+        final labelStyle = TextStyle(
+          fontSize: screenWidth < 360 ? 12 : 13,
+          fontWeight: FontWeight.w500,
+          color: AppTheme.black,
+        );
+        final priceStyle = TextStyle(
+          fontSize: screenWidth < 360 ? 13 : 14,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.black,
+        );
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.grey.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.name,
+                          style: titleStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    itemBuilder: (context, index) {
+                      final v = variants[index];
+                      final available = v.stock > 0 && v.isAvailable;
+                      return Consumer<CartProvider>(
+                        builder: (context, cp, _) {
+                          final qty = cp.getQuantity(product.id, variantId: v.id);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.lightGrey),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    v.label,
+                                    style: labelStyle,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: Text(
+                                    currencyFormat.format(v.price),
+                                    style: priceStyle,
+                                  ),
+                                ),
+                                if (qty > 0 && available)
+                                  Container(
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryGreen,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () async {
+                                            if (qty > 1) {
+                                              await cp.updateQuantity(product.id, qty - 1, variantId: v.id);
+                                            } else {
+                                              await cp.removeItem(product.id, variantId: v.id);
+                                            }
+                                          },
+                                          child: Container(
+                                            width: 24,
+                                            height: 24,
+                                            margin: const EdgeInsets.all(4),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(Icons.remove, size: 14, color: AppTheme.primaryGreen),
+                                          ),
+                                        ),
+                                        Container(
+                                          constraints: const BoxConstraints(minWidth: 20),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          child: const DefaultTextStyle(
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            child: Text(''),
+                                          ),
+                                        ),
+                                        Container(
+                                          constraints: const BoxConstraints(minWidth: 20),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          child: Text(
+                                            qty.toString(),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () async {
+                                            if (qty < v.stock) {
+                                              await cp.updateQuantity(product.id, qty + 1, variantId: v.id);
+                                            }
+                                          },
+                                          child: Container(
+                                            width: 24,
+                                            height: 24,
+                                            margin: const EdgeInsets.all(4),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(Icons.add, size: 14, color: AppTheme.primaryGreen),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  SizedBox(
+                                    height: 32,
+                                    child: ElevatedButton(
+                                      onPressed: available
+                                          ? () async {
+                                              await cp.addItem(product, variant: v);
+                                            }
+                                          : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: available ? AppTheme.primaryGreen : AppTheme.grey.withOpacity(0.3),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        textStyle: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: screenWidth < 360 ? 12 : 13,
+                                        ),
+                                      ),
+                                      child: Text(available ? 'ADD' : 'Out of Stock'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemCount: variants.length,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

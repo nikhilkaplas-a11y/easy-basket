@@ -559,8 +559,7 @@ class AdminProvider with ChangeNotifier {
   }) async {
     _error = null;
     try {
-      // Use admin endpoint for authenticated requests
-      final response = await apiService.get('/admin/products/$productId/variants', token: token);
+      final response = await apiService.get('/products/$productId/variants', token: token);
       if (response is Map<String, dynamic> && response.containsKey('variants')) {
         final List<dynamic> data = response['variants'] as List? ?? [];
         return data.map((json) => ProductVariantModel.fromJson(json as Map<String, dynamic>)).toList();
@@ -605,7 +604,7 @@ class AdminProvider with ChangeNotifier {
       if (displayOrder != null) data['displayOrder'] = displayOrder;
       if (isDefault != null) data['isDefault'] = isDefault;
 
-      final response = await apiService.post('/admin/products/$productId/variants', data, token: token);
+      final response = await apiService.post('/products/$productId/variants', data, token: token);
       
       // Check if response indicates success
       if (response != null) {
@@ -653,7 +652,7 @@ class AdminProvider with ChangeNotifier {
       if (displayOrder != null) data['displayOrder'] = displayOrder;
       if (isDefault != null) data['isDefault'] = isDefault;
 
-      await apiService.put('/admin/variants/$variantId', data, token: token);
+      await apiService.put('/variants/$variantId', data, token: token);
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -673,7 +672,7 @@ class AdminProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await apiService.delete('/admin/variants/$variantId', token: token);
+      await apiService.delete('/variants/$variantId', token: token);
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -684,4 +683,3 @@ class AdminProvider with ChangeNotifier {
     }
   }
 }
-

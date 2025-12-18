@@ -24,6 +24,10 @@ class ApiService {
         headers['Authorization'] = 'Bearer $currentToken';
       }
 
+      // Debug: Log the full GET URL for troubleshooting
+      // ignore: avoid_print
+      print('[API][GET] $baseUrl$endpoint');
+
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
@@ -94,6 +98,7 @@ class ApiService {
         headers['Authorization'] = 'Bearer $token';
       }
 
+      print('[API][POST] $baseUrl$endpoint');
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
@@ -139,6 +144,7 @@ class ApiService {
         headers['Authorization'] = 'Bearer $token';
       }
 
+      print('[API][PUT] $baseUrl$endpoint');
       final response = await http.put(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
@@ -182,6 +188,7 @@ class ApiService {
         headers['Authorization'] = 'Bearer $token';
       }
 
+      print('[API][DELETE] $baseUrl$endpoint');
       final response = await http.delete(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
@@ -277,4 +284,3 @@ class TokenExpiredException implements Exception {
   @override
   String toString() => message;
 }
-
