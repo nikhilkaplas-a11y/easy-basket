@@ -54,7 +54,7 @@ class Responsive {
   
   // Get responsive category grid columns
   int getCategoryGridColumns() {
-    if (isMobile) return 4;
+    if (isMobile) return 3;
     if (isTablet) return 5;
     return 6;
   }
@@ -78,4 +78,3 @@ extension ResponsiveExtension on BuildContext {
   bool get isTablet => screenWidth >= Responsive.mobileBreakpoint && screenWidth < Responsive.tabletBreakpoint;
   bool get isDesktop => screenWidth >= Responsive.tabletBreakpoint;
 }
-

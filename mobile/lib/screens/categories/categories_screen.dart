@@ -93,7 +93,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           // Optimized aspect ratio for icon + name
           // Icon (45px) + spacing (4px) + name (30px for 2 lines) + padding (16px) = ~95px needed
           // For width ~53px (on small screens), aspect ratio needs to be higher
-          final aspectRatio = screenWidth < 360 ? 1.15 : 1.1;
+          final aspectRatio = screenWidth < 360 ? 0.85 : 0.95;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -134,9 +134,6 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Optimized icon size to fit in available space - smaller for tight constraints
-    final iconSize = screenWidth < 360 ? 42.0 : 45.0;
 
     return GestureDetector(
       onTap: () async {
@@ -165,86 +162,94 @@ class _CategoryCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon Section - Fixed size
-              Container(
-                width: iconSize,
-                height: iconSize,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxH = constraints.maxHeight;
+            final gap = maxH < 64 ? 2.0 : 4.0;
+            final reservedTextHeight = maxH < 64 ? 12.0 : 22.0;
+            final computedIconSize = (maxH - reservedTextHeight - gap - 8).clamp(16.0, 46.0);
+            final remaining = maxH - computedIconSize - gap;
+            final nameMaxLines = remaining < 16 ? 1 : 2;
+            final nameFontSize = remaining < 16 ? responsive.fontSize(9) : responsive.fontSize(11);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: computedIconSize,
+                    height: computedIconSize,
+                    decoration: BoxDecoration(
                       color: AppTheme.primaryGreen.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryGreen.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: category.imageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: CachedNetworkImage(
-                          imageUrl: category.imageUrl!,
-                          width: iconSize,
-                          height: iconSize,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: AppTheme.primaryGreen.withOpacity(0.1),
-                            child: Center(
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                    child: category.imageUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: category.imageUrl!,
+                              width: computedIconSize,
+                              height: computedIconSize,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: AppTheme.primaryGreen.withOpacity(0.1),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                                    ),
+                                  ),
                                 ),
                               ),
+                              errorWidget: (context, url, error) => Icon(
+                                Icons.category_rounded,
+                                size: responsive.iconSize(22),
+                                color: AppTheme.primaryGreen,
+                              ),
+                              fadeInDuration: const Duration(milliseconds: 300),
                             ),
-                          ),
-                          errorWidget: (context, url, error) => Icon(
+                          )
+                        : Icon(
                             Icons.category_rounded,
                             size: responsive.iconSize(22),
                             color: AppTheme.primaryGreen,
                           ),
-                          fadeInDuration: const Duration(milliseconds: 300),
-                        ),
-                      )
-                    : Icon(
-                        Icons.category_rounded,
-                        size: responsive.iconSize(22),
-                        color: AppTheme.primaryGreen,
-                      ),
-              ),
-              const SizedBox(height: 4),
-              // Category Name - Flexible height with minimal spacing
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Text(
-                    category.name.isNotEmpty ? category.name : 'Category',
-                    style: TextStyle(
-                      fontSize: responsive.fontSize(11),
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.black,
-                      height: 1.1,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                  SizedBox(height: gap),
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        category.name.isNotEmpty ? category.name : 'Category',
+                        style: TextStyle(
+                          fontSize: nameFontSize,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.black,
+                          height: 1.1,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: nameMaxLines,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 }
-
