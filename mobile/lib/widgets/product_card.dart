@@ -356,11 +356,11 @@ class ProductCard extends StatelessWidget {
         ((product.hasVariants && product.variants != null && product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
          (!product.hasVariants && product.stock > 0));
     
-    // Calculate button width based on content - Compact for small cards
+    // Make ADD button larger to reduce empty space
     final buttonWidth = variantCount > 1 
-        ? (screenWidth < 360 ? 46.0 : 50.0)
-        : (screenWidth < 360 ? 40.0 : 46.0);
-    final buttonHeight = screenWidth < 360 ? 20.0 : 24.0;
+        ? (screenWidth < 360 ? 68.0 : 78.0)
+        : (screenWidth < 360 ? 64.0 : 74.0);
+    final buttonHeight = screenWidth < 360 ? 30.0 : 34.0;
     
     return Container(
       width: buttonWidth,
@@ -384,58 +384,58 @@ class ProductCard extends StatelessWidget {
                 }
               : null,
           borderRadius: BorderRadius.circular(6),
-          child: Container(
-            alignment: Alignment.center,
-            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: isAdding
-                ? SizedBox(
-                    height: screenWidth < 360 ? 12 : 14,
-                    width: screenWidth < 360 ? 12 : 14,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : variantCount > 1
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'ADD',
-                            style: TextStyle(
-                              fontSize: screenWidth < 360 ? 9 : 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              height: 1.0,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          SizedBox(height: 0),
-                          Text(
-                            '$variantCount options',
-                            style: TextStyle(
-                              fontSize: screenWidth < 360 ? 7 : 8,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.95),
-                              height: 1.0,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        (product.hasVariants && product.variants != null && product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
-                        (!product.hasVariants && product.isAvailable && product.stock > 0)
-                            ? 'ADD'
-                            : 'Out of Stock',
+      child: Container(
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: isAdding
+            ? SizedBox(
+                height: screenWidth < 360 ? 14 : 16,
+                width: screenWidth < 360 ? 14 : 16,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : variantCount > 1
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'ADD',
                         style: TextStyle(
-                          fontSize: screenWidth < 360 ? 10 : 11,
+                          fontSize: screenWidth < 360 ? 11 : 12,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          letterSpacing: 0.3,
+                          height: 1.0,
+                          letterSpacing: 0.2,
                         ),
                       ),
-          ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '$variantCount options',
+                        style: TextStyle(
+                          fontSize: screenWidth < 360 ? 8.5 : 9.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withOpacity(0.95),
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    (product.hasVariants && product.variants != null && product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+                    (!product.hasVariants && product.isAvailable && product.stock > 0)
+                        ? 'ADD'
+                        : 'Out of Stock',
+                    style: TextStyle(
+                      fontSize: screenWidth < 360 ? 12 : 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+      ),
         ),
       ),
     );

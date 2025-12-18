@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/category_model.dart';
 import '../../providers/product_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../../widgets/product_card.dart';
+import '../../widgets/floating_cart_bar.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 
@@ -153,6 +155,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
   Widget build(BuildContext context) {
     final responsive = Responsive(context);
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final cartProvider = Provider.of<CartProvider>(context);
     
     return Scaffold(
       appBar: AppBar(
@@ -169,19 +172,32 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
           onPressed: () => context.pop(),
         ),
       ),
-      body: _isLoadingSubcategories
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
-              ),
-            )
-          : _subcategories.isEmpty
-              ? _buildProductsOnlyView()
-              : _buildSideBySideView(isMobile),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: _isLoadingSubcategories
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                    ),
+                  )
+                : _subcategories.isEmpty
+                    ? _buildProductsOnlyView(cartProvider)
+                    : _buildSideBySideView(isMobile, cartProvider),
+          ),
+          // Floating Cart Bar
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: const FloatingCartBar(),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildProductsOnlyView() {
+  Widget _buildProductsOnlyView(CartProvider cartProvider) {
     final provider = Provider.of<ProductProvider>(context);
     final screenWidth = MediaQuery.of(context).size.width;
     
@@ -189,51 +205,56 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
       children: [
         // Products grid - No search bar for cleaner UI
         Expanded(
-          child: _isLoadingProducts
-              ? const Center(child: CircularProgressIndicator())
-              : provider.products.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.shopping_bag_outlined, size: 64, color: AppTheme.grey),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No products found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: AppTheme.grey,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: cartProvider.itemCount > 0 ? 120 : 24, // Extra padding when cart bar is visible
+            ),
+            child: _isLoadingProducts
+                ? const Center(child: CircularProgressIndicator())
+                : provider.products.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.shopping_bag_outlined, size: 64, color: AppTheme.grey),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No products found',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: AppTheme.grey,
+                              ),
                             ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => _loadProducts(widget.parentCategoryId),
+                        child: GridView.builder(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth < 360 ? 8 : 12,
+                            vertical: screenWidth < 360 ? 8 : 12,
                           ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () => _loadProducts(widget.parentCategoryId),
-                      child: GridView.builder(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth < 360 ? 8 : 12,
-                          vertical: screenWidth < 360 ? 8 : 12,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            // More granular aspect ratio for better text rendering on small screens
+                            childAspectRatio: screenWidth < 360 ? 0.62 : screenWidth < 400 ? 0.64 : 0.67,
+                            crossAxisSpacing: screenWidth < 360 ? 8 : 12,
+                            mainAxisSpacing: screenWidth < 360 ? 8 : 12,
+                          ),
+                          itemCount: provider.products.length,
+                          itemBuilder: (context, index) {
+                            return ProductCard(product: provider.products[index]);
+                          },
                         ),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          // More granular aspect ratio for better text rendering on small screens
-                          childAspectRatio: screenWidth < 360 ? 0.62 : screenWidth < 400 ? 0.64 : 0.67,
-                          crossAxisSpacing: screenWidth < 360 ? 8 : 12,
-                          mainAxisSpacing: screenWidth < 360 ? 8 : 12,
-                        ),
-                        itemCount: provider.products.length,
-                        itemBuilder: (context, index) {
-                          return ProductCard(product: provider.products[index]);
-                        },
                       ),
-                    ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSideBySideView(bool isMobile) {
+  Widget _buildSideBySideView(bool isMobile, CartProvider cartProvider) {
     // Blinkit-style: Side-by-side layout for both mobile and desktop
     // Mobile: Compact sidebar to give more space to products
     final sidebarWidth = isMobile ? 80.0 : 200.0;
@@ -380,14 +401,14 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
         ),
         // Right side - Products (no search bar for cleaner UI)
         Expanded(
-          child: _buildProductsGrid(showSearchBar: false),
+          child: _buildProductsGrid(showSearchBar: false, cartProvider: cartProvider),
         ),
       ],
     );
   }
 
 
-  Widget _buildProductsGrid({bool showSearchBar = true}) {
+  Widget _buildProductsGrid({bool showSearchBar = true, CartProvider? cartProvider}) {
     final provider = Provider.of<ProductProvider>(context);
     final responsive = Responsive(context);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -398,6 +419,8 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
     final crossAxisCount = isMobile 
         ? 2 
         : (availableWidth < 600 ? 2 : (availableWidth < 900 ? 3 : 4));
+    
+    final cartItemCount = cartProvider?.itemCount ?? 0;
     
     return _isLoadingProducts
         ? const Center(child: CircularProgressIndicator())
@@ -424,9 +447,11 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                   return _loadProducts(categoryId);
                 },
                 child: GridView.builder(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth < 360 ? 8 : 12,
-                    vertical: screenWidth < 360 ? 8 : 12,
+                  padding: EdgeInsets.only(
+                    left: screenWidth < 360 ? 8 : 12,
+                    right: screenWidth < 360 ? 8 : 12,
+                    top: screenWidth < 360 ? 8 : 12,
+                    bottom: cartItemCount > 0 ? 120 : 24, // Extra padding when cart bar is visible
                   ),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,

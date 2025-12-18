@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/product_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../../widgets/product_card.dart';
+import '../../widgets/floating_cart_bar.dart';
 import '../../models/category_model.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
@@ -112,6 +114,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cartProvider = Provider.of<CartProvider>(context);
+    
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -199,11 +203,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
           onPressed: () => context.go('/home'),
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Category Info Header (if category selected)
-          if (widget.categoryId != null)
-            Consumer<ProductProvider>(
+          // Main content - Column with all content
+          Positioned.fill(
+            child: Column(
+              children: [
+                // Category Info Header (if category selected)
+                if (widget.categoryId != null)
+                  Consumer<ProductProvider>(
               builder: (context, provider, _) {
                 // Get category from categories list first (most reliable)
                 CategoryModel? category;
@@ -405,8 +413,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ),
           Expanded(
-            child: Consumer<ProductProvider>(
-              builder: (context, provider, _) {
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: cartProvider.itemCount > 0 ? 120 : 24, // Extra padding when cart bar is visible
+              ),
+              child: Consumer<ProductProvider>(
+                builder: (context, provider, _) {
                 // Update category name from products if available
                 if (widget.categoryId != null && 
                     provider.products.isNotEmpty && 
@@ -523,8 +535,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     );
                   },
                 );
-              },
+                },
+              ),
             ),
+          ),
+              ],
+            ),
+          ),
+          // Floating Cart Bar - Must be last in Stack to appear on top
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: const FloatingCartBar(),
           ),
         ],
       ),

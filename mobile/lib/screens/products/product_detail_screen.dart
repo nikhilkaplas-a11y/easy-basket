@@ -8,6 +8,7 @@ import '../../models/product_variant_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../utils/theme.dart';
+import '../../widgets/floating_cart_bar.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int productId;
@@ -145,7 +146,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 110),
+                  padding: EdgeInsets.only(
+                    bottom: cartProvider.itemCount > 0 ? 200 : 110, // Extra padding when cart bar is visible
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -162,15 +165,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 12),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                             if (_hasUsableVariants(product))
                               _buildVariantSection(product, cartProvider, currencyFormat)
                             else
-                              _buildSimpleQuantitySection(product, cartProvider),
-                        const SizedBox(height: 16),
-                        _buildHighlightsRow(product),
+                              _buildNoVariantInfo(product, currencyFormat),
+                            const SizedBox(height: 16),
+                            _buildHighlightsRow(product),
                             const SizedBox(height: 16),
                             _buildDescription(product),
                             if (_isDetailsMissing(product)) ...[
@@ -186,6 +189,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
                 ),
+                // Floating Cart Bar (above sticky CTA when cart has items)
+                if (cartProvider.itemCount > 0)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 90, // Position above sticky CTA (which is ~90px tall)
+                    child: const FloatingCartBar(),
+                  ),
+                // Sticky Add to Cart CTA
                 Positioned(
                   left: 0,
                   right: 0,
@@ -258,13 +270,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
               quantity.toString(),
-              style: const TextStyle(
+                          style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'RoundedSans',
-              ),
-            ),
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'RoundedSans',
+                          ),
+                        ),
           ),
           // Increment button
           GestureDetector(
@@ -337,12 +349,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 children: [
                   Icon(Icons.image_outlined, size: 72, color: AppTheme.grey),
                   SizedBox(height: 8),
-                  Text(
+                        Text(
                     'Image not available',
-                    style: TextStyle(
-                      color: AppTheme.grey,
+                          style: TextStyle(
+                            color: AppTheme.grey,
                       fontSize: 14,
-                      fontFamily: 'RoundedSans',
+                            fontFamily: 'RoundedSans',
                     ),
                   ),
                 ],
@@ -369,27 +381,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ? (_selectedVariant?.price ?? product.variants!.first.price)
         : product.price;
     final String safeName = (product.name.isNotEmpty) ? product.name : 'Product';
-
-    return Container(
+                          
+                          return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
+                              boxShadow: [
+                                BoxShadow(
             color: Colors.black.withOpacity(0.04),
             blurRadius: 12,
             offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+                                ),
+                              ],
+                            ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                                children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+                                    children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,17 +447,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.primaryGreen.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
+                                            ),
+                                            child: Text(
                     currencyFormat.format(displayPrice),
-                          style: const TextStyle(
+                                              style: const TextStyle(
                       fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                                                fontWeight: FontWeight.bold,
                             color: AppTheme.primaryGreen,
                             fontFamily: 'RoundedSans',
-                          ),
-                        ),
-                ),
+                                              ),
+                                            ),
+                                          ),
             ],
           ),
           const SizedBox(height: 10),
@@ -460,9 +472,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 text: product.stock > 15 ? 'Fresh Stock' : 'Limited Stock',
                 icon: Icons.eco_outlined,
                 color: AppTheme.primaryGreen,
-              ),
-            ],
-          ),
+                                        ),
+                                    ],
+                                  ),
         ],
       ),
     );
@@ -498,16 +510,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                        Text(
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
                   product.name.isNotEmpty ? product.name : 'Product',
-                  style: const TextStyle(
+                                          style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    fontFamily: 'RoundedSans',
+                                            fontFamily: 'RoundedSans',
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -543,26 +555,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
+                                          children: [
+                                            Text(
                 currencyFormat.format(displayPrice),
-                style: const TextStyle(
+                                              style: const TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryGreen,
-                  fontFamily: 'RoundedSans',
-                ),
-              ),
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.primaryGreen,
+                                                fontFamily: 'RoundedSans',
+                                              ),
+                                            ),
               const SizedBox(height: 4),
-              Text(
+                                              Text(
                 product.stock > 0 ? 'In stock' : 'Limited',
-                          style: TextStyle(
-                  fontSize: 13,
+                                                style: TextStyle(
+                                                  fontSize: 13,
                   color: product.stock > 0 ? AppTheme.grey : Colors.orange,
-                  fontFamily: 'RoundedSans',
-                ),
-              ),
-            ],
+                                                  fontFamily: 'RoundedSans',
+                                                ),
+                                              ),
+                                            ],
           ),
         ],
       ),
@@ -591,9 +603,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     color: Colors.black.withOpacity(0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
+                                        ),
+                                      ],
+                                    ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -629,7 +641,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+                                      decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -664,7 +676,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Text(
               _showFullDescription ? 'Show less' : 'Read more',
               style: const TextStyle(
-                color: AppTheme.primaryGreen,
+                                        color: AppTheme.primaryGreen,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'RoundedSans',
               ),
@@ -699,19 +711,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           runSpacing: 12,
           children: variants.map((variant) {
                           final isSelected = _selectedVariant?.id == variant.id;
-                          final variantInCart = cartProvider.contains(product.id, variantId: variant.id);
-                          final variantQuantity = variantInCart 
-                              ? cartProvider.getQuantity(product.id, variantId: variant.id)
-                              : 0;
             final originalPrice = variant.price * 1.1;
                           final discountPercent = ((originalPrice - variant.price) / originalPrice * 100).round();
                           final hasDiscount = discountPercent > 0;
                           
             return GestureDetector(
               onTap: () {
-                setState(() {
-                  _selectedVariant = variant;
-                });
+                                              setState(() {
+                                                _selectedVariant = variant;
+                                              });
               },
               child: Container(
                 width: 140,
@@ -757,7 +765,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
                               color: Colors.blueAccent,
-                              borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: Text(
                               '$discountPercent% OFF',
@@ -765,10 +773,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                                 color: Colors.white,
                                 fontSize: 10,
                                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'RoundedSans',
+                                                fontFamily: 'RoundedSans',
+                                              ),
                                             ),
                                           ),
-                                        ),
                                     ],
                                   ),
                     const SizedBox(height: 8),
@@ -806,21 +814,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                                  if (variantQuantity > 0)
-                                    _buildVariantQuantitySelector(
-                                      context,
-                                      cartProvider,
-                                      product,
-                                      variant,
-                                      variantQuantity,
-                                    )
-                                  else
-                      const SizedBox.shrink(),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: isSelected
+                          ? const Icon(Icons.check_circle, color: AppTheme.primaryGreen, size: 18)
+                          : const SizedBox.shrink(),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
         ),
       ],
     );
@@ -886,10 +890,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     '$_quantity',
                                     style: const TextStyle(
                                       fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                fontFamily: 'RoundedSans',
-                                              ),
-                                            ),
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'RoundedSans',
+                                    ),
+                                  ),
                                   IconButton(
                       icon: const Icon(Icons.add),
                                     onPressed: () {
@@ -908,19 +912,81 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 for (int i = 0; i < _quantity; i++) {
                                   await cartProvider.addItem(product);
                                 }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                        content: Text('$_quantity x ${product.name} added to cart'),
-                                    ),
-                                  );
-                                  context.pop();
-                                }
                               },
                                     ),
                                 ],
                               ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNoVariantInfo(ProductModel product, NumberFormat currencyFormat) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            product.name,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+          const SizedBox(height: 6),
+                          Row(
+                            children: [
+              Text(
+                currencyFormat.format(product.price),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryGreen,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+              const SizedBox(width: 10),
+              _buildPill(
+                text: product.unit ?? 'unit',
+                icon: Icons.inventory_2_outlined,
+                color: AppTheme.lightGrey,
+                foreground: AppTheme.darkGrey,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            product.stock > 0 ? 'In stock' : 'Limited',
+                                style: TextStyle(
+              fontSize: 13,
+              color: product.stock > 0 ? AppTheme.grey : Colors.orange,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+          const SizedBox(height: 8),
+          Text(
+            'Use the Add to cart bar below to choose quantity.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.grey,
+              fontFamily: 'RoundedSans',
+                ),
+              ),
+            ],
       ),
     );
   }
@@ -957,10 +1023,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ? activeVariant.label
         : (product.unit ?? '');
 
+    final bool nonVariantInCart = !hasVariants && cartProvider.contains(product.id);
+    final int nonVariantQty = !hasVariants ? cartProvider.getQuantity(product.id) : 0;
+
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
+      decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
@@ -993,7 +1062,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
+        color: AppTheme.primaryGreen,
                     fontFamily: 'RoundedSans',
                   ),
                 ),
@@ -1004,9 +1073,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     fontSize: 11,
                     color: AppTheme.grey,
                     fontFamily: 'RoundedSans',
-                  ),
                 ),
-              ],
+              ),
+            ],
                               ),
                               const Spacer(),
             if (isOutOfStock)
@@ -1045,59 +1114,72 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         }
                       },
                     )
-            else
-              Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.lightGrey,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                                children: [
-                                  IconButton(
-                          icon: const Icon(Icons.remove),
-                          onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
-                                  ),
-                                  Text(
-                                    '$_quantity',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'RoundedSans',
-                                    ),
-                                  ),
-                                  IconButton(
-                          icon: const Icon(Icons.add),
-                                    onPressed: () {
-                                      if (_quantity < product.stock) {
-                                        setState(() => _quantity++);
-                                      }
-                                    },
-                                  ),
-                                ],
+            else if (!hasVariants)
+              nonVariantQty > 0
+                  ? Row(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightGrey,
+                            borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove),
+                                onPressed: () async {
+                                  if (nonVariantQty > 1) {
+                                    await cartProvider.updateQuantity(product.id, nonVariantQty - 1);
+                                    setState(() {
+                                      _quantity = nonVariantQty - 1;
+                                    });
+              } else {
+                                    await cartProvider.removeItem(product.id);
+                                    setState(() {
+                                      _quantity = 1;
+                                    });
+                                  }
+                                },
                               ),
+                              Text(
+                                '$nonVariantQty',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'RoundedSans',
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add),
+                                onPressed: nonVariantQty < product.stock
+                                    ? () async {
+                                        await cartProvider.updateQuantity(product.id, nonVariantQty + 1);
+                                        setState(() {
+                                          _quantity = nonVariantQty + 1;
+                                        });
+                                      }
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : _buildPrimaryCta(
+                      label: 'Add to cart',
+                      onPressed: () async {
+                        await cartProvider.addItem(product);
+                        setState(() {
+                          _quantity = cartProvider.getQuantity(product.id);
+                        });
+                      },
+                    )
+            else
+              const SizedBox.shrink(),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  _buildPrimaryCta(
-                    label: 'Add to cart',
-                              onPressed: () async {
-                                for (int i = 0; i < _quantity; i++) {
-                                  await cartProvider.addItem(product);
-                                }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('$_quantity x ${product.name} added to cart')),
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
-          ],
-                                      ),
-                                    ),
-                                  );
+                ),
+    );
   }
 
   Widget _buildInfoCards() {
