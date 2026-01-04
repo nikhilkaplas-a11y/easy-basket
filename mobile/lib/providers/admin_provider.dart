@@ -291,6 +291,7 @@ class AdminProvider with ChangeNotifier {
     required double price,
     required int categoryId,
     String? description,
+    String? tags,
     String? imageUrl,
     int? stock,
     String? unit,
@@ -306,6 +307,7 @@ class AdminProvider with ChangeNotifier {
         'categoryId': categoryId,
       };
       if (description != null) data['description'] = description;
+      if (tags != null) data['tags'] = tags;
       if (imageUrl != null) data['imageUrl'] = imageUrl;
       if (stock != null) data['stock'] = stock;
       if (unit != null) data['unit'] = unit;
@@ -328,6 +330,7 @@ class AdminProvider with ChangeNotifier {
     required int productId,
     String? name,
     String? description,
+    String? tags,
     double? price,
     String? imageUrl,
     int? categoryId,
@@ -343,6 +346,7 @@ class AdminProvider with ChangeNotifier {
       final data = <String, dynamic>{};
       if (name != null) data['name'] = name;
       if (description != null) data['description'] = description;
+      if (tags != null) data['tags'] = tags;
       if (price != null) data['price'] = price;
       if (imageUrl != null) data['imageUrl'] = imageUrl;
       if (categoryId != null) data['categoryId'] = categoryId;

@@ -6,11 +6,13 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { Category } from './Category';
 import { ProductVariant } from './ProductVariant';
 
 @Entity()
+@Index('IDX_PRODUCT_FULLTEXT', ['name', 'tags', 'description'], { fulltext: true })
 export class Product {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -20,6 +22,13 @@ export class Product {
 
   @Column('text', { nullable: true })
   description!: string;
+
+  /**
+   * Search keywords/tags to help find products with different names/spellings
+   * Example: for "Coke", tags could be "soda, cold drink, beverage, coca cola"
+   */
+  @Column('text', { nullable: true })
+  tags!: string;
 
   /**
    * Base price - used when no variants exist or as fallback

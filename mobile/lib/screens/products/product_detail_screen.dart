@@ -168,10 +168,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                            if (_hasUsableVariants(product))
-                              _buildVariantSection(product, cartProvider, currencyFormat)
-                            else
-                              _buildNoVariantInfo(product, currencyFormat),
+                            () {
+                              final usableVariants = product.hasVariants && product.variants != null
+                                  ? product.variants!.where((v) => v.isAvailable).toList()
+                                  : <ProductVariantModel>[];
+                              if (usableVariants.length > 1) {
+                                return _buildVariantSection(product, cartProvider, currencyFormat);
+                              }
+                              return _buildNoVariantInfo(product, currencyFormat);
+                            }(),
                             const SizedBox(height: 16),
                             _buildHighlightsRow(product),
                             const SizedBox(height: 16),
@@ -907,21 +912,66 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               const Spacer(),
               _buildPrimaryCta(
-                label: 'Add ${_quantity > 1 ? "$_quantity " : ""}to Cart',
-                              onPressed: () async {
-                                for (int i = 0; i < _quantity; i++) {
-                                  await cartProvider.addItem(product);
-                                }
-                              },
-                                    ),
-                                ],
-                              ),
+                label: 'Add ${_quantity} ${product.unit ?? ""} to Cart',
+                onPressed: () async {
+                  for (int i = 0; i < _quantity; i++) {
+                    await cartProvider.addItem(product);
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if ((product.unit ?? '').isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final preset in [
+                  1,
+                  2,
+                  5,
+                ].where((v) =>
+                    v <= (product.maxQuantity?.toInt() ?? product.stock) &&
+                    v <= product.stock))
+                  GestureDetector(
+                    onTap: () {
+                      if (preset <= product.stock) {
+                        setState(() => _quantity = preset);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGrey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$preset ${product.unit}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'RoundedSans',
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
     );
   }
 
   Widget _buildNoVariantInfo(ProductModel product, NumberFormat currencyFormat) {
+    final bool singleVariantAvailable = product.hasVariants &&
+        product.variants != null &&
+        product.variants!.where((v) => v.isAvailable).length == 1;
+    final ProductVariantModel? singleVariant = singleVariantAvailable
+        ? product.variants!.firstWhere((v) => v.isAvailable)
+        : null;
+    final double priceToShow = singleVariant != null ? singleVariant.price : product.price;
+    final String unitLabelToShow = singleVariant != null ? singleVariant.label : _nonVariantLabel(product);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -948,10 +998,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                               ),
           const SizedBox(height: 6),
-                          Row(
-                            children: [
+          Row(
+            children: [
               Text(
-                currencyFormat.format(product.price),
+                currencyFormat.format(priceToShow),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -961,7 +1011,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
               const SizedBox(width: 10),
               _buildPill(
-                text: product.unit ?? 'unit',
+                text: unitLabelToShow,
                 icon: Icons.inventory_2_outlined,
                 color: AppTheme.lightGrey,
                 foreground: AppTheme.darkGrey,
@@ -1021,7 +1071,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final String sizeLabel = hasVariants && activeVariant != null
         ? activeVariant.label
-        : (product.unit ?? '');
+        : _nonVariantLabel(product);
 
     final bool nonVariantInCart = !hasVariants && cartProvider.contains(product.id);
     final int nonVariantQty = !hasVariants ? cartProvider.getQuantity(product.id) : 0;
@@ -1180,6 +1230,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ),
     );
+  }
+
+  String _nonVariantLabel(ProductModel product) {
+    // Try to infer quantity from product name "(...)" or minQuantity, else unit
+    final name = product.name;
+    final bracketMatch = RegExp(r'\(([^)]+)\)$').firstMatch(name);
+    if (bracketMatch != null) {
+      final content = bracketMatch.group(1)!.trim();
+      if (content.isNotEmpty) return content;
+    }
+    if (product.minQuantity != null && product.unit != null) {
+      final q = product.minQuantity!;
+      final qStr = q % 1 == 0 ? q.toInt().toString() : q.toString();
+      return '$qStr ${product.unit}';
+    }
+    if (product.unit != null) {
+      return '1 ${product.unit}';
+    }
+    return '';
   }
 
   Widget _buildInfoCards() {

@@ -1,15 +1,78 @@
 import { Request, Response } from 'express';
+
 import { AppDataSource } from '../config/database';
-import { Product } from '../entities/Product';
 import { Category } from '../entities/Category';
+import { Product } from '../entities/Product';
+
+import { Brackets } from 'typeorm';
 
 export class ProductController {
+  static async getSuggestions(req: Request, res: Response): Promise<void> {
+    try {
+      const { search } = req.query;
+
+      if (!search || String(search).length < 2) {
+        res.json([]);
+        return;
+      }
+
+      const productRepository = AppDataSource.getRepository(Product);
+      
+      // Use raw query for performance and flexibility
+      // We want to return unique names that match the search
+      // Split query into words and require all of them (AND logic)
+      const searchTerms = String(search)
+        .trim()
+        .split(/\s+/)
+        .map(term => {
+           // If term is very short, don't force it with + as it might not be indexed
+           return term.length <= 2 ? `${term}*` : `+${term}*`;
+        })
+        .join(' ');
+
+      const suggestions = await productRepository
+        .createQueryBuilder('product')
+        .select('product.name', 'name')
+        .addSelect('MAX(product.imageUrl)', 'imageUrl') // Pick one image for the name
+        .where('product.isAvailable = :isAvailable', { isAvailable: true })
+        .andWhere(
+            new Brackets((qb) => {
+                qb.where(`MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`, { search: searchTerms })
+                  .orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
+            })
+        )
+        .groupBy('product.name') // Group by name to get distinct names
+        .limit(8)
+        .getRawMany();
+
+      res.json(suggestions.map((s, index) => ({ id: index, name: s.name, imageUrl: s.imageUrl })));
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      res.status(500).json({ message: 'Error fetching suggestions' });
+    }
+  }
+
   static async getAllProducts(req: Request, res: Response): Promise<void> {
     try {
-      const { categoryId, search } = req.query;
+      const { categoryId, search, limit } = req.query;
       const productRepository = AppDataSource.getRepository(Product);
       const queryBuilder = productRepository
         .createQueryBuilder('product')
+        .select([
+          'product.id',
+          'product.name',
+          'product.price',
+          'product.imageUrl',
+          'product.stock',
+          'product.unit',
+          'product.isAvailable',
+          'product.hasVariants',
+          'product.baseUnit',
+          'product.minQuantity',
+          'product.maxQuantity',
+          'product.categoryId',
+          'product.tags'
+        ])
         .leftJoinAndSelect('product.category', 'category')
         .leftJoinAndSelect('product.variants', 'variants')
         .where('product.isAvailable = :isAvailable', { isAvailable: true });
@@ -19,9 +82,33 @@ export class ProductController {
       }
 
       if (search) {
-        queryBuilder.andWhere('(product.name LIKE :search OR product.description LIKE :search)', {
-          search: `%${search}%`,
-        });
+        // Use Full-Text Search with Boolean Mode for better matching
+        // Split query into words and require all of them (AND logic)
+        // e.g. "Chia Seeds" -> "+Chia* +Seeds*"
+        const searchTerms = String(search)
+          .trim()
+          .split(/\s+/)
+          .map(term => {
+             // If term is very short, don't force it with + as it might not be indexed
+             // Exception: if the query ONLY has short words, we might need to rely on LIKE mostly
+             return term.length <= 2 ? `${term}*` : `+${term}*`;
+          })
+          .join(' ');
+
+        // Combine FTS with LIKE to catch short words/numbers (e.g., "1L") that FTS might miss
+        queryBuilder.andWhere(
+            new Brackets((qb) => {
+                qb.where(`MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`, { search: searchTerms })
+                  .orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
+            })
+        );
+      }
+
+      // Add limit to prevent fetching too many records (default 50 for search, or if specified)
+      if (limit) {
+        queryBuilder.take(Number(limit));
+      } else if (search) {
+        queryBuilder.take(50);
       }
 
       const products = await queryBuilder.getMany();
@@ -78,7 +165,7 @@ export class ProductController {
 
   static async createProduct(req: Request, res: Response): Promise<void> {
     try {
-      const { name, description, price, imageUrl, categoryId, stock, unit } = req.body;
+      const { name, description, price, imageUrl, categoryId, stock, unit, tags } = req.body;
 
       if (!name || !price || !categoryId) {
         res.status(400).json({ message: 'Name, price, and category are required' });
@@ -102,6 +189,7 @@ export class ProductController {
         category,
         stock: stock || 0,
         unit: unit || 'piece',
+        tags,
       });
 
       await productRepository.save(product);
@@ -123,7 +211,7 @@ export class ProductController {
         return;
       }
 
-      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable } = req.body;
+      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable, tags } = req.body;
 
       if (name) product.name = name;
       if (description !== undefined) product.description = description;
@@ -132,6 +220,7 @@ export class ProductController {
       if (stock !== undefined) product.stock = stock;
       if (unit) product.unit = unit;
       if (isAvailable !== undefined) product.isAvailable = isAvailable;
+      if (tags !== undefined) product.tags = tags;
 
       if (categoryId) {
         const categoryRepository = AppDataSource.getRepository(Category);

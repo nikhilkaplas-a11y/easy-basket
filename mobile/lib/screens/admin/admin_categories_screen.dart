@@ -383,7 +383,7 @@ class _CategoryCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${category.subcategories!.length} subcategor${category.subcategories!.length == 1 ? 'y' : 'ies'}',
+                          '${category.subcategories!.where((c) => c.isActive).length} subcategor${category.subcategories!.where((c) => c.isActive).length == 1 ? 'y' : 'ies'}',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppTheme.primaryGreen,
@@ -679,4 +679,3 @@ class _SubcategoriesDialogState extends State<_SubcategoriesDialog> {
     );
   }
 }
-

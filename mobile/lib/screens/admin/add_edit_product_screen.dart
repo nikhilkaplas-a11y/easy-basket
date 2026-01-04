@@ -29,6 +29,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _tagsController = TextEditingController();
   final _priceController = TextEditingController();
   final _stockController = TextEditingController();
   final _imageUrlController = TextEditingController();
@@ -81,6 +82,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     if (_product != null) {
       _nameController.text = _product!.name;
       _descriptionController.text = _product!.description ?? '';
+      _tagsController.text = _product!.tags ?? '';
       _priceController.text = _product!.price.toString();
       _stockController.text = _product!.stock.toString();
       _imageUrlController.text = _product!.imageUrl ?? '';
@@ -99,6 +101,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _tagsController.dispose();
     _priceController.dispose();
     _stockController.dispose();
     _imageUrlController.dispose();
@@ -162,11 +165,12 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         name: _nameController.text.trim(),
         price: price,
         categoryId: _selectedCategoryId!,
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        imageUrl: null, // Will be set after upload
-        stock: stock,
+            description: _descriptionController.text.trim().isEmpty
+                ? null
+                : _descriptionController.text.trim(),
+            tags: _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim(),
+            imageUrl: null, // Will be set after upload
+            stock: stock,
         unit: _selectedUnit,
       );
 
@@ -280,6 +284,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
+        tags: _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim(),
         imageUrl: imageUrl,
         stock: int.tryParse(_stockController.text.trim()) ?? 0,
         unit: _selectedUnit,
@@ -478,6 +483,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             price: price,
             categoryId: _selectedCategoryId!,
             description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+            tags: _tagsController.text.trim(),
             imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
             stock: stock,
             unit: _selectedUnit,
@@ -489,6 +495,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             price: price,
             categoryId: _selectedCategoryId,
             description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+            tags: _tagsController.text.trim(),
             imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
             stock: stock,
             unit: _selectedUnit,
@@ -594,6 +601,16 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _tagsController,
+              decoration: const InputDecoration(
+                labelText: 'Search Tags (comma-separated)',
+                prefixIcon: Icon(Icons.tag),
+                border: OutlineInputBorder(),
+                helperText: 'Add synonyms/keywords (e.g., "soda, cold drink" for "Coke")',
+              ),
             ),
             const SizedBox(height: 16),
             Row(

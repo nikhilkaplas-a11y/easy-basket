@@ -783,6 +783,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+              const _HomeFooter(),
             ],
                   ),
                 );
@@ -894,3 +895,107 @@ class _CategorySliderCard extends StatelessWidget {
   }
 }
 
+
+class _HomeFooter extends StatelessWidget {
+  const _HomeFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      color: AppTheme.lightGrey.withOpacity(0.5),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildTrustBadge(
+                context,
+                icon: Icons.verified_user_outlined,
+                text: '100% Genuine',
+              ),
+              _buildTrustBadge(
+                context,
+                icon: Icons.local_shipping_outlined,
+                text: 'Fast Delivery',
+              ),
+              _buildTrustBadge(
+                context,
+                icon: Icons.refresh_outlined,
+                text: 'Easy Returns',
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Divider(color: AppTheme.grey.withOpacity(0.2)),
+          const SizedBox(height: 24),
+          const Text(
+            'Live for food, delivered by Easy Bucket',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.grey,
+              letterSpacing: 0.5,
+              fontStyle: FontStyle.italic,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Made with ',
+                style: TextStyle(fontSize: 12, color: AppTheme.grey),
+              ),
+              const Icon(Icons.favorite, color: Colors.red, size: 14),
+              const Text(
+                ' in India',
+                style: TextStyle(fontSize: 12, color: AppTheme.grey),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Easy Bucket © ${DateTime.now().year}',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.grey.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrustBadge(BuildContext context, {required IconData icon, required String text}) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: AppTheme.primaryGreen, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.darkGrey,
+          ),
+        ),
+      ],
+    );
+  }
+}

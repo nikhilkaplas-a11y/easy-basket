@@ -5,6 +5,7 @@ class ProductModel {
   final int id;
   final String name;
   final String? description;
+  final String? tags;
   final double price;
   final String? imageUrl;
   final CategoryModel? category;
@@ -21,6 +22,7 @@ class ProductModel {
     required this.id,
     required this.name,
     this.description,
+    this.tags,
     required this.price,
     this.imageUrl,
     this.category,
@@ -78,6 +80,7 @@ class ProductModel {
       id: json['id'] as int,
       name: json['name'] as String,
       description: json['description'] as String?,
+      tags: json['tags'] as String?,
       price: priceValue,
       imageUrl: json['imageUrl'] as String?,
       category: json['category'] != null

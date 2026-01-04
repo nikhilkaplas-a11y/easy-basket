@@ -1,11 +1,11 @@
-import { Response } from 'express';
 import { AppDataSource } from '../config/database';
-import { Order } from '../entities/Order';
-import { User } from '../entities/User';
-import { Product } from '../entities/Product';
-import { Category } from '../entities/Category';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { Category } from '../entities/Category';
 import { FCMService } from '../services/fcm.service';
+import { Order } from '../entities/Order';
+import { Product } from '../entities/Product';
+import { Response } from 'express';
+import { User } from '../entities/User';
 
 export class AdminController {
   static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -314,7 +314,7 @@ export class AdminController {
 
   static async createProduct(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { name, description, price, imageUrl, categoryId, stock, unit } = req.body;
+      const { name, description, price, imageUrl, categoryId, stock, unit, tags } = req.body;
 
       if (!name || !price || !categoryId) {
         res.status(400).json({ message: 'Name, price, and category are required' });
@@ -339,6 +339,7 @@ export class AdminController {
         stock: stock || 0,
         unit: unit || 'piece',
         isAvailable: true,
+        tags,
       });
 
       await productRepository.save(product);
@@ -352,7 +353,7 @@ export class AdminController {
   static async updateProduct(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable } = req.body;
+      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable, tags } = req.body;
 
       const productRepository = AppDataSource.getRepository(Product);
       const product = await productRepository.findOne({
@@ -372,6 +373,7 @@ export class AdminController {
       if (stock !== undefined) product.stock = stock;
       if (unit) product.unit = unit;
       if (isAvailable !== undefined) product.isAvailable = isAvailable;
+      if (tags !== undefined) product.tags = tags;
 
       if (categoryId) {
         const categoryRepository = AppDataSource.getRepository(Category);

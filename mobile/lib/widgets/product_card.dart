@@ -231,10 +231,19 @@ class ProductCard extends StatelessWidget {
         return availableVariants.first.label;
       }
     }
-    // Fallback to product unit
-    if (product.unit != null) {
-      return '1 ${product.unit}';
+    // No variants: try to infer quantity from product name "(...)" or minQuantity
+    final name = product.name;
+    final bracketMatch = RegExp(r'\(([^)]+)\)$').firstMatch(name);
+    if (bracketMatch != null) {
+      final content = bracketMatch.group(1)!.trim();
+      if (content.isNotEmpty) return content;
     }
+    if (product.minQuantity != null && product.unit != null) {
+      final q = product.minQuantity!;
+      final qStr = q % 1 == 0 ? q.toInt().toString() : q.toString();
+      return '$qStr ${product.unit}';
+    }
+    if (product.unit != null) return '1 ${product.unit}';
     return '';
   }
 
@@ -347,7 +356,14 @@ class ProductCard extends StatelessWidget {
           onTap: (isAvailable && !isAdding)
               ? () async {
                   if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                    await _showVariantBottomSheet(context);
+                    final availableVariants = product.variants!
+                        .where((v) => v.isAvailable && v.stock > 0)
+                        .toList();
+                    if (availableVariants.length == 1) {
+                      await cartProvider.addItem(product, variant: availableVariants.first);
+                    } else {
+                      await _showVariantBottomSheet(context);
+                    }
                   } else {
                     await cartProvider.addItem(product);
                   }
@@ -423,11 +439,15 @@ class ProductCard extends StatelessWidget {
     Responsive responsive,
     double screenWidth,
   ) {
+    final variantCount = product.hasVariants && product.variants != null
+        ? product.variants!.where((v) => v.isAvailable).length
+        : 0;
     final buttonSize = screenWidth < 360 ? 15.0 : 17.0;
     final iconSize = screenWidth < 360 ? 10.0 : 11.0;
     final fontSize = screenWidth < 360 ? 9.0 : 10.0;
     // For products with variants, we can't increment from card - need to go to detail page
-    final canIncrement = !product.hasVariants && quantity < product.stock && product.isAvailable;
+    final canIncrement = (!product.hasVariants && quantity < product.stock && product.isAvailable) ||
+        (product.hasVariants && variantCount == 1);
     final canDecrement = quantity > 0;
     
     return Container(
@@ -445,15 +465,24 @@ class ProductCard extends StatelessWidget {
           GestureDetector(
             onTap: () async {
               if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                await _showVariantBottomSheet(context);
-                return;
-              }
-              
-              if (quantity > 1) {
-                await cartProvider.updateQuantity(product.id, quantity - 1);
+                if (variantCount > 1) {
+                  await _showVariantBottomSheet(context);
+                  return;
+                }
+                // Single variant: update directly
+                final v = product.variants!.firstWhere((vv) => vv.isAvailable, orElse: () => product.variants!.first);
+                if (quantity > 1) {
+                  await cartProvider.updateQuantity(product.id, quantity - 1, variantId: v.id);
+                } else {
+                  await cartProvider.removeItem(product.id, variantId: v.id);
+                }
               } else {
-                // Remove item when quantity becomes 0
-                await cartProvider.removeItem(product.id);
+                if (quantity > 1) {
+                  await cartProvider.updateQuantity(product.id, quantity - 1);
+                } else {
+                  // Remove item when quantity becomes 0
+                  await cartProvider.removeItem(product.id);
+                }
               }
             },
             child: Container(
@@ -490,10 +519,16 @@ class ProductCard extends StatelessWidget {
             onTap: canIncrement
                 ? () async {
                     if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                      await _showVariantBottomSheet(context);
-                      return;
+                      if (variantCount > 1) {
+                        await _showVariantBottomSheet(context);
+                        return;
+                      }
+                      // Single variant: update directly
+                      final v = product.variants!.firstWhere((vv) => vv.isAvailable, orElse: () => product.variants!.first);
+                      await cartProvider.updateQuantity(product.id, quantity + 1, variantId: v.id);
+                    } else {
+                      await cartProvider.updateQuantity(product.id, quantity + 1);
                     }
-                    await cartProvider.updateQuantity(product.id, quantity + 1);
                   }
                 : (product.hasVariants && product.variants != null && product.variants!.isNotEmpty)
                     ? () async => _showVariantBottomSheet(context)

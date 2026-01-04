@@ -8,15 +8,44 @@ class ProductProvider with ChangeNotifier {
 
   List<ProductModel> _products = [];
   List<CategoryModel> _categories = [];
+  List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
   String? _error;
 
   List<ProductModel> get products => _products;
   List<CategoryModel> get categories => _categories;
+  List<Map<String, dynamic>> get suggestions => _suggestions;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
   ProductProvider({required this.apiService});
+
+  Future<void> fetchSuggestions(String query) async {
+    if (query.length < 2) {
+      _suggestions = [];
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final response = await apiService.get('/products/suggestions?search=$query');
+      if (response is List) {
+        _suggestions = response.map((item) => item as Map<String, dynamic>).toList();
+      } else {
+        _suggestions = [];
+      }
+      notifyListeners();
+    } catch (e) {
+      print('Error fetching suggestions: $e');
+      _suggestions = [];
+      notifyListeners();
+    }
+  }
+
+  void clearSuggestions() {
+    _suggestions = [];
+    notifyListeners();
+  }
 
   Future<void> fetchCategories() async {
     _isLoading = true;

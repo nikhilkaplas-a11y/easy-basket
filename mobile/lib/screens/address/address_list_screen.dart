@@ -112,13 +112,16 @@ class _AddressListScreenState extends State<AddressListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/address/add'),
-        backgroundColor: AppTheme.primaryGreen,
-        foregroundColor: AppTheme.white,
-        icon: const Icon(Icons.add_location_alt),
-        label: const Text('Add Address'),
-      ),
+      // Hide FAB when "Continue to Payment" button is visible to prevent overlap
+      floatingActionButton: (_isFromCheckout && _selectedAddressId != null)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => context.push('/address/add'),
+              backgroundColor: AppTheme.primaryGreen,
+              foregroundColor: AppTheme.white,
+              icon: const Icon(Icons.add_location_alt),
+              label: const Text('Add Address'),
+            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: (orderProvider.isLoading || _isUpdating || _isCheckingService)
           ? const Center(child: CircularProgressIndicator())

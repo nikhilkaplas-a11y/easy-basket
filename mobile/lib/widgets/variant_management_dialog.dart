@@ -416,7 +416,7 @@ class _AddEditVariantDialogState extends State<_AddEditVariantDialog> {
   bool _isDefault = false;
   bool _isLoading = false;
 
-  final List<String> _units = ['g', 'kg', 'piece', 'pack', 'dozen'];
+  final List<String> _units = ['g', 'kg', 'ml', 'liter', 'piece', 'pack', 'dozen'];
 
   @override
   void initState() {
@@ -597,7 +597,7 @@ class _AddEditVariantDialogState extends State<_AddEditVariantDialog> {
                         controller: _labelController,
                         decoration: InputDecoration(
                           labelText: 'Label *',
-                          hintText: 'e.g., 250g, 1 kg, 2 kg',
+                          hintText: 'e.g., 250 g, 1 kg, 2 kg, 5 L',
                           prefixIcon: const Icon(Icons.label, size: 20),
                           border: const OutlineInputBorder(),
                           isDense: true,
@@ -845,4 +845,3 @@ class _AddEditVariantDialogState extends State<_AddEditVariantDialog> {
     );
   }
 }
-
