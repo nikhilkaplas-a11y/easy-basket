@@ -199,7 +199,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: 90, // Position above sticky CTA (which is ~90px tall)
+                    bottom: 100, // Position above sticky CTA (cart bar is now taller ~80px)
                     child: const FloatingCartBar(),
                   ),
                 // Sticky Add to Cart CTA

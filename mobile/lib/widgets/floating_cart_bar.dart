@@ -25,21 +25,21 @@ class FloatingCartBar extends StatelessWidget {
         return SafeArea(
           top: false,
           child: Container(
-            margin: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: AppTheme.primaryGreen,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 24,
+                  offset: const Offset(0, 6),
                   spreadRadius: 0,
                 ),
                 BoxShadow(
-                  color: AppTheme.primaryGreen.withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 2),
+                  color: AppTheme.primaryGreen.withOpacity(0.4),
+                  blurRadius: 18,
+                  offset: const Offset(0, 3),
                   spreadRadius: 0,
                 ),
               ],
@@ -48,53 +48,64 @@ class FloatingCartBar extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => context.push('/cart'),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
+                splashColor: Colors.white.withOpacity(0.2),
+                highlightColor: Colors.white.withOpacity(0.1),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                   child: Row(
                     children: [
                       // Cart Icon with Badge
                       Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: const Icon(
                               Icons.shopping_cart_rounded,
                               color: Colors.white,
-                              size: 24,
+                              size: 28,
                             ),
                           ),
                           Positioned(
-                            right: -4,
-                            top: -4,
+                            right: -6,
+                            top: -6,
                             child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
                                 color: AppTheme.primaryYellow,
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
                               constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
+                                minWidth: 22,
+                                minHeight: 22,
                               ),
                               child: Center(
                                 child: Text(
                                   '${cartProvider.itemCount}',
                                   style: const TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                               ),
@@ -102,7 +113,7 @@ class FloatingCartBar extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 18),
                       // Cart Info
                       Expanded(
                         child: Column(
@@ -111,32 +122,41 @@ class FloatingCartBar extends StatelessWidget {
                           children: [
                             Text(
                               '${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'} in cart',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.white.withOpacity(0.95),
                                 fontWeight: FontWeight.w500,
-                                fontFamily: 'RoundedSans',
+                                letterSpacing: 0.2,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               currencyFormat.format(cartProvider.totalAmount),
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: 22,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'RoundedSans',
+                                letterSpacing: 0.5,
+                                height: 1.2,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 12),
                       // View Cart Button
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -144,16 +164,16 @@ class FloatingCartBar extends StatelessWidget {
                             Text(
                               'View Cart',
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.primaryGreen,
-                                fontFamily: 'RoundedSans',
+                                letterSpacing: 0.3,
                               ),
                             ),
-                            SizedBox(width: 6),
+                            SizedBox(width: 8),
                             Icon(
                               Icons.arrow_forward_rounded,
-                              size: 18,
+                              size: 20,
                               color: AppTheme.primaryGreen,
                             ),
                           ],

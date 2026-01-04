@@ -1,17 +1,17 @@
+import { Address } from '../entities/Address';
+import { Category } from '../entities/Category';
 import { DataSource } from 'typeorm';
+import { Order } from '../entities/Order';
+import { OrderItem } from '../entities/OrderItem';
+import { Product } from '../entities/Product';
+import { ProductCollection } from '../entities/ProductCollection';
+import { ProductVariant } from '../entities/ProductVariant';
+import { RefreshToken } from '../entities/RefreshToken';
+import { ServiceArea } from '../entities/ServiceArea';
+import { User } from '../entities/User';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-import { User } from '../entities/User';
-import { Product } from '../entities/Product';
-import { Order } from '../entities/Order';
-import { Category } from '../entities/Category';
-import { Address } from '../entities/Address';
-import { OrderItem } from '../entities/OrderItem';
-import { RefreshToken } from '../entities/RefreshToken';
-import { ServiceArea } from '../entities/ServiceArea';
-import { ProductVariant } from '../entities/ProductVariant';
 
 export const AppDataSource = new DataSource({
   type: 'mysql',

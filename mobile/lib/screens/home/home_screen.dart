@@ -189,134 +189,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppTheme.primaryGreen,
-        iconTheme: const IconThemeData(color: AppTheme.white),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.primaryGreen,
-                AppTheme.primaryGreen.withOpacity(0.85),
-              ],
-            ),
-          ),
-        ),
-        title: Row(
+      backgroundColor: AppTheme.white,
+      body: SafeArea(
+        child: Stack(
           children: [
-            // Logo/Icon
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: AppTheme.white.withOpacity(0.3),
-                  width: 1.5,
-                ),
-              ),
-              child: const Icon(
-                Icons.shopping_basket_rounded,
-                color: AppTheme.white,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // App Name with better typography
-            const Text(
-              'Easy Basket',
-              style: TextStyle(
-                color: AppTheme.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // Cart Icon with badge
-          Stack(
-            children: [
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_rounded,
-                    color: AppTheme.white,
-                    size: 22,
-                  ),
-                ),
-                onPressed: () => context.push('/cart'),
-              ),
-              if (cartProvider.itemCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryYellow,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppTheme.white,
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
-                    child: Text(
-                      '${cartProvider.itemCount}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Profile Icon
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.person_outline_rounded,
-                color: AppTheme.white,
-                size: 22,
-              ),
-            ),
-            onPressed: () => context.push('/profile'),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Stack(
-        children: [
-          RefreshIndicator(
+            RefreshIndicator(
             onRefresh: () async {
               final productProvider = Provider.of<ProductProvider>(context, listen: false);
               final orderProvider = Provider.of<OrderProvider>(context, listen: false);
@@ -338,212 +215,183 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Address Bar (Blinkit Style)
-              Consumer<OrderProvider>(
-                builder: (context, orderProvider, _) {
-                  final defaultAddress = orderProvider.addresses.isNotEmpty
-                      ? orderProvider.addresses.firstWhere(
-                          (addr) => addr.isDefault,
-                          orElse: () => orderProvider.addresses.first,
-                        )
-                      : null;
-                  final hasNoAddress = orderProvider.addresses.isEmpty;
-
-                  // Address Bar - Clean & Elegant Design (Blinkit/Zomato Style)
-                  return Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    decoration: BoxDecoration(
-                      color: hasNoAddress
-                          ? Colors.orange.shade50
-                          : AppTheme.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: hasNoAddress
-                            ? Colors.orange.shade200
-                            : AppTheme.primaryGreen.withOpacity(0.2),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                          spreadRadius: 0,
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (hasNoAddress) {
-                          context.push('/address/add');
-                        } else {
-                          context.push('/addresses');
-                        }
-                      },
-                      child: Row(
-                        children: [
-                          // Location Icon
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: hasNoAddress
-                                  ? Colors.orange.shade100
-                                  : AppTheme.primaryGreen.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.location_on_rounded,
-                              color: hasNoAddress
-                                  ? Colors.orange.shade700
-                                  : AppTheme.primaryGreen,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Address Text
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (defaultAddress != null && defaultAddress.tag != null)
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 4),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primaryGreen.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      defaultAddress.tag!.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.primaryGreen,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                Text(
-                                  defaultAddress != null
-                                      ? defaultAddress.addressLine1.length > 45
-                                          ? '${defaultAddress.addressLine1.substring(0, 45)}...'
-                                          : defaultAddress.addressLine1
-                                      : 'Add delivery address',
-                                  style: TextStyle(
-                                    color: hasNoAddress
-                                        ? Colors.orange.shade900
-                                        : AppTheme.black,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.1,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (defaultAddress != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      '${defaultAddress.city}, ${defaultAddress.state}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.grey,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  )
-                                else if (hasNoAddress)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      'Required to place orders',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.orange.shade700,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Arrow Icon
-                          Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            color: hasNoAddress
-                                ? Colors.orange.shade700
-                                : AppTheme.primaryGreen,
-                            size: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              // Search Bar - Premium Design
+              // Header Section (Blinkit Style: Delivery Info + Search)
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                color: AppTheme.white,
-                child: GestureDetector(
-                  onTap: () => context.push('/products'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppTheme.lightGrey.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppTheme.lightGrey.withOpacity(0.5),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                color: Colors.white,
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  children: [
+                    // Top Row: Delivery Time, Address, Profile
+                    Consumer<OrderProvider>(
+                      builder: (context, orderProvider, _) {
+                        final defaultAddress = orderProvider.addresses.isNotEmpty
+                            ? orderProvider.addresses.firstWhere(
+                                (addr) => addr.isDefault,
+                                orElse: () => orderProvider.addresses.first,
+                              )
+                            : null;
+                        
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Brand Header
+                                    Row(
+                                      children: [
+                                        // Logo Icon
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryGreen,
+                                            borderRadius: BorderRadius.circular(12),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppTheme.primaryGreen.withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.shopping_basket_rounded,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Brand Name
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Easy Bucket',
+                                              style: TextStyle(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.w900,
+                                                color: AppTheme.black,
+                                                height: 1.0,
+                                                letterSpacing: -0.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // Address Row with Dropdown
+                                    GestureDetector(
+                                      onTap: () => context.push(orderProvider.addresses.isEmpty ? '/address/add' : '/addresses'),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.lightGrey.withOpacity(0.5),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 16),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                defaultAddress != null
+                                                    ? defaultAddress.tag != null 
+                                                        ? '${defaultAddress.tag!.toUpperCase()} - ${defaultAddress.addressLine1}'
+                                                        : defaultAddress.addressLine1
+                                                    : 'Add delivery address',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppTheme.black.withOpacity(0.8),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.black.withOpacity(0.6), size: 20),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Profile Icon
+                              GestureDetector(
+                                onTap: () => context.push('/profile'),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(color: AppTheme.lightGrey, width: 1),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(Icons.person_outline_rounded, color: AppTheme.black, size: 26),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.search_rounded,
-                          color: AppTheme.grey.withOpacity(0.7),
-                          size: 22,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            'Search for products...',
-                            style: TextStyle(
-                              color: AppTheme.grey.withOpacity(0.8),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w400,
+
+                    // Search Bar
+                    GestureDetector(
+                      onTap: () => context.push('/products'),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
-                          ),
+                          ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryGreen.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.mic_rounded,
-                            color: AppTheme.primaryGreen,
-                            size: 18,
-                          ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, color: AppTheme.black, size: 24),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Search "rice"',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                                width: 1, 
+                                height: 20, 
+                                color: Colors.grey.shade300
+                            ), // Divider
+                            const SizedBox(width: 12),
+                             Icon(Icons.mic_none_rounded, color: AppTheme.black, size: 24),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
               // Categories Section (Horizontal Scrollable Slider - Blinkit Style)
@@ -572,12 +420,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Categories',
+                              'Shop by category',
                               style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
                                 color: AppTheme.black,
-                                fontFamily: 'RoundedSans',
+                                letterSpacing: -0.5,
                               ),
                             ),
                             TextButton(
@@ -673,62 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 4,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.primaryGreen,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Text(
-                                      'Featured Products',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.black,
-                                        fontFamily: 'RoundedSans',
-                                        letterSpacing: 0.3,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                TextButton(
-                                  onPressed: () => context.push('/products'),
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        'View All',
-                                        style: TextStyle(
-                                          color: AppTheme.primaryGreen,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Icons.arrow_forward_ios_rounded,
-                                        size: 14,
-                                        color: AppTheme.primaryGreen,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
                         // Info message for users without address
                         if (hasNoAddress)
                           Container(
@@ -762,20 +554,56 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         const SizedBox(height: 16),
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: MediaQuery.of(context).size.width < 400 ? 0.68 : 0.70, // Increased to reduce white space below image
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: productProvider.products.length > 4 ? 4 : productProvider.products.length,
-                          itemBuilder: (context, index) {
-                            final product = productProvider.products[index];
-                            return ProductCard(product: product);
-                          },
+                        
+                        // Snack it away Section (Horizontal Carousel - Blinkit Style)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0), // Aligned with content
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Snack it away',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.black,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => context.push('/products'),
+                                    child: const Text(
+                                      'see all',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF0C831F), // Blinkit green
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 290, // Increased height for taller cards (0.55 aspect ratio)
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: productProvider.products.length,
+                                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                                itemBuilder: (context, index) {
+                                  final product = productProvider.products[index];
+                                  return SizedBox(
+                                    width: 160, // Fixed width for horizontal cards
+                                    child: ProductCard(product: product),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -799,8 +627,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
 }
 
