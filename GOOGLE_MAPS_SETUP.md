@@ -117,7 +117,7 @@ For full map experience, use mobile app (Android/iOS).
 
 ## Benefits
 
-1. **Better UX**: Visual map selection like Zomato/Blinkit
+1. **Better UX**: Visual map selection like zomato / blinkit
 2. **More Accurate**: Users can fine-tune exact location
 3. **Faster**: No need to type full address
 4. **Professional**: Modern, polished experience

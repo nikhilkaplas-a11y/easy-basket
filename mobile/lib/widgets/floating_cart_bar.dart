@@ -116,12 +116,11 @@ class FloatingCartBar extends StatelessWidget {
                       const SizedBox(width: 18),
                       // Cart Info
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
-                              '${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'} in cart',
+                              '${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'}',
                               style: TextStyle(
                                 fontSize: 15,
                                 color: Colors.white.withOpacity(0.95),
@@ -129,15 +128,14 @@ class FloatingCartBar extends StatelessWidget {
                                 letterSpacing: 0.2,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(width: 8),
                             Text(
                               currencyFormat.format(cartProvider.totalAmount),
                               style: const TextStyle(
-                                fontSize: 22,
+                                fontSize: 15,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                                height: 1.2,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],

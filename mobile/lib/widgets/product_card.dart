@@ -167,12 +167,14 @@ class ProductCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           // Price on the left - Flexible to prevent overflow
-                          Expanded(
+                          Flexible(
+                            flex: 2,
                             child: _buildPriceDisplay(product, currencyFormat, priceFontSize, hasDiscount),
                           ),
                           SizedBox(width: screenWidth < 360 ? 2 : 3),
-                          // ADD Button or Quantity Selector on the right - Flexible to prevent overflow
-                          Flexible(
+                          // ADD Button or Quantity Selector on the right - Fixed size to prevent overflow
+                          SizedBox(
+                            width: screenWidth < 360 ? 60 : screenWidth < 400 ? 70 : 80,
                             child: quantity > 0
                                 ? _buildQuantitySelector(context, cartProvider, quantity, responsive, screenWidth)
                                 : _buildAddButton(context, cartProvider, isAdding, buttonFontSize, screenWidth, variantCount),
@@ -431,7 +433,7 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  // Blinkit-style quantity selector - Positioned on the side, Compact to prevent overflow
+  // Compact integrated quantity selector - All in one green container
   Widget _buildQuantitySelector(
     BuildContext context,
     CartProvider cartProvider,
@@ -442,114 +444,133 @@ class ProductCard extends StatelessWidget {
     final variantCount = product.hasVariants && product.variants != null
         ? product.variants!.where((v) => v.isAvailable).length
         : 0;
-    final buttonSize = screenWidth < 360 ? 15.0 : 17.0;
-    final iconSize = screenWidth < 360 ? 10.0 : 11.0;
-    final fontSize = screenWidth < 360 ? 9.0 : 10.0;
     // For products with variants, we can't increment from card - need to go to detail page
     final canIncrement = (!product.hasVariants && quantity < product.stock && product.isAvailable) ||
         (product.hasVariants && variantCount == 1);
     final canDecrement = quantity > 0;
     
+    // Ultra-compact sizing to prevent overflow - More compact on smaller devices
+    final height = screenWidth < 360 ? 22.0 : screenWidth < 400 ? 24.0 : 26.0;
+    final iconSize = screenWidth < 360 ? 12.0 : screenWidth < 400 ? 14.0 : 16.0;
+    final fontSize = screenWidth < 360 ? 11.0 : screenWidth < 400 ? 12.0 : 13.0;
+    final buttonWidth = screenWidth < 360 ? 20.0 : screenWidth < 400 ? 22.0 : 24.0;
+    final horizontalPadding = screenWidth < 360 ? 3.0 : screenWidth < 400 ? 4.0 : 6.0;
+    final maxWidth = screenWidth < 360 ? 60.0 : screenWidth < 400 ? 70.0 : 80.0;
+    
     return Container(
-      height: screenWidth < 360 ? 20 : 24,
+      height: height,
+      constraints: BoxConstraints(maxWidth: maxWidth),
       decoration: BoxDecoration(
         color: AppTheme.primaryGreen,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: IntrinsicWidth(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          mainAxisSize: MainAxisSize.min,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Decrement button
-          GestureDetector(
-            onTap: () async {
-              if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                if (variantCount > 1) {
-                  await _showVariantBottomSheet(context);
-                  return;
-                }
-                // Single variant: update directly
-                final v = product.variants!.firstWhere((vv) => vv.isAvailable, orElse: () => product.variants!.first);
-                if (quantity > 1) {
-                  await cartProvider.updateQuantity(product.id, quantity - 1, variantId: v.id);
+          // Minus button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () async {
+                if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
+                  if (variantCount > 1) {
+                    await _showVariantBottomSheet(context);
+                    return;
+                  }
+                  // Single variant: update directly
+                  final v = product.variants!.firstWhere((vv) => vv.isAvailable, orElse: () => product.variants!.first);
+                  if (quantity > 1) {
+                    await cartProvider.updateQuantity(product.id, quantity - 1, variantId: v.id);
+                  } else {
+                    await cartProvider.removeItem(product.id, variantId: v.id);
+                  }
                 } else {
-                  await cartProvider.removeItem(product.id, variantId: v.id);
+                  if (quantity > 1) {
+                    await cartProvider.updateQuantity(product.id, quantity - 1);
+                  } else {
+                    // Remove item when quantity becomes 0
+                    await cartProvider.removeItem(product.id);
+                  }
                 }
-              } else {
-                if (quantity > 1) {
-                  await cartProvider.updateQuantity(product.id, quantity - 1);
-                } else {
-                  // Remove item when quantity becomes 0
-                  await cartProvider.removeItem(product.id);
-                }
-              }
-            },
-            child: Container(
-              width: buttonSize,
-              height: buttonSize,
-              margin: const EdgeInsets.all(1.5),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
+              },
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(6),
+                bottomLeft: Radius.circular(6),
               ),
-              child: Icon(
-                Icons.remove,
-                size: iconSize,
-                color: AppTheme.primaryGreen,
+              child: Container(
+                width: buttonWidth,
+                height: height,
+                alignment: Alignment.center,
+                child: Text(
+                  '-',
+                  style: TextStyle(
+                    fontSize: iconSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
+                ),
               ),
             ),
           ),
-          // Quantity display - Compact padding
+          // Quantity display
           Container(
-            padding: EdgeInsets.symmetric(horizontal: screenWidth < 360 ? 4 : 5),
-            constraints: BoxConstraints(minWidth: 16),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            constraints: BoxConstraints(minWidth: screenWidth < 360 ? 14 : 16),
             child: Text(
               quantity.toString(),
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                height: 1.0,
               ),
               textAlign: TextAlign.center,
             ),
           ),
-          // Increment button
-          GestureDetector(
-            onTap: canIncrement
-                ? () async {
-                    if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
-                      if (variantCount > 1) {
-                        await _showVariantBottomSheet(context);
-                        return;
+          // Plus button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: canIncrement
+                  ? () async {
+                      if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
+                        if (variantCount > 1) {
+                          await _showVariantBottomSheet(context);
+                          return;
+                        }
+                        // Single variant: update directly
+                        final v = product.variants!.firstWhere((vv) => vv.isAvailable, orElse: () => product.variants!.first);
+                        await cartProvider.updateQuantity(product.id, quantity + 1, variantId: v.id);
+                      } else {
+                        await cartProvider.updateQuantity(product.id, quantity + 1);
                       }
-                      // Single variant: update directly
-                      final v = product.variants!.firstWhere((vv) => vv.isAvailable, orElse: () => product.variants!.first);
-                      await cartProvider.updateQuantity(product.id, quantity + 1, variantId: v.id);
-                    } else {
-                      await cartProvider.updateQuantity(product.id, quantity + 1);
                     }
-                  }
-                : (product.hasVariants && product.variants != null && product.variants!.isNotEmpty)
-                    ? () async => _showVariantBottomSheet(context)
-                    : null,
-            child: Container(
-              width: buttonSize,
-              height: buttonSize,
-              margin: const EdgeInsets.all(1.5),
-              decoration: BoxDecoration(
-                color: canIncrement ? Colors.white : Colors.white.withOpacity(0.5),
-                shape: BoxShape.circle,
+                  : (product.hasVariants && product.variants != null && product.variants!.isNotEmpty)
+                      ? () async => _showVariantBottomSheet(context)
+                      : null,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(6),
+                bottomRight: Radius.circular(6),
               ),
-              child: Icon(
-                Icons.add,
-                size: iconSize,
-                color: canIncrement ? AppTheme.primaryGreen : AppTheme.grey,
+              child: Container(
+                width: buttonWidth,
+                height: height,
+                alignment: Alignment.center,
+                child: Text(
+                  '+',
+                  style: TextStyle(
+                    fontSize: iconSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
+                ),
               ),
             ),
           ),
         ],
-        ),
       ),
     );
   }
