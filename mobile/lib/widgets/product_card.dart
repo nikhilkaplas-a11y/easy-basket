@@ -45,6 +45,11 @@ class ProductCard extends StatelessWidget {
         ? product.variants!.where((v) => v.isAvailable).length 
         : 0;
 
+    // Check if product is out of stock
+    final isOutOfStock = !product.isAvailable || 
+        ((product.hasVariants && product.variants != null && !product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+         (!product.hasVariants && product.stock <= 0));
+
     return GestureDetector(
       onTap: () => context.push('/product/${product.id}'),
       child: Container(
@@ -63,129 +68,182 @@ class ProductCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+          child: Stack(
             children: [
-            // Image Section with Discount Badge - Use Expanded with flex
-            Expanded(
-              flex: 55, // 55% of available space (reduced from 60% to give more space to content)
-              child: Stack(
+              // Main content
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: double.infinity,
-                      child: product.imageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: product.imageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: AppTheme.lightGrey,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                    // Image Section with Discount Badge - Use Expanded with flex
+                    Expanded(
+                      flex: 55, // 55% of available space (reduced from 60% to give more space to content)
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: double.infinity,
+                              child: product.imageUrl != null
+                                  ? CachedNetworkImage(
+                                      imageUrl: product.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Container(
+                                        color: AppTheme.lightGrey,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                                          ),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        color: AppTheme.lightGrey,
+                                        child: Icon(Icons.image, size: responsive.iconSize(40), color: AppTheme.grey),
+                                      ),
+                                      fadeInDuration: const Duration(milliseconds: 300),
+                                      fadeOutDuration: const Duration(milliseconds: 100),
+                                    )
+                                  : Container(
+                                      color: AppTheme.lightGrey,
+                                      child: Icon(Icons.image, size: responsive.iconSize(40), color: AppTheme.grey),
+                                    ),
+                            ),
+                          ),
+                          // Discount Badge
+                          if (hasDiscount)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0C831F), // Blinkit green
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${discountPercent.toStringAsFixed(0)}% OFF',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
-                              errorWidget: (context, url, error) => Container(
-                                color: AppTheme.lightGrey,
-                                child: Icon(Icons.image, size: responsive.iconSize(40), color: AppTheme.grey),
-                              ),
-                              fadeInDuration: const Duration(milliseconds: 300),
-                              fadeOutDuration: const Duration(milliseconds: 100),
-                            )
-                          : Container(
-                              color: AppTheme.lightGrey,
-                              child: Icon(Icons.image, size: responsive.iconSize(40), color: AppTheme.grey),
                             ),
-                    ),
-                  ),
-                  // Discount Badge
-                  if (hasDiscount)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0C831F), // Blinkit green
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${discountPercent.toStringAsFixed(0)}% OFF',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // Content Section - Use Expanded with flex (increased to ensure product name is visible)
-            Expanded(
-              flex: 45, // 45% of available space (increased from 40% to ensure product name visibility)
-              child: ClipRect(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth < 360 ? 4.0 : 5.0,
-                    vertical: screenWidth < 360 ? 3.0 : 4.0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Product Name - Must be visible with proper ellipsis (Blinkit style)
-                      Expanded(
-                        flex: 2, // Give more space to product name
-                        child: _buildProductName(nameFontSize, screenWidth),
-                      ),
-                      SizedBox(height: screenWidth < 360 ? 0.5 : 1),
-                      // Weight/Unit Display - Optional, can be removed if space is tight
-                      if (product.unit != null || (product.hasVariants && product.variants != null && product.variants!.isNotEmpty))
-                        Flexible(
-                          child: Text(
-                            _getWeightDisplay(),
-                            style: TextStyle(
-                              fontSize: screenWidth < 360 ? 7.5 : 8.5,
-                              color: AppTheme.grey,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      SizedBox(height: screenWidth < 360 ? 1 : 2),
-                      // Price and ADD Button in same row (Blinkit style) - Saves space
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Price on the left - Flexible to prevent overflow
-                          Flexible(
-                            flex: 2,
-                            child: _buildPriceDisplay(product, currencyFormat, priceFontSize, hasDiscount),
-                          ),
-                          SizedBox(width: screenWidth < 360 ? 2 : 3),
-                          // ADD Button or Quantity Selector on the right - Fixed size to prevent overflow
-                          SizedBox(
-                            width: screenWidth < 360 ? 60 : screenWidth < 400 ? 70 : 80,
-                            child: quantity > 0
-                                ? _buildQuantitySelector(context, cartProvider, quantity, responsive, screenWidth)
-                                : _buildAddButton(context, cartProvider, isAdding, buttonFontSize, screenWidth, variantCount),
-                          ),
                         ],
                       ),
-                    ],
+                    ),
+                    // Content Section - Use Expanded with flex (increased to ensure product name is visible)
+                    Expanded(
+                      flex: 45, // 45% of available space (increased from 40% to ensure product name visibility)
+                      child: ClipRect(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth < 360 ? 4.0 : 5.0,
+                            vertical: screenWidth < 360 ? 3.0 : 4.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Product Name - Must be visible with proper ellipsis (Blinkit style)
+                              Expanded(
+                                flex: 2, // Give more space to product name
+                                child: _buildProductName(nameFontSize, screenWidth),
+                              ),
+                              SizedBox(height: screenWidth < 360 ? 0.5 : 1),
+                              // Weight/Unit Display - Optional, can be removed if space is tight
+                              if (product.unit != null || (product.hasVariants && product.variants != null && product.variants!.isNotEmpty))
+                                Flexible(
+                                  child: Text(
+                                    _getWeightDisplay(),
+                                    style: TextStyle(
+                                      fontSize: screenWidth < 360 ? 7.5 : 8.5,
+                                      color: AppTheme.grey,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              SizedBox(height: screenWidth < 360 ? 1 : 2),
+                              // Price and ADD Button in same row (Blinkit style) - Saves space
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Price on the left - Flexible to prevent overflow
+                                  Flexible(
+                                    flex: 2,
+                                    child: _buildPriceDisplay(product, currencyFormat, priceFontSize, hasDiscount),
+                                  ),
+                                  SizedBox(width: screenWidth < 360 ? 2 : 3),
+                                  // ADD Button or Quantity Selector on the right - Fixed size to prevent overflow
+                                  SizedBox(
+                                    width: screenWidth < 360 ? 60 : screenWidth < 400 ? 70 : 80,
+                                    child: quantity > 0
+                                        ? _buildQuantitySelector(context, cartProvider, quantity, responsive, screenWidth)
+                                        : _buildAddButton(context, cartProvider, isAdding, buttonFontSize, screenWidth, variantCount),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              // Grey overlay for out of stock products
+              if (isOutOfStock)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-              ),
-            ),
+              // Out of Stock Banner - Transparent overlay at top
+              if (isOutOfStock)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.block,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Out of Stock',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -416,10 +474,7 @@ class ProductCard extends StatelessWidget {
                     ),
                   )
                 : Text(
-                    (product.hasVariants && product.variants != null && product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
-                    (!product.hasVariants && product.isAvailable && product.stock > 0)
-                        ? 'ADD'
-                        : 'Out of Stock',
+                    'ADD',
                     style: TextStyle(
                       fontSize: screenWidth < 360 ? 12 : 13,
                       fontWeight: FontWeight.bold,
