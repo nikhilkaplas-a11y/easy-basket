@@ -383,7 +383,7 @@ class _CategoryCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${category.subcategories!.where((c) => c.isActive).length} subcategor${category.subcategories!.where((c) => c.isActive).length == 1 ? 'y' : 'ies'}',
+                          '${category.subcategories!.length} subcategor${category.subcategories!.length == 1 ? 'y' : 'ies'}',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppTheme.primaryGreen,
@@ -507,8 +507,9 @@ class _SubcategoriesDialogState extends State<_SubcategoriesDialog> {
         return;
       }
       
+      // Include inactive subcategories for admin dashboard
       final response = await adminProvider.apiService.get(
-        '/categories/${widget.parentCategory.id}/subcategories',
+        '/categories/${widget.parentCategory.id}/subcategories?includeInactive=true',
         token: authProvider.token!,
       );
       

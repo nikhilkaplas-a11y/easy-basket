@@ -4,7 +4,6 @@ import { DataSource } from 'typeorm';
 import { Order } from '../entities/Order';
 import { OrderItem } from '../entities/OrderItem';
 import { Product } from '../entities/Product';
-import { ProductCollection } from '../entities/ProductCollection';
 import { ProductVariant } from '../entities/ProductVariant';
 import { RefreshToken } from '../entities/RefreshToken';
 import { ServiceArea } from '../entities/ServiceArea';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../models/product_model.dart';
+import '../../models/category_model.dart';
 import '../../utils/theme.dart';
 import '../../widgets/variant_management_dialog.dart';
 import 'package:intl/intl.dart';
@@ -18,11 +20,17 @@ class AdminProductsScreen extends StatefulWidget {
 
 class _AdminProductsScreenState extends State<AdminProductsScreen> {
   final _scrollController = ScrollController();
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  int? _selectedCategoryId;
+  String? _searchQuery;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProducts();
       _loadCategories();
@@ -32,7 +40,23 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      final newQuery = _searchController.text.trim().isEmpty ? null : _searchController.text.trim();
+      if (newQuery != _searchQuery) {
+        setState(() {
+          _searchQuery = newQuery;
+        });
+        _loadProducts();
+      }
+    });
   }
 
   void _onScroll() {
@@ -40,7 +64,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
       final adminProvider = Provider.of<AdminProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (adminProvider.hasMore && !adminProvider.isLoadingMore) {
-        adminProvider.fetchProducts(token: authProvider.token, loadMore: true);
+        adminProvider.fetchProducts(
+          token: authProvider.token,
+          loadMore: true,
+          search: _searchQuery,
+          categoryId: _selectedCategoryId,
+        );
       }
     }
   }
@@ -48,13 +77,28 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   void _loadProducts() {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    adminProvider.fetchProducts(token: authProvider.token);
+    adminProvider.fetchProducts(
+      token: authProvider.token,
+      search: _searchQuery,
+      categoryId: _selectedCategoryId,
+    );
   }
 
   void _loadCategories() {
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
     productProvider.fetchCategories();
   }
+
+  void _clearFilters() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = null;
+      _selectedCategoryId = null;
+    });
+    _loadProducts();
+  }
+
+  bool get _hasActiveFilters => _searchQuery != null || _selectedCategoryId != null;
 
   Future<void> _deleteProduct(ProductModel product) async {
     final confirmed = await showDialog<bool>(
@@ -119,66 +163,105 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          _loadProducts();
-          _loadCategories();
-        },
-        child: adminProvider.isLoading && adminProvider.products.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : adminProvider.products.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inventory_2_outlined, size: 64, color: AppTheme.grey),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No products found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: AppTheme.grey,
+      body: Column(
+        children: [
+          // Search and Filter Section
+          _SearchAndFilterSection(
+            searchController: _searchController,
+            searchFocusNode: _searchFocusNode,
+            selectedCategoryId: _selectedCategoryId,
+            onCategoryChanged: (categoryId) {
+              setState(() {
+                _selectedCategoryId = categoryId;
+              });
+              _loadProducts();
+            },
+            onClearFilters: _hasActiveFilters ? _clearFilters : null,
+            onSearchCleared: () {
+              setState(() {
+                _searchQuery = null;
+              });
+              _loadProducts();
+            },
+          ),
+          // Products List
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _loadProducts();
+                _loadCategories();
+              },
+              child: adminProvider.isLoading && adminProvider.products.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : adminProvider.products.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _hasActiveFilters ? Icons.search_off : Icons.inventory_2_outlined,
+                                size: 64,
+                                color: AppTheme.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _hasActiveFilters
+                                    ? 'No products found matching your search'
+                                    : 'No products found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: AppTheme.grey,
+                                ),
+                              ),
+                              if (_hasActiveFilters) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Clear Filters'),
+                                ),
+                              ],
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: () => context.push('/admin/products/add'),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Product'),
+                              ),
+                            ],
                           ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: adminProvider.products.length + (adminProvider.hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == adminProvider.products.length) {
+                              // Load more indicator
+                              if (adminProvider.isLoadingMore) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            }
+                            final product = adminProvider.products[index];
+                            return _ProductCard(
+                              product: product,
+                              currencyFormat: currencyFormat,
+                              onDelete: () => _deleteProduct(product),
+                              onEdit: () async {
+                                final result = await context.push('/admin/products/${product.id}/edit');
+                                if (result == true) {
+                                  _loadProducts();
+                                }
+                              },
+                              onRefresh: _loadProducts,
+                            );
+                          },
                         ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () => context.push('/admin/products/add'),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Product'),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: adminProvider.products.length + (adminProvider.hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == adminProvider.products.length) {
-                        // Load more indicator
-                        if (adminProvider.isLoadingMore) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      }
-                      final product = adminProvider.products[index];
-                      return _ProductCard(
-                        product: product,
-                        currencyFormat: currencyFormat,
-                        onDelete: () => _deleteProduct(product),
-                        onEdit: () async {
-                          final result = await context.push('/admin/products/${product.id}/edit');
-                          if (result == true) {
-                            _loadProducts();
-                          }
-                        },
-                        onRefresh: _loadProducts,
-                      );
-                    },
-                  ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -189,6 +272,205 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         },
         backgroundColor: AppTheme.primaryGreen,
         child: const Icon(Icons.add, color: AppTheme.white),
+      ),
+    );
+  }
+}
+
+class _SearchAndFilterSection extends StatefulWidget {
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final int? selectedCategoryId;
+  final ValueChanged<int?> onCategoryChanged;
+  final VoidCallback? onClearFilters;
+  final VoidCallback? onSearchCleared;
+
+  const _SearchAndFilterSection({
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.selectedCategoryId,
+    required this.onCategoryChanged,
+    this.onClearFilters,
+    this.onSearchCleared,
+  });
+
+  @override
+  State<_SearchAndFilterSection> createState() => _SearchAndFilterSectionState();
+}
+
+class _SearchAndFilterSectionState extends State<_SearchAndFilterSection> {
+  // Build a flat list of all categories (parent + subcategories) for the dropdown
+  List<CategoryModel> _buildAllCategories(List<CategoryModel> categories) {
+    final List<CategoryModel> allCategories = [];
+    
+    for (final category in categories) {
+      if (category.isActive) {
+        // Add parent category
+        allCategories.add(category);
+        
+        // Add subcategories if they exist
+        if (category.hasSubcategories) {
+          final activeSubcategories = category.subcategories!
+              .where((sub) => sub.isActive)
+              .toList();
+          allCategories.addAll(activeSubcategories);
+        }
+      }
+    }
+    
+    return allCategories;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productProvider = Provider.of<ProductProvider>(context);
+    final topLevelCategories = productProvider.categories.where((c) => c.isActive && c.isTopLevel).toList();
+    final allCategories = _buildAllCategories(topLevelCategories);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.searchController,
+              builder: (context, value, child) {
+                return TextField(
+                  controller: widget.searchController,
+                  focusNode: widget.searchFocusNode,
+                  decoration: InputDecoration(
+                    hintText: 'Search products by name, description...',
+                    prefixIcon: const Icon(Icons.search, color: AppTheme.grey),
+                    suffixIcon: value.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              widget.searchController.clear();
+                              widget.onSearchCleared?.call();
+                            },
+                          )
+                        : null,
+                filled: true,
+                fillColor: AppTheme.lightGrey.withOpacity(0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppTheme.lightGrey, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2),
+                ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Category Filter and Clear Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                // Category Dropdown
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightGrey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.lightGrey),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int?>(
+                        value: widget.selectedCategoryId,
+                        isExpanded: true,
+                        icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryGreen),
+                        hint: Row(
+                          children: [
+                            Icon(Icons.category, size: 18, color: AppTheme.grey),
+                            const SizedBox(width: 8),
+                            Text(
+                              'All Categories',
+                              style: TextStyle(color: AppTheme.grey, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                        items: [
+                          DropdownMenuItem<int?>(
+                            value: null,
+                            child: Row(
+                              children: [
+                                Icon(Icons.category, size: 18, color: AppTheme.grey),
+                                const SizedBox(width: 8),
+                                const Text('All Categories'),
+                              ],
+                            ),
+                          ),
+                          ...allCategories.map((category) {
+                            final isSubcategory = category.isSubcategory;
+                            return DropdownMenuItem<int?>(
+                              value: category.id,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isSubcategory ? Icons.subdirectory_arrow_right : Icons.category,
+                                    size: 18,
+                                    color: isSubcategory ? AppTheme.grey : AppTheme.primaryGreen,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      isSubcategory ? '  ${category.name}' : category.name,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontStyle: isSubcategory ? FontStyle.italic : FontStyle.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                        onChanged: widget.onCategoryChanged,
+                      ),
+                    ),
+                  ),
+                ),
+                // Clear Filters Button
+                  if (widget.onClearFilters != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.clear_all, color: AppTheme.primaryGreen),
+                        onPressed: widget.onClearFilters,
+                        tooltip: 'Clear all filters',
+                      ),
+                    ),
+                  ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

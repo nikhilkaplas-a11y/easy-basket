@@ -9,6 +9,7 @@ export class CategoryController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const skip = (page - 1) * limit;
+      const includeInactive = req.query.includeInactive === 'true';
 
       const categoryRepository = AppDataSource.getRepository(Category);
       
@@ -16,8 +17,12 @@ export class CategoryController {
       const queryBuilder = categoryRepository
         .createQueryBuilder('category')
         .leftJoinAndSelect('category.subcategories', 'subcategories')
-        .leftJoinAndSelect('category.parentCategory', 'parentCategory')
-        .where('category.isActive = :isActive', { isActive: true });
+        .leftJoinAndSelect('category.parentCategory', 'parentCategory');
+      
+      // Only filter by isActive if includeInactive is not true
+      if (!includeInactive) {
+        queryBuilder.where('category.isActive = :isActive', { isActive: true });
+      }
 
       // Filter by parent category if provided
       if (parentId) {
@@ -79,13 +84,20 @@ export class CategoryController {
   static async getSubcategories(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const includeInactive = req.query.includeInactive === 'true';
       const categoryRepository = AppDataSource.getRepository(Category);
       
+      const whereCondition: any = { 
+        parentCategory: { id: Number(id) },
+      };
+      
+      // Only filter by isActive if includeInactive is not true
+      if (!includeInactive) {
+        whereCondition.isActive = true;
+      }
+      
       const subcategories = await categoryRepository.find({
-        where: { 
-          parentCategory: { id: Number(id) },
-          isActive: true,
-        },
+        where: whereCondition,
         relations: ['parentCategory'],
         order: { displayOrder: 'ASC', name: 'ASC' },
       });

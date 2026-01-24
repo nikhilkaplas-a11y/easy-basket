@@ -6,6 +6,7 @@ import { Order } from '../entities/Order';
 import { Product } from '../entities/Product';
 import { Response } from 'express';
 import { User } from '../entities/User';
+import { Brackets } from 'typeorm';
 
 export class AdminController {
   static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -287,14 +288,48 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const skip = (page - 1) * limit;
+      const { categoryId, search } = req.query;
 
       const productRepository = AppDataSource.getRepository(Product);
-      const [products, total] = await productRepository.findAndCount({
-        relations: ['category'],
-        order: { createdAt: 'DESC' },
-        skip,
-        take: limit,
-      });
+      const queryBuilder = productRepository
+        .createQueryBuilder('product')
+        .leftJoinAndSelect('product.category', 'category')
+        .leftJoinAndSelect('product.variants', 'variants');
+
+      // Filter by category if provided
+      if (categoryId) {
+        queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId: Number(categoryId) });
+      }
+
+      // Filter by search query if provided - use Full-Text Search like user app
+      if (search && String(search).trim().length > 0) {
+        const searchTerm = String(search).trim();
+        
+        // Use Full-Text Search with Boolean Mode for better matching
+        // Split query into words and require all of them (AND logic)
+        // e.g. "Chia Seeds" -> "+Chia* +Seeds*"
+        const searchTerms = searchTerm
+          .split(/\s+/)
+          .map(term => {
+            // If term is very short, don't force it with + as it might not be indexed
+            return term.length <= 2 ? `${term}*` : `+${term}*`;
+          })
+          .join(' ');
+
+        // Combine FTS with LIKE to catch short words/numbers (e.g., "1L") that FTS might miss
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            qb.where(`MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`, { search: searchTerms })
+              .orWhere('product.name LIKE :likeSearch', { likeSearch: `%${searchTerm}%` })
+              .orWhere('product.description LIKE :likeSearch', { likeSearch: `%${searchTerm}%` })
+              .orWhere('product.tags LIKE :likeSearch', { likeSearch: `%${searchTerm}%` });
+          })
+        );
+      }
+
+      queryBuilder.orderBy('product.createdAt', 'DESC').skip(skip).take(limit);
+
+      const [products, total] = await queryBuilder.getManyAndCount();
 
       res.json({
         products,

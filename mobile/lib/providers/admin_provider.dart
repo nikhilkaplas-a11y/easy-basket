@@ -236,7 +236,33 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchProducts({String? token, bool loadMore = false}) async {
+  Future<ProductModel?> fetchProductById({required String token, required int productId}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await apiService.get('/products/$productId', token: token);
+      final product = ProductModel.fromJson(response as Map<String, dynamic>);
+      
+      // Update product in the list if it exists
+      final existingIndex = _products.indexWhere((p) => p.id == productId);
+      if (existingIndex >= 0) {
+        _products[existingIndex] = product;
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return product;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<void> fetchProducts({String? token, bool loadMore = false, String? search, int? categoryId}) async {
     if (loadMore) {
       if (!_hasMore || _isLoadingMore) return;
       _isLoadingMore = true;
@@ -251,7 +277,14 @@ class AdminProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await apiService.get('/admin/products?page=$_currentPage&limit=20', token: token);
+      String endpoint = '/admin/products?page=$_currentPage&limit=20';
+      if (search != null && search.isNotEmpty) {
+        endpoint += '&search=${Uri.encodeComponent(search)}';
+      }
+      if (categoryId != null) {
+        endpoint += '&categoryId=$categoryId';
+      }
+      final response = await apiService.get(endpoint, token: token);
       if (response is Map<String, dynamic> && response.containsKey('products')) {
         final List<dynamic> data = response['products'] as List? ?? [];
         final pagination = response['pagination'] as Map<String, dynamic>?;
@@ -404,7 +437,8 @@ class AdminProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await apiService.get('/categories?page=$_currentPage&limit=20', token: token);
+      // Include inactive categories for admin dashboard
+      final response = await apiService.get('/categories?page=$_currentPage&limit=20&includeInactive=true', token: token);
       if (response is Map<String, dynamic> && response.containsKey('categories')) {
         final List<dynamic> data = response['categories'] as List? ?? [];
         final pagination = response['pagination'] as Map<String, dynamic>?;

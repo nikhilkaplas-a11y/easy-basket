@@ -66,15 +66,34 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   }
 
   Future<void> _loadProduct() async {
+    if (widget.productId == null) return;
+    
     setState(() => _isLoadingProduct = true);
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await adminProvider.fetchProducts(token: authProvider.token);
-    _product = adminProvider.products.firstWhere(
-      (prod) => prod.id == widget.productId,
-      orElse: () => adminProvider.products.first,
+    
+    if (authProvider.token == null) {
+      setState(() => _isLoadingProduct = false);
+      return;
+    }
+    
+    // Fetch product directly by ID instead of fetching all products
+    _product = await adminProvider.fetchProductById(
+      token: authProvider.token!,
+      productId: widget.productId!,
     );
-    _loadProductData();
+    
+    if (_product != null) {
+      _loadProductData();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load product')),
+        );
+        context.pop();
+      }
+    }
+    
     setState(() => _isLoadingProduct = false);
   }
 
