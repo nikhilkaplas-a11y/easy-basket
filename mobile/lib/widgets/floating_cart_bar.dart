@@ -52,130 +52,72 @@ class FloatingCartBar extends StatelessWidget {
                 splashColor: Colors.white.withOpacity(0.2),
                 highlightColor: Colors.white.withOpacity(0.1),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: Row(
                     children: [
-                      // Cart Icon with Badge
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.shopping_cart_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                          Positioned(
-                            right: -6,
-                            top: -6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryYellow,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.3),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 22,
-                                minHeight: 22,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${cartProvider.itemCount}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      // Cart Icon - Lighter green square with rounded corners
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryGreen.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.shopping_cart_outlined,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                      const SizedBox(width: 18),
-                      // Cart Info
+                      const SizedBox(width: 16),
+                      // Cart Info - Two lines: items on top, price below
                       Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               '${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'}',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.white.withOpacity(0.95),
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              currencyFormat.format(cartProvider.totalAmount),
                               style: const TextStyle(
                                 fontSize: 15,
                                 color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              currencyFormat.format(cartProvider.totalAmount),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 0.3,
+                                height: 1.2,
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // View Cart Button
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                      // View Cart - White text with arrow on green background
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'View Cart',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'View Cart',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryGreen,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 20,
-                              color: AppTheme.primaryGreen,
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ],
                       ),
                     ],
                   ),
