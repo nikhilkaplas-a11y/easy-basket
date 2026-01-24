@@ -34,6 +34,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   final _descriptionController = TextEditingController();
   final _imageUrlController = TextEditingController();
   final _imageNameController = TextEditingController();
+  final _displayOrderController = TextEditingController();
   XFile? _selectedImage;
   bool _isUploadingImage = false;
   double _uploadProgress = 0.0;
@@ -84,11 +85,15 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       _imageUrlController.text = _category!.imageUrl ?? '';
       _isActive = _category!.isActive;
       _selectedParentCategoryId = _category!.parentCategoryId;
+      _displayOrderController.text = _category!.displayOrder.toString();
       
       // Auto-fill image name from category name
       if (_imageNameController.text.isEmpty) {
         _imageNameController.text = _category!.name.toLowerCase().replaceAll(' ', '-');
       }
+    } else {
+      // Set default display order for new categories
+      _displayOrderController.text = '0';
     }
   }
 
@@ -117,6 +122,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     _descriptionController.dispose();
     _imageUrlController.dispose();
     _imageNameController.dispose();
+    _displayOrderController.dispose();
     super.dispose();
   }
 
@@ -302,6 +308,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       return;
     }
 
+    final displayOrder = int.tryParse(_displayOrderController.text.trim()) ?? 0;
+    
     final success = _category == null
         ? await adminProvider.createCategory(
             token: authProvider.token!,
@@ -309,6 +317,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
             imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
             parentCategoryId: _selectedParentCategoryId,
+            displayOrder: displayOrder,
           )
         : await adminProvider.updateCategory(
             token: authProvider.token!,
@@ -318,6 +327,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
             isActive: _isActive,
             parentCategoryId: _selectedParentCategoryId,
+            displayOrder: displayOrder,
           );
 
     setState(() => _isLoading = false);
@@ -397,6 +407,28 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 setState(() {
                   _selectedParentCategoryId = value;
                 });
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _displayOrderController,
+              decoration: const InputDecoration(
+                labelText: 'Display Order',
+                hintText: 'Lower numbers appear first (0, 1, 2...)',
+                prefixIcon: Icon(Icons.sort),
+                border: OutlineInputBorder(),
+                helperText: 'Set the order in which this category appears',
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return null; // Optional field
+                }
+                final order = int.tryParse(value.trim());
+                if (order == null || order < 0) {
+                  return 'Please enter a valid number (0 or greater)';
+                }
+                return null;
               },
             ),
             const SizedBox(height: 16),

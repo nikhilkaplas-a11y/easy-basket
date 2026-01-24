@@ -33,6 +33,7 @@ import '../screens/admin/admin_products_screen.dart';
 import '../screens/admin/admin_categories_screen.dart';
 import '../screens/admin/add_edit_category_screen.dart';
 import '../screens/admin/add_edit_product_screen.dart';
+import '../screens/admin/category_order_screen.dart';
 import '../models/address_model.dart';
 import '../screens/service_area/service_not_available_screen.dart';
 import '../screens/onboarding/location_detection_screen.dart';
@@ -345,6 +346,10 @@ class AppRouter {
           // We'll fetch category by ID in the screen if needed
           return AddEditCategoryScreen(categoryId: id);
         },
+      ),
+      GoRoute(
+        path: '/admin/categories/order',
+        builder: (context, state) => const CategoryOrderScreen(),
       ),
       GoRoute(
         path: '/admin/products/add',

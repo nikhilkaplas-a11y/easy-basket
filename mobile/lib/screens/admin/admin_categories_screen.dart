@@ -126,6 +126,49 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
     }
   }
 
+  Future<void> _moveCategory(CategoryModel category, int direction) async {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (authProvider.token == null) return;
+
+    // Find current index
+    final currentIndex = adminProvider.categories.indexWhere((c) => c.id == category.id);
+    if (currentIndex == -1) return;
+
+    // Calculate new index
+    final newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= adminProvider.categories.length) return;
+
+    // Get the category we're swapping with
+    final swapCategory = adminProvider.categories[newIndex];
+    
+    // Swap display orders
+    final tempOrder = category.displayOrder;
+    final newOrder = swapCategory.displayOrder;
+
+    // Update both categories
+    final success1 = await adminProvider.updateCategory(
+      token: authProvider.token!,
+      categoryId: category.id,
+      displayOrder: newOrder,
+    );
+
+    final success2 = await adminProvider.updateCategory(
+      token: authProvider.token!,
+      categoryId: swapCategory.id,
+      displayOrder: tempOrder,
+    );
+
+    if (success1 && success2 && mounted) {
+      _loadCategories();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(adminProvider.error ?? 'Failed to reorder category')),
+      );
+    }
+  }
+
   Future<void> _viewSubcategories(CategoryModel category) async {
     // If category has subcategories, show them in a dialog or navigate
     if (category.hasSubcategories) {
@@ -185,6 +228,11 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.sort),
+            onPressed: () => context.push('/admin/categories/order'),
+            tooltip: 'Manage Category Order',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadCategories,
           ),
@@ -233,12 +281,18 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                         return const SizedBox.shrink();
                       }
                       final category = adminProvider.categories[index];
+                      final canMoveUp = index > 0;
+                      final canMoveDown = index < adminProvider.categories.length - 1;
                       return _CategoryCard(
                         category: category,
+                        canMoveUp: canMoveUp,
+                        canMoveDown: canMoveDown,
                         onEdit: () => _editCategory(category),
                         onDelete: () => _deleteCategory(category),
                         onToggleStatus: () => _toggleCategoryStatus(category),
                         onTap: () => _viewSubcategories(category),
+                        onMoveUp: canMoveUp ? () => _moveCategory(category, -1) : null,
+                        onMoveDown: canMoveDown ? () => _moveCategory(category, 1) : null,
                       );
                     },
                   ),
@@ -263,6 +317,10 @@ class _CategoryCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onToggleStatus;
   final VoidCallback? onTap;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   const _CategoryCard({
     required this.category,
@@ -270,6 +328,10 @@ class _CategoryCard extends StatelessWidget {
     required this.onDelete,
     required this.onToggleStatus,
     this.onTap,
+    this.canMoveUp = false,
+    this.canMoveDown = false,
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   @override
@@ -421,6 +483,34 @@ class _CategoryCard extends StatelessWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Reorder buttons
+                if (onMoveUp != null || onMoveDown != null) ...[
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_upward,
+                      color: canMoveUp ? AppTheme.primaryGreen : AppTheme.grey,
+                      size: 18,
+                    ),
+                    onPressed: canMoveUp ? onMoveUp : null,
+                    tooltip: 'Move Up',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_downward,
+                      color: canMoveDown ? AppTheme.primaryGreen : AppTheme.grey,
+                      size: 18,
+                    ),
+                    onPressed: canMoveDown ? onMoveDown : null,
+                    tooltip: 'Move Down',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const SizedBox(height: 4),
+                ],
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
                   onPressed: onEdit,
