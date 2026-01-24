@@ -492,9 +492,26 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${item.product.name} x ${item.quantity}'),
-                            Text(currencyFormat.format(item.total)),
+                            Flexible(
+                              child: Text(
+                                '${item.product.name} x ${item.quantity}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              currencyFormat.format(item.total),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
                       )),
