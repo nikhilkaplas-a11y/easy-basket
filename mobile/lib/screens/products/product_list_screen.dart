@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../widgets/product_card.dart';
@@ -239,10 +240,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                 child: imageUrl != null && imageUrl.isNotEmpty
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          imageUrl,
+                                        child: CachedNetworkImage(
+                                          imageUrl: imageUrl,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.search, size: 20, color: AppTheme.grey),
+                                          placeholder: (context, url) => const Center(
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                          errorWidget: (context, url, error) => const Icon(Icons.search, size: 20, color: AppTheme.grey),
                                         ),
                                       )
                                     : const Icon(Icons.search, size: 20, color: AppTheme.grey),

@@ -52,9 +52,9 @@
 }
 
 # Keep custom model classes (adjust package name as needed)
--keep class com.easybasket.app.models.** { *; }
--keep class com.easybasket.app.services.** { *; }
--keep class com.easybasket.app.providers.** { *; }
+-keep class com.easybasket.grocery.models.** { *; }
+-keep class com.easybasket.grocery.services.** { *; }
+-keep class com.easybasket.grocery.providers.** { *; }
 
 # Razorpay
 -keep class com.razorpay.** { *; }

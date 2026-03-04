@@ -429,7 +429,7 @@ aws ssm put-parameter \
 ```dart
 class AppConfig {
   // Production API URL
-  static const String apiBaseUrl = 'https://your-domain.com/api';
+  // static const String apiBaseUrl = 'https://your-domain.com/api';
   // OR if using IP (not recommended for production)
   // static const String apiBaseUrl = 'http://YOUR_ELASTIC_IP/api';
   

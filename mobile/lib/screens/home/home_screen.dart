@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -269,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Easy Bucket',
+                                              'Easy Basket',
                                               style: TextStyle(
                                                 fontSize: 24,
                                                 fontWeight: FontWeight.w900,
@@ -679,12 +680,21 @@ class _CategorySliderCard extends StatelessWidget {
               child: category.imageUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        category.imageUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: category.imageUrl!,
                         width: iconSize,
                         height: iconSize,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
+                        placeholder: (context, url) => Container(
+                          color: AppTheme.primaryGreen.withOpacity(0.1),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Icon(
                           Icons.category,
                           size: responsive.iconSize(24),
                           color: AppTheme.primaryGreen,
@@ -759,7 +769,7 @@ class _HomeFooter extends StatelessWidget {
           Divider(color: AppTheme.grey.withOpacity(0.2)),
           const SizedBox(height: 24),
           const Text(
-            'Live for food, delivered by Easy Bucket',
+            'Live for food, delivered by Easy Basket',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -786,7 +796,7 @@ class _HomeFooter extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Easy Bucket © ${DateTime.now().year}',
+            'Easy Basket © ${DateTime.now().year}',
             style: TextStyle(
               fontSize: 12,
               color: AppTheme.grey.withOpacity(0.7),

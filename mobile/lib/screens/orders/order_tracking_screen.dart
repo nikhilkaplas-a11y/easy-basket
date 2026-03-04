@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/order_model.dart';
@@ -359,12 +360,23 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: item.product.imageUrl != null
-                          ? Image.network(
-                              item.product.imageUrl!,
+                          ? CachedNetworkImage(
+                              imageUrl: item.product.imageUrl!,
                               width: 60,
                               height: 60,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              placeholder: (context, url) => Container(
+                                width: 60,
+                                height: 60,
+                                color: AppTheme.lightGrey,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 width: 60,
                                 height: 60,
                                 color: AppTheme.lightGrey,

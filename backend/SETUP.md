@@ -47,7 +47,25 @@ FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"..."}
 - Get Firebase service account JSON from Firebase Console
 - Paste the entire JSON as a string in `.env`
 
-### 4. Optional: Razorpay (for Payments)
+### 4. Optional: Twilio (for OTP / Phone Verification)
+
+For real OTP over SMS (login flow):
+
+```env
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_VERIFY_SERVICE_SID=VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Action Required:**
+- Sign up at https://www.twilio.com
+- From Console: Account SID and Auth Token
+- Create a Verify Service (Verify → Services → Create), copy the Service SID (starts with `VA`)
+- Add all three to `.env`. If any are missing, the app falls back to dev OTP `1234`.
+
+See `TWILIO_SETUP.md` for step-by-step setup.
+
+### 5. Optional: Razorpay (for Payments)
 
 For payment processing:
 

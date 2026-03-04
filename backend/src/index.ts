@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { AppDataSource } from './config/database';
+import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
@@ -16,7 +17,6 @@ import productRoutes from './routes/product.routes';
 import serviceAreaRoutes from './routes/serviceArea.routes';
 import uploadRoutes from './routes/upload.routes';
 import variantRoutes from './routes/variant.routes';
-import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 
 // Load environment variables FIRST before importing any modules that use them
 dotenv.config();
@@ -106,6 +106,18 @@ AppDataSource.initialize()
   })
   .catch((error: any) => {
     console.error('❌ Database connection error:', error.message || error);
+    
+    // Helpful hints for ETIMEDOUT (can't reach DB host)
+    if (error.code === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT')) {
+      console.error('');
+      console.error('💡 ETIMEDOUT = Cannot reach the database host. Check:');
+      console.error('   1. DB_HOST in .env – use localhost if MySQL is on this machine');
+      console.error('   2. MySQL is running: mysql is running, or brew services start mysql');
+      console.error('   3. If remote DB: firewall, security group, or VPN blocking port 3306');
+      console.error('   4. DB_PORT (default 3306) matches your MySQL port');
+      console.error(`   Current: host=${process.env.DB_HOST || 'localhost'} port=${process.env.DB_PORT || '3306'}`);
+      console.error('');
+    }
     
     // Check for specific index drop error
     if (error.code === 'ER_DROP_INDEX_FK' || error.errno === 1553) {

@@ -26,6 +26,9 @@ module.exports = {
       RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
       RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
       FIREBASE_SERVICE_ACCOUNT: process.env.FIREBASE_SERVICE_ACCOUNT,
+      TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
+      TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+      TWILIO_VERIFY_SERVICE_SID: process.env.TWILIO_VERIFY_SERVICE_SID,
     },
     // Auto-restart settings
     autorestart: true,

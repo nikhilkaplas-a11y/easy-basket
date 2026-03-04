@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -539,12 +540,19 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: item.product.imageUrl != null
-                              ? Image.network(
-                                  item.product.imageUrl!,
+                              ? CachedNetworkImage(
+                                  imageUrl: item.product.imageUrl!,
                                   width: 50,
                                   height: 50,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                                  placeholder: (context, url) => const SizedBox(
+                                    width: 50,
+                                    height: 50,
+                                    child: Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => const Icon(Icons.image),
                                 )
                               : const Icon(Icons.image),
                           title: Text(item.product.name),

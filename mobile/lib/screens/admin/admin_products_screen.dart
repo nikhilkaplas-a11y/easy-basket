@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
@@ -504,12 +505,20 @@ class _ProductCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: product.imageUrl != null
-                  ? Image.network(
-                      product.imageUrl!,
+                  ? CachedNetworkImage(
+                      imageUrl: product.imageUrl!,
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (context, url) => Container(
+                        width: 80,
+                        height: 80,
+                        color: AppTheme.lightGrey,
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         width: 80,
                         height: 80,
                         color: AppTheme.lightGrey,

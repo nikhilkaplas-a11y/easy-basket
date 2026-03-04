@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
@@ -192,12 +193,23 @@ class CartScreen extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: item.product.imageUrl != null
-                  ? Image.network(
-                      item.product.imageUrl!,
+                  ? CachedNetworkImage(
+                      imageUrl: item.product.imageUrl!,
                       width: 90,
                       height: 90,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (context, url) => Container(
+                        width: 90,
+                        height: 90,
+                        color: AppTheme.lightGrey,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         width: 90,
                         height: 90,
                         color: AppTheme.lightGrey,

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 
 import { AppDataSource } from '../config/database';
 import { FCMService } from '../services/fcm.service';
+import { TwilioService } from '../services/twilio.service';
 import { User } from '../entities/User';
 import { RefreshToken } from '../entities/RefreshToken';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -18,13 +19,19 @@ export class AuthController {
     }
 
     try {
-      // OTP is always 1234 for all users (no SMS provider needed)
-      console.log(`OTP request for ${phoneNumber}. Use OTP: 1234`);
-
-      res.json({ message: 'OTP sent successfully. Use 1234 for testing.' });
+      if (TwilioService.isConfigured()) {
+        await TwilioService.sendVerification(phoneNumber, 'sms');
+        console.log(`OTP sent via Twilio for ${phoneNumber}`);
+        res.json({ message: 'OTP sent successfully to your phone number.' });
+      } else {
+        // Dev fallback when Twilio is not configured
+        console.log(`OTP request for ${phoneNumber}. Use OTP: 1234`);
+        res.json({ message: 'OTP sent successfully. Use 1234 for testing.' });
+      }
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Error sending OTP' });
+      console.error('Error sending OTP:', error);
+      const message = error instanceof Error ? error.message : 'Error sending OTP';
+      res.status(500).json({ message: 'Error sending OTP', error: process.env.NODE_ENV === 'development' ? message : undefined });
     }
   }
 
@@ -37,10 +44,20 @@ export class AuthController {
     }
 
     try {
-      // Accept OTP 1234 for all users (no verification needed)
-      if (otp !== '1234') {
-        res.status(400).json({ message: 'Invalid OTP. Please use 1234' });
-        return;
+      let otpValid = false;
+      if (TwilioService.isConfigured()) {
+        otpValid = await TwilioService.checkVerification(phoneNumber, otp);
+        if (!otpValid) {
+          res.status(400).json({ message: 'Invalid or expired OTP. Please request a new one.' });
+          return;
+        }
+      } else {
+        // Dev fallback: accept 1234 when Twilio is not configured
+        if (otp !== '1234') {
+          res.status(400).json({ message: 'Invalid OTP. Please use 1234' });
+          return;
+        }
+        otpValid = true;
       }
 
       // Check database connection

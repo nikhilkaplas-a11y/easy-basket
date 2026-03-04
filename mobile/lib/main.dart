@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
-// Conditional import for Firebase - use stub on web
-import 'package:firebase_core/firebase_core.dart' if (dart.library.html) 'services/firebase_stub.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
@@ -21,20 +19,6 @@ import 'services/razorpay_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase (skip for web due to compatibility issues)
-  if (!kIsWeb) {
-    try {
-      // Conditional import - Firebase.initializeApp() only available on mobile
-      await Firebase.initializeApp();
-      debugPrint('✅ Firebase initialized');
-    } catch (e) {
-      debugPrint('⚠️ Firebase initialization error: $e');
-      debugPrint('⚠️ Push notifications will not work without Firebase');
-    }
-  } else {
-    debugPrint('⚠️ Firebase skipped on web platform');
-  }
   
   // Initialize SharedPreferences
   final prefs = await SharedPreferences.getInstance();

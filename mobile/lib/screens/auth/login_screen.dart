@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (authProvider.error == null) {
       setState(() => _isOtpSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP sent successfully! Use 1234 for testing')),
+        const SnackBar(content: Text('OTP sent successfully!')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,9 +55,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _verifyOTP() async {
-    if (_otpController.text.length != 4) {
+    if (_otpController.text.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter 4-digit OTP')),
+        const SnackBar(content: Text('Please enter 6-digit OTP')),
       );
       return;
     }
@@ -172,10 +172,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _otpController,
                   keyboardType: TextInputType.number,
-                  maxLength: 4,
+                  maxLength: 6,
                   decoration: InputDecoration(
                     labelText: 'Enter OTP',
-                    hintText: '1234',
+                    hintText: '123456',
                     hintStyle: TextStyle(
                       color: AppTheme.grey.withOpacity(0.5),
                     ),

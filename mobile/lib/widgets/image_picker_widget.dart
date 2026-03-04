@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/theme.dart';
 
 class ImagePickerWidget extends StatefulWidget {
@@ -167,25 +168,17 @@ class _ImagePickerWidgetState extends State<ImagePickerWidget> {
                         // Show current image from URL
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            widget.currentImageUrl!,
+                          child: CachedNetworkImage(
+                            imageUrl: widget.currentImageUrl!,
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildPlaceholder();
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                ),
-                              );
-                            },
+                            placeholder: (context, url) => Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _buildPlaceholder(),
                           ),
                         ),
                         // Change image button

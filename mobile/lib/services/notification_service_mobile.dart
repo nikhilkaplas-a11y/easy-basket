@@ -1,4 +1,5 @@
-import 'package:firebase_messaging/firebase_messaging.dart';
+// Notification Service - Firebase removed
+// Push notifications are disabled until Firebase is re-added
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,345 +7,51 @@ import '../services/api_service.dart';
 import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
 
-/// Top-level function to handle background messages
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('📱 Background message received: ${message.messageId}');
-  debugPrint('Title: ${message.notification?.title}');
-  debugPrint('Body: ${message.notification?.body}');
-  debugPrint('Data: ${message.data}');
-}
-
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final ApiService _apiService = ApiService();
   
-  String? _fcmToken;
   BuildContext? _context;
   AdminProvider? _adminProvider;
   AuthProvider? _authProvider;
   bool _isInitialized = false;
 
-  String? get fcmToken => _fcmToken;
+  String? get fcmToken => null; // No FCM token without Firebase
   
   /// Manually trigger FCM token generation and send to backend
-  /// Useful when notification service was initialized before login
+  /// Stub - does nothing without Firebase
   Future<void> ensureTokenSent() async {
     if (kIsWeb) return;
-    
-    try {
-      if (!_isInitialized) {
-        debugPrint('⚠️ [FCM] Service not initialized, cannot ensure token');
-        return;
-      }
-      
-      if (_fcmToken == null) {
-        debugPrint('📱 [FCM] Token not generated, generating now...');
-        await _getFCMToken();
-      } else if (_authProvider?.token != null) {
-        debugPrint('📤 [FCM] Token exists, sending to backend...');
-        await _sendTokenToBackend(_fcmToken!);
-      } else {
-        debugPrint('⚠️ [FCM] Token exists but auth token not available');
-      }
-    } catch (e) {
-      debugPrint('❌ [FCM] Error ensuring token sent: $e');
-    }
+    debugPrint('⚠️ [NOTIFICATION] Firebase removed - notifications disabled');
   }
 
-  /// Initialize Firebase Messaging
+  /// Initialize Notification Service
+  /// Stub - does nothing without Firebase
   Future<void> initialize({
     required BuildContext context,
     required AdminProvider adminProvider,
     required AuthProvider authProvider,
   }) async {
     if (kIsWeb) {
-      debugPrint('⚠️ FCM not supported on web');
+      debugPrint('⚠️ Notifications not supported on web');
       return;
     }
 
-    // Prevent multiple initializations
     if (_isInitialized) {
-      debugPrint('⚠️ [FCM] Service already initialized, skipping...');
-      // But still update context and providers in case they changed
-      _context = context;
-      _adminProvider = adminProvider;
-      _authProvider = authProvider;
-      // Ensure token is sent if it wasn't before
-      await ensureTokenSent();
+      debugPrint('⚠️ [NOTIFICATION] Service already initialized');
       return;
     }
 
     _context = context;
     _adminProvider = adminProvider;
     _authProvider = authProvider;
+    _isInitialized = true;
 
-    try {
-      // Request permission
-      NotificationSettings settings = await _firebaseMessaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-
-      debugPrint('📱 Notification permission status: ${settings.authorizationStatus}');
-
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        debugPrint('✅ [FCM] Permission granted, proceeding...');
-        
-        // Get FCM token (will send to backend if auth token available)
-        await _getFCMToken();
-        
-        // If token was generated but auth token wasn't available, retry after delay
-        if (_fcmToken != null && _authProvider?.token == null) {
-          debugPrint('⏳ [FCM] Token generated but auth not ready, will retry in 3 seconds...');
-          Future.delayed(const Duration(seconds: 3), () {
-            if (_fcmToken != null && _authProvider?.token != null) {
-              debugPrint('🔄 [FCM] Retrying token send to backend...');
-              _sendTokenToBackend(_fcmToken!);
-            }
-          });
-        }
-
-        // Handle foreground messages
-        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-        debugPrint('✅ [FCM] Foreground message handler registered');
-
-        // Handle background messages (when app is in background)
-        FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
-        debugPrint('✅ [FCM] Background message handler registered');
-
-        // Handle notification when app is opened from terminated state
-        RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
-        if (initialMessage != null) {
-          debugPrint('📱 [FCM] App opened from notification');
-          _handleMessageOpenedApp(initialMessage);
-        }
-
-        // Set up background message handler
-        FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-        debugPrint('✅ [FCM] Background message handler set');
-
-        // Listen for token refresh
-        _firebaseMessaging.onTokenRefresh.listen(_onTokenRefresh);
-        debugPrint('✅ [FCM] Token refresh listener registered');
-        
-        _isInitialized = true;
-        debugPrint('✅ [FCM] Initialization complete');
-      } else {
-        debugPrint('⚠️ [FCM] Permission not granted: ${settings.authorizationStatus}');
-        _isInitialized = true; // Mark as initialized even if permission denied
-      }
-    } catch (e) {
-      debugPrint('❌ [FCM] Error initializing: $e');
-      _isInitialized = true; // Mark as initialized even on error to prevent retry loops
-    }
-  }
-
-  /// Get FCM token and send to backend
-  Future<void> _getFCMToken() async {
-    try {
-      _fcmToken = await _firebaseMessaging.getToken();
-      debugPrint('📱 [FCM] Token generated: $_fcmToken');
-
-      if (_fcmToken != null) {
-        debugPrint('📱 [FCM] Token length: ${_fcmToken!.length}');
-        if (_authProvider?.token != null) {
-          debugPrint('📱 [FCM] Auth token available, sending FCM token to backend...');
-          // Send token to backend
-          await _sendTokenToBackend(_fcmToken!);
-        } else {
-          debugPrint('⚠️ [FCM] Auth token not available yet, will retry later');
-          // Retry after a delay if token not available
-          Future.delayed(const Duration(seconds: 2), () {
-            if (_fcmToken != null && _authProvider?.token != null) {
-              _sendTokenToBackend(_fcmToken!);
-            }
-          });
-        }
-      } else {
-        debugPrint('❌ [FCM] Failed to get FCM token');
-      }
-    } catch (e) {
-      debugPrint('❌ [FCM] Error getting FCM token: $e');
-    }
-  }
-
-  /// Send FCM token to backend
-  Future<void> _sendTokenToBackend(String token) async {
-    try {
-      if (_authProvider?.token == null) {
-        debugPrint('⚠️ [FCM] Cannot send token: Auth token not available');
-        return;
-      }
-
-      debugPrint('📤 [FCM] Sending token to backend: ${token.substring(0, 20)}...');
-      await _apiService.put(
-        '/auth/profile',
-        {'fcmToken': token},
-        token: _authProvider!.token!,
-      );
-      debugPrint('✅ [FCM] Token sent to backend successfully');
-    } catch (e) {
-      debugPrint('❌ [FCM] Error sending token to backend: $e');
-      debugPrint('❌ [FCM] Error details: ${e.toString()}');
-    }
-  }
-
-  /// Handle token refresh
-  Future<void> _onTokenRefresh(String newToken) async {
-    debugPrint('🔄 FCM token refreshed: $newToken');
-    _fcmToken = newToken;
-    await _sendTokenToBackend(newToken);
-  }
-
-  /// Handle foreground messages (app is open)
-  void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('📱 [FCM] Foreground message received: ${message.messageId}');
-    debugPrint('📱 [FCM] Title: ${message.notification?.title}');
-    debugPrint('📱 [FCM] Body: ${message.notification?.body}');
-    debugPrint('📱 [FCM] Data: ${message.data}');
-    
-    // Always refresh admin data if admin is logged in (even without context)
-    if (_authProvider?.user?.role == 'admin') {
-      debugPrint('📱 [FCM] Refreshing admin data...');
-      _refreshAdminData();
-    }
-
-    // Try to show notification if context is available
-    if (_context != null && _context!.mounted) {
-      debugPrint('📱 [FCM] Context available, showing SnackBar...');
-      // Show in-app notification
-      final notification = message.notification;
-      if (notification != null) {
-        try {
-          ScaffoldMessenger.of(_context!).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.notifications, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          notification.title ?? 'New Notification',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        if (notification.body != null)
-                          Text(
-                            notification.body!,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-              action: SnackBarAction(
-                label: 'View',
-                textColor: Colors.white,
-                onPressed: () => _navigateToOrders(message.data),
-              ),
-            ),
-          );
-          debugPrint('✅ [FCM] SnackBar shown successfully');
-        } catch (e) {
-          debugPrint('❌ [FCM] Error showing SnackBar: $e');
-        }
-      }
-    } else {
-      debugPrint('⚠️ [FCM] Context not available or not mounted, skipping SnackBar');
-      debugPrint('⚠️ [FCM] Context is null: ${_context == null}');
-      if (_context != null) {
-        debugPrint('⚠️ [FCM] Context mounted: ${_context!.mounted}');
-      }
-    }
-  }
-
-  /// Handle message when app is opened from notification
-  void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint('📱 [FCM] Message opened app: ${message.messageId}');
-    debugPrint('📱 [FCM] Title: ${message.notification?.title}');
-    debugPrint('📱 [FCM] Body: ${message.notification?.body}');
-    debugPrint('📱 [FCM] Data: ${message.data}');
-
-    // Always refresh admin data if admin is logged in
-    if (_authProvider?.user?.role == 'admin') {
-      debugPrint('📱 [FCM] Refreshing admin data...');
-      _refreshAdminData();
-    }
-
-    // Navigate to orders page if context is available
-    if (_context != null && _context!.mounted) {
-      debugPrint('📱 [FCM] Context available, navigating to orders...');
-      _navigateToOrders(message.data);
-      // Refresh data after navigation
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _refreshAdminData();
-      });
-    } else {
-      debugPrint('⚠️ [FCM] Context not available, will navigate when context is ready');
-      // Try to navigate after a delay if context becomes available
-      Future.delayed(const Duration(seconds: 1), () {
-        if (_context != null && _context!.mounted) {
-          _navigateToOrders(message.data);
-        }
-      });
-    }
-  }
-
-  /// Navigate to orders page based on notification data
-  void _navigateToOrders(Map<String, dynamic> data) {
-    if (_context == null || !_context!.mounted) return;
-
-    final type = data['type'] as String?;
-    final orderId = data['orderId'] as String?;
-
-    if (type == 'new_order' || type == 'order_status_update') {
-      // Navigate to admin orders page
-      _context!.go('/admin/orders');
-      
-      // If specific order ID, could navigate to order details
-      // if (orderId != null) {
-      //   _context!.push('/admin/orders/$orderId');
-      // }
-    }
-  }
-
-  /// Refresh admin data when notification received
-  void _refreshAdminData() {
-    if (_authProvider?.token == null) {
-      debugPrint('⚠️ [FCM] Cannot refresh: Auth token is null');
-      return;
-    }
-    
-    if (_adminProvider == null) {
-      debugPrint('⚠️ [FCM] Cannot refresh: AdminProvider is null');
-      return;
-    }
-
-    debugPrint('🔄 [FCM] Refreshing admin stats and orders...');
-    try {
-      // Refresh stats
-      _adminProvider!.fetchStats(token: _authProvider!.token);
-      debugPrint('✅ [FCM] Stats refresh triggered');
-      
-      // Refresh orders
-      _adminProvider!.fetchOrders(token: _authProvider!.token);
-      debugPrint('✅ [FCM] Orders refresh triggered');
-    } catch (e) {
-      debugPrint('❌ [FCM] Error refreshing admin data: $e');
-    }
+    debugPrint('⚠️ [NOTIFICATION] Firebase removed - push notifications are disabled');
+    debugPrint('⚠️ [NOTIFICATION] To enable notifications, add Firebase back to the project');
   }
 
   /// Update context and providers (call when navigating)
@@ -361,4 +68,3 @@ class NotificationService {
     if (authProvider != null) _authProvider = authProvider;
   }
 }
-

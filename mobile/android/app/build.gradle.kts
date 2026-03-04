@@ -3,13 +3,13 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.example.easy_basket"
+    namespace = "com.easybasket.grocery"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Use NDK 27 required by Flutter plugins (e.g. razorpay_flutter, geolocator_android, etc.)
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,9 +21,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Change to your unique Application ID before publishing to Play Store
-        // Format: com.yourcompany.appname (e.g., com.easybasket.app)
-        applicationId = "com.easybasket.app"
+        // Unique Application ID for Google Play Store
+        // Changed to avoid Kotlin reserved keyword 'in'
+        applicationId = "com.easybasket.grocery"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -35,26 +35,32 @@ android {
     signingConfigs {
         create("release") {
             // Keystore file path (relative to android/app/)
-            val keystoreFile = file("../easy-basket-key.jks")
+            val keystoreFile = file("easy-basket-key.jks")
             if (keystoreFile.exists()) {
                 storeFile = keystoreFile
                 // Use environment variables for passwords (more secure)
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+                val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: "nik3122@@"
+                val keyPassword = System.getenv("KEY_PASSWORD") ?: "nik3122@@"
+                storePassword = keystorePassword
                 keyAlias = "easy-basket-key"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+                this.keyPassword = keyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            // Use release signing config if keystore exists, otherwise use debug (for testing)
-            val keystoreFile = file("../easy-basket-key.jks")
+            // ALWAYS use release signing config - required for Play Store
+            val keystoreFile = file("easy-basket-key.jks")
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                // Fallback to debug signing (remove this before production!)
-                signingConfig = signingConfigs.getByName("debug")
+                // No fallback - fail if keystore doesn't exist
+                throw GradleException("Release keystore not found! Please ensure easy-basket-key.jks exists in android/app/")
+            }
+            // FULL debug symbols so Flutter's strip check finds expected files (see flutter/flutter#181031)
+            ndk {
+                debugSymbolLevel = "full"
             }
             // Disable minification for testing APK (enable for Play Store)
             isMinifyEnabled = false
