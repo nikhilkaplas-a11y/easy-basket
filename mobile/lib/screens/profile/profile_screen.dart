@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../utils/theme.dart';
@@ -259,7 +260,7 @@ class ProfileScreen extends StatelessWidget {
                       context,
                       icon: Icons.info_outline_rounded,
                       title: 'About',
-                      subtitle: 'App version 1.0.0',
+                      subtitle: 'App version ${AppConfig.appVersion}',
                       color: Colors.grey,
                       onTap: () {
                         showDialog(
@@ -267,7 +268,7 @@ class ProfileScreen extends StatelessWidget {
                           builder: (context) => AlertDialog(
                             title: const Text('About Easy Basket'),
                             content: const Text(
-                              'Easy Basket - Instant Grocery Delivery\n\nVersion 1.0.0\n\nYour trusted partner for quick grocery delivery.',
+                              'Easy Basket - Instant Grocery Delivery\n\nVersion ${AppConfig.appVersion}\n\nYour trusted partner for quick grocery delivery.',
                             ),
                             actions: [
                               TextButton(
