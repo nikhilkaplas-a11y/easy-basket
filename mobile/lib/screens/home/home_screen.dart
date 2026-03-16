@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -23,12 +24,43 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _hasCheckedServiceAvailability = false; // Prevent multiple checks
+
+  late AnimationController _dateAnimController;
+  late Animation<Offset> _dateSlideAnim;
+  late Animation<double> _dateFadeAnim;
+  Timer? _midnightTimer;
 
   @override
   void initState() {
     super.initState();
+
+    _dateAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),   // slide-in duration
+      reverseDuration: const Duration(milliseconds: 400), // slide-out duration
+    );
+
+    _dateSlideAnim = Tween<Offset>(
+      begin: const Offset(1.5, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _dateAnimController,
+      curve: Curves.elasticOut,        // bouncy slide-in
+      reverseCurve: Curves.easeInBack, // smooth slide-out to the right
+    ));
+
+    _dateFadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _dateAnimController, curve: Curves.easeIn),
+    );
+
+    // Trigger pop-in after first frame, hold 1s, then pop-out
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _playDateAnimation();
+      _scheduleMidnightUpdate();
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       final orderProvider = Provider.of<OrderProvider>(context, listen: false);
@@ -184,6 +216,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _playDateAnimation() {
+    _dateAnimController.forward().then((_) {
+      Future.delayed(const Duration(milliseconds: 2500), () {
+        if (mounted) _dateAnimController.reverse();
+      });
+    });
+  }
+
+  void _scheduleMidnightUpdate() {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final duration = nextMidnight.difference(now);
+
+    _midnightTimer = Timer(duration, () {
+      if (mounted) {
+        setState(() {}); // rebuilds date text with new DateTime.now()
+        _playDateAnimation();
+        _scheduleMidnightUpdate(); // schedule for the following midnight
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _midnightTimer?.cancel();
+    _dateAnimController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
@@ -298,10 +359,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                           children: [
                                             Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 16),
                                             const SizedBox(width: 6),
-                                            Flexible(
+                                            ConstrainedBox(
+                                              constraints: const BoxConstraints(maxWidth: 160),
                                               child: Text(
                                                 defaultAddress != null
-                                                    ? defaultAddress.tag != null 
+                                                    ? defaultAddress.tag != null
                                                         ? '${defaultAddress.tag!.toUpperCase()} - ${defaultAddress.addressLine1}'
                                                         : defaultAddress.addressLine1
                                                     : 'Add delivery address',
@@ -620,6 +682,36 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           // Floating Cart Button (Blinkit Style)
+          // Date badge — floats at screen level so it slides freely from the right edge
+          Positioned(
+            right: 0,
+            top: 68,
+            child: AnimatedBuilder(
+              animation: _dateAnimController,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(_dateSlideAnim.value.dx * 80, 0),
+                  child: child,
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  DateFormat('d MMM').format(DateTime.now()),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
           Positioned(
             left: 0,
             right: 0,

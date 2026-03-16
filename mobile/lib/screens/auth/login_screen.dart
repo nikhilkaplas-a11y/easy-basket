@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -15,16 +16,28 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
   bool _isOtpSent = false;
   bool _isLoading = false;
+  late AnimationController _lineAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _lineAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+  }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _otpController.dispose();
+    _lineAnim.dispose();
     super.dispose();
   }
 
@@ -73,28 +86,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success) {
       if (mounted) {
-        // Initialize notification service after successful login (mobile only)
         if (!kIsWeb) {
           try {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-            
-            debugPrint('📱 [LOGIN] Initializing notification service after login...');
             await NotificationService().initialize(
               context: context,
               adminProvider: adminProvider,
               authProvider: authProvider,
             );
-            debugPrint('✅ [LOGIN] Notification service initialized');
           } catch (e) {
             debugPrint('❌ [LOGIN] Error initializing notification service: $e');
           }
         }
-        
-        // Let router handle redirect based on user role
+
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final userRole = authProvider.user?.role;
-        
+
         if (userRole == 'admin') {
           context.go('/admin/dashboard');
         } else if (userRole == 'delivery') {
@@ -112,115 +120,544 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: AppTheme.primaryGreen,
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          // Animated background on the green section
+          AnimatedBuilder(
+            animation: _lineAnim,
+            builder: (context, _) => CustomPaint(
+              painter: _BgPainter(_lineAnim.value),
+              size: size,
+            ),
+          ),
+
+          Column(
             children: [
-              const Icon(
-                Icons.shopping_basket,
-                size: 100,
-                color: AppTheme.primaryGreen,
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'Welcome to Easy Basket',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'RoundedSans',
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Enter your phone number to continue',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.grey,
-                  fontFamily: 'RoundedSans',
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                enabled: !_isOtpSent && !_isLoading,
-                readOnly: _isOtpSent || _isLoading,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: '9876543210',
-                  hintStyle: TextStyle(
-                    color: AppTheme.grey.withOpacity(0.5),
-                  ),
-                  prefixIcon: const Icon(Icons.phone),
-                  prefixText: '+91 ',
-                  counterText: '', // Hide character counter
-                ),
-                autofocus: false,
-              ),
-              if (_isOtpSent) ...[
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    labelText: 'Enter OTP',
-                    hintText: '123456',
-                    hintStyle: TextStyle(
-                      color: AppTheme.grey.withOpacity(0.5),
+              // ── Brand Section (top) ──────────────────────────────
+              Expanded(
+                flex: 45,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Logo circle
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.shopping_basket_rounded,
+                            size: 46,
+                            color: AppTheme.primaryGreen,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Easy Basket',
+                          style: TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -1,
+                            height: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Fresh groceries at your doorstep',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Trust row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _TrustBadge(icon: Icons.bolt_rounded, label: 'Fast'),
+                            _dividerDot(),
+                            _TrustBadge(icon: Icons.eco_rounded, label: 'Fresh'),
+                            _dividerDot(),
+                            _TrustBadge(icon: Icons.verified_rounded, label: 'Trusted'),
+                          ],
+                        ),
+                      ],
                     ),
-                    prefixIcon: const Icon(Icons.lock),
                   ),
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _verifyOTP,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Verify OTP'),
+              ),
+
+              // ── Form Card (bottom) ───────────────────────────────
+              Expanded(
+                flex: 55,
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 350),
+                      transitionBuilder: (child, anim) => FadeTransition(
+                        opacity: anim,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.08),
+                            end: Offset.zero,
+                          ).animate(anim),
+                          child: child,
+                        ),
+                      ),
+                      child: _isOtpSent ? _OtpForm(
+                        key: const ValueKey('otp'),
+                        phone: _phoneController.text,
+                        controller: _otpController,
+                        isLoading: _isLoading,
+                        onVerify: _verifyOTP,
+                        onChangePhone: () => setState(() {
+                          _isOtpSent = false;
+                          _otpController.clear();
+                        }),
+                      ) : _PhoneForm(
+                        key: const ValueKey('phone'),
+                        controller: _phoneController,
+                        isLoading: _isLoading,
+                        onSend: _sendOTP,
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _isOtpSent = false;
-                      _otpController.clear();
-                    });
-                  },
-                  child: const Text('Change Phone Number'),
-                ),
-              ] else ...[
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _sendOTP,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Send OTP'),
-                ),
-              ],
+              ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dividerDot() => Container(
+        width: 4,
+        height: 4,
+        margin: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.5),
+          shape: BoxShape.circle,
+        ),
+      );
+}
+
+// ─── Phone form ──────────────────────────────────────────────────────────────
+
+class _PhoneForm extends StatelessWidget {
+  final TextEditingController controller;
+  final bool isLoading;
+  final VoidCallback onSend;
+
+  const _PhoneForm({
+    super.key,
+    required this.controller,
+    required this.isLoading,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Login / Sign up',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1A1A1A),
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'We\'ll send a one-time password to verify',
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey.shade500,
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        // Phone field
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F7F9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE8E8E8)),
+          ),
+          child: Row(
+            children: [
+              // +91 prefix box
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    right: BorderSide(color: Color(0xFFE8E8E8)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Text(
+                      '🇮🇳',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '+91',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Number input
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  enabled: !isLoading,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Enter your phone number',
+                    hintStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey.shade400,
+                      letterSpacing: 0,
+                    ),
+                    border: InputBorder.none,
+                    counterText: '',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Send OTP button
+        _GreenButton(
+          label: 'Send OTP',
+          isLoading: isLoading,
+          onPressed: onSend,
+        ),
+
+        const SizedBox(height: 24),
+        Center(
+          child: Text(
+            'By continuing, you agree to our Terms of Service\nand Privacy Policy',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade400,
+              height: 1.6,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── OTP form ────────────────────────────────────────────────────────────────
+
+class _OtpForm extends StatelessWidget {
+  final String phone;
+  final TextEditingController controller;
+  final bool isLoading;
+  final VoidCallback onVerify;
+  final VoidCallback onChangePhone;
+
+  const _OtpForm({
+    super.key,
+    required this.phone,
+    required this.controller,
+    required this.isLoading,
+    required this.onVerify,
+    required this.onChangePhone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Verify OTP',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1A1A1A),
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        RichText(
+          text: TextSpan(
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            children: [
+              const TextSpan(text: 'OTP sent to '),
+              TextSpan(
+                text: '+91 $phone',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryGreen,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        // OTP field
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F7F9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE8E8E8)),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            autofocus: true,
+            textAlign: TextAlign.center,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 10,
+              color: AppTheme.primaryGreen,
+            ),
+            decoration: InputDecoration(
+              hintText: '------',
+              hintStyle: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 10,
+                color: Colors.grey.shade300,
+              ),
+              border: InputBorder.none,
+              counterText: '',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        _GreenButton(
+          label: 'Verify & Continue',
+          isLoading: isLoading,
+          onPressed: onVerify,
+        ),
+
+        const SizedBox(height: 16),
+        Center(
+          child: TextButton(
+            onPressed: onChangePhone,
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primaryGreen,
+            ),
+            child: const Text(
+              'Change phone number',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Gradient green button ───────────────────────────────────────────────────
+
+class _GreenButton extends StatelessWidget {
+  final String label;
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _GreenButton({
+    required this.label,
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: isLoading
+              ? null
+              : const LinearGradient(
+                  colors: [Color(0xFF1DB954), Color(0xFF0C831F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          color: isLoading ? Colors.grey.shade200 : null,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: isLoading
+              ? []
+              : [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+        ),
+        child: ElevatedButton(
+          onPressed: isLoading ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: isLoading
+              ? const SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                  ),
+                )
+              : Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
         ),
       ),
     );
   }
 }
 
+// ─── Trust badge ─────────────────────────────────────────────────────────────
+
+class _TrustBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _TrustBadge({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: Colors.white.withValues(alpha: 0.9)),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Animated background painter ─────────────────────────────────────────────
+
+class _BgPainter extends CustomPainter {
+  final double animValue;
+
+  _BgPainter(this.animValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.06)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    // Sweeping diagonal lines across the green top section
+    final offset = (animValue * 60.0) % 60.0;
+    for (int i = -3; i < 14; i++) {
+      final x = i * 60.0 + offset;
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + size.height * 0.5, size.height * 0.5),
+        paint,
+      );
+    }
+
+    // Radiating arcs from top-right
+    final arcPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.07)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 1; i <= 6; i++) {
+      final radius = 40.0 + i * 45.0 + math.sin(animValue * 2 * math.pi) * 10;
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset(size.width, 0), radius: radius),
+        math.pi * 0.5,
+        math.pi * 0.5,
+        false,
+        arcPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BgPainter oldDelegate) =>
+      oldDelegate.animValue != animValue;
+}
