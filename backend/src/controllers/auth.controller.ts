@@ -9,6 +9,12 @@ import { RefreshToken } from '../entities/RefreshToken';
 import { AuthRequest } from '../middleware/auth.middleware';
 import jwt from 'jsonwebtoken';
 
+function formatBirthday(birthday: Date | string | null | undefined): string | null {
+  if (birthday == null) return null;
+  if (birthday instanceof Date) return birthday.toISOString().split('T')[0];
+  return String(birthday).split('T')[0];
+}
+
 export class AuthController {
   static async login(req: Request, res: Response): Promise<void> {
     const { phoneNumber } = req.body;
@@ -120,7 +126,7 @@ export class AuthController {
           phoneNumber: user.phoneNumber,
           name: user.name,
           email: user.email,
-          birthday: user.birthday ? user.birthday.toISOString().split('T')[0] : null,
+          birthday: formatBirthday(user.birthday),
           role: user.role,
         },
       });
@@ -180,7 +186,7 @@ export class AuthController {
           phoneNumber: user.phoneNumber,
           name: user.name,
           email: user.email,
-          birthday: user.birthday ? user.birthday.toISOString().split('T')[0] : null,
+          birthday: formatBirthday(user.birthday),
           role: user.role,
         },
       });
