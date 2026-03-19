@@ -164,7 +164,6 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
           widget.parentCategoryName,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
           ),
         ),
         leading: IconButton(
@@ -238,7 +237,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             // More granular aspect ratio for better text rendering on small screens
-                            childAspectRatio: screenWidth < 360 ? 0.62 : screenWidth < 400 ? 0.64 : 0.67,
+                            childAspectRatio: screenWidth < 360 ? 0.52 : screenWidth < 400 ? 0.54 : 0.56,
                             crossAxisSpacing: screenWidth < 360 ? 8 : 12,
                             mainAxisSpacing: screenWidth < 360 ? 8 : 12,
                           ),
@@ -456,7 +455,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
                     // More granular aspect ratio for better text rendering on small screens
-                    childAspectRatio: screenWidth < 360 ? 0.62 : screenWidth < 400 ? 0.64 : 0.67,
+                    childAspectRatio: screenWidth < 360 ? 0.52 : screenWidth < 400 ? 0.54 : 0.56,
                     crossAxisSpacing: screenWidth < 360 ? 8 : 12,
                     mainAxisSpacing: screenWidth < 360 ? 8 : 12,
                   ),

@@ -31,7 +31,6 @@ class CartScreen extends StatelessWidget {
             'My Cart',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontFamily: 'RoundedSans',
               color: AppTheme.black,
             ),
           ),
@@ -70,7 +69,6 @@ class CartScreen extends StatelessWidget {
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.black,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
               const SizedBox(height: 12),
@@ -79,7 +77,6 @@ class CartScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.grey,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
               const SizedBox(height: 40),
@@ -91,7 +88,6 @@ class CartScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    fontFamily: 'RoundedSans',
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -120,7 +116,6 @@ class CartScreen extends StatelessWidget {
           'My Cart (${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'})',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
             color: AppTheme.black,
           ),
         ),
@@ -242,7 +237,6 @@ class CartScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      fontFamily: 'RoundedSans',
                       color: AppTheme.black,
                     ),
                     maxLines: 2,
@@ -256,7 +250,6 @@ class CartScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.grey,
-                        fontFamily: 'RoundedSans',
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -267,7 +260,6 @@ class CartScreen extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.primaryGreen,
-                      fontFamily: 'RoundedSans',
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -278,7 +270,6 @@ class CartScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.grey,
-                      fontFamily: 'RoundedSans',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -409,13 +400,11 @@ class CartScreen extends StatelessWidget {
           'Remove Item',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
           ),
         ),
         content: Text(
           'Remove ${item.product.name}${item.variant != null ? " (${item.variant!.label})" : ""} from cart?',
           style: const TextStyle(
-            fontFamily: 'RoundedSans',
           ),
         ),
         actions: [
@@ -425,7 +414,6 @@ class CartScreen extends StatelessWidget {
               'Cancel',
               style: TextStyle(
                 color: AppTheme.grey,
-                fontFamily: 'RoundedSans',
               ),
             ),
           ),
@@ -448,7 +436,6 @@ class CartScreen extends StatelessWidget {
             child: const Text(
               'Remove',
               style: TextStyle(
-                fontFamily: 'RoundedSans',
               ),
             ),
           ),
@@ -526,7 +513,6 @@ class CartScreen extends StatelessWidget {
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.orange.shade700,
-                                fontFamily: 'RoundedSans',
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -535,7 +521,6 @@ class CartScreen extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.orange.shade600,
-                                fontFamily: 'RoundedSans',
                               ),
                             ),
                           ],
@@ -589,7 +574,6 @@ class CartScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      fontFamily: 'RoundedSans',
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -628,7 +612,6 @@ class CartScreen extends StatelessWidget {
             fontSize: isTotal ? 18 : 15,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
             color: AppTheme.black,
-            fontFamily: 'RoundedSans',
           ),
         ),
         Text(
@@ -637,7 +620,6 @@ class CartScreen extends StatelessWidget {
             fontSize: isTotal ? 22 : 16,
             fontWeight: FontWeight.bold,
             color: isTotal ? AppTheme.primaryGreen : AppTheme.black,
-            fontFamily: 'RoundedSans',
           ),
         ),
       ],

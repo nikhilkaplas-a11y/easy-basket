@@ -131,7 +131,6 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: _getStatusColor(),
-                    fontFamily: 'RoundedSans',
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -145,7 +144,6 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     color: widget.status == PaymentStatus.orderPlaced
                         ? AppTheme.grey
                         : Colors.grey,
-                    fontFamily: 'RoundedSans',
                     height: 1.5,
                   ),
                   textAlign: TextAlign.center,
@@ -182,7 +180,6 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.orange.shade700,
-                                  fontFamily: 'RoundedSans',
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -191,7 +188,6 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.orange.shade600,
-                                  fontFamily: 'RoundedSans',
                                 ),
                               ),
                             ],

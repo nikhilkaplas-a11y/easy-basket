@@ -130,7 +130,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           style: TextStyle(
             color: AppTheme.black,
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
           ),
         ),
         leading: IconButton(

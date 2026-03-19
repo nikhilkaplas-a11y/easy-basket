@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Brand Colors
@@ -11,65 +12,53 @@ class AppTheme {
   static const Color darkGrey = Color(0xFF424242);
 
   static ThemeData get lightTheme {
+    final baseTextTheme = GoogleFonts.plusJakartaSansTextTheme();
+
     return ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryGreen,
         primary: primaryGreen,
         secondary: primaryYellow,
       ),
       scaffoldBackgroundColor: white,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: white,
         elevation: 0,
-        iconTheme: IconThemeData(color: black),
-        titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: black),
+        titleTextStyle: GoogleFonts.plusJakartaSans(
           color: black,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
       ),
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(
-          fontSize: 32,
+      textTheme: baseTextTheme.copyWith(
+        displayLarge: baseTextTheme.displayLarge?.copyWith(
           fontWeight: FontWeight.bold,
           color: black,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
-        displayMedium: TextStyle(
-          fontSize: 28,
+        displayMedium: baseTextTheme.displayMedium?.copyWith(
           fontWeight: FontWeight.bold,
           color: black,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
-        displaySmall: TextStyle(
-          fontSize: 24,
+        displaySmall: baseTextTheme.displaySmall?.copyWith(
           fontWeight: FontWeight.bold,
           color: black,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
-        headlineMedium: TextStyle(
-          fontSize: 20,
+        headlineMedium: baseTextTheme.headlineMedium?.copyWith(
           fontWeight: FontWeight.w600,
           color: black,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
-        titleLarge: TextStyle(
-          fontSize: 18,
+        titleLarge: baseTextTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w600,
           color: black,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
+        bodyLarge: baseTextTheme.bodyLarge?.copyWith(
           color: black,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
+        bodyMedium: baseTextTheme.bodyMedium?.copyWith(
           color: grey,
-          // fontFamily: 'RoundedSans', // Uncomment if you add the font
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -80,10 +69,9 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.plusJakartaSans(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            // fontFamily: 'RoundedSans', // Uncomment if you add the font
           ),
         ),
       ),
@@ -99,4 +87,3 @@ class AppTheme {
     );
   }
 }
-

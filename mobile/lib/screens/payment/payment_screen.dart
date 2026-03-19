@@ -484,7 +484,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'RoundedSans',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -524,7 +523,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'RoundedSans',
                         ),
                       ),
                       Text(
@@ -533,7 +531,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.primaryGreen,
-                          fontFamily: 'RoundedSans',
                         ),
                       ),
                     ],
@@ -549,7 +546,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              fontFamily: 'RoundedSans',
             ),
           ),
           const SizedBox(height: 16),

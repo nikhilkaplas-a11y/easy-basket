@@ -77,7 +77,6 @@ class _SubcategorySelectionScreenState extends State<SubcategorySelectionScreen>
           widget.parentCategoryName,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
           ),
         ),
         leading: IconButton(
@@ -107,7 +106,6 @@ class _SubcategorySelectionScreenState extends State<SubcategorySelectionScreen>
                         style: TextStyle(
                           fontSize: 18,
                           color: AppTheme.grey,
-                          fontFamily: 'RoundedSans',
                         ),
                       ),
                       const SizedBox(height: 24),

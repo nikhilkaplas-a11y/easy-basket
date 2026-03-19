@@ -104,7 +104,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
           'My Orders',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
             color: AppTheme.black,
           ),
         ),
@@ -135,7 +134,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
             style: TextStyle(
               fontSize: 16,
               color: AppTheme.grey,
-              fontFamily: 'RoundedSans',
             ),
           ),
         ],
@@ -162,7 +160,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.grey,
-                fontFamily: 'RoundedSans',
               ),
             ),
             const SizedBox(height: 8),
@@ -172,7 +169,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: AppTheme.grey,
-                fontFamily: 'RoundedSans',
               ),
             ),
             const SizedBox(height: 24),
@@ -239,7 +235,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.black,
-                  fontFamily: 'RoundedSans',
                   letterSpacing: -0.5,
                 ),
               ),
@@ -250,7 +245,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.grey.withOpacity(0.8),
-                  fontFamily: 'RoundedSans',
                   height: 1.5,
                 ),
               ),
@@ -263,7 +257,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    fontFamily: 'RoundedSans',
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -336,7 +329,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'RoundedSans',
                               color: AppTheme.black,
                             ),
                           ),
@@ -355,7 +347,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: AppTheme.grey.withOpacity(0.8),
-                                    fontFamily: 'RoundedSans',
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -394,7 +385,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   color: statusColor,
-                                  fontFamily: 'RoundedSans',
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -504,7 +494,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.primaryGreen,
-                                  fontFamily: 'RoundedSans',
                                 ),
                               ),
                             ),
@@ -559,7 +548,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: AppTheme.grey,
-                                  fontFamily: 'RoundedSans',
                                 ),
                               ),
                             ],
@@ -571,7 +559,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.grey.withOpacity(0.7),
-                            fontFamily: 'RoundedSans',
                           ),
                         ),
                       ],
@@ -585,7 +572,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             color: AppTheme.grey.withOpacity(0.6),
-                            fontFamily: 'RoundedSans',
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -596,7 +582,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryGreen,
-                            fontFamily: 'RoundedSans',
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -616,7 +601,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        fontFamily: 'RoundedSans',
                       ),
                     ),
                     style: ElevatedButton.styleFrom(

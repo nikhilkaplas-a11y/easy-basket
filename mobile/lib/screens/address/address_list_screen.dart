@@ -137,7 +137,6 @@ class _AddressListScreenState extends State<AddressListScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           color: AppTheme.grey,
-                          fontFamily: 'RoundedSans',
                         ),
                       ),
                       const SizedBox(height: 16),

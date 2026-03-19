@@ -52,6 +52,7 @@ dependencies:
   intl: ^0.18.1
   uuid: ^4.2.1
   url_launcher: ^6.2.2
+  google_fonts: ^8.0.2
 
 dev_dependencies:
   flutter_test:

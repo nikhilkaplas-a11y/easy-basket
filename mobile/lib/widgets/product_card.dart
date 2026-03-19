@@ -56,18 +56,18 @@ class ProductCard extends StatelessWidget {
         // Remove fixed height - let grid's aspect ratio control it
         decoration: BoxDecoration(
           color: AppTheme.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              spreadRadius: 0,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.14),
+              spreadRadius: 2,
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Stack(
             children: [
               // Main content
@@ -77,18 +77,19 @@ class ProductCard extends StatelessWidget {
                 children: [
                     // Image Section with Discount Badge - Use Expanded with flex
                     Expanded(
-                      flex: 55, // 55% of available space (reduced from 60% to give more space to content)
+                      flex: 55, // 55% for image
                       child: Stack(
                         children: [
                           ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                             child: SizedBox(
                               width: double.infinity,
                               height: double.infinity,
                               child: product.imageUrl != null
                                   ? CachedNetworkImage(
                                       imageUrl: product.imageUrl!,
-                                      fit: BoxFit.cover,
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.center,
                                       placeholder: (context, url) => Container(
                                         color: AppTheme.lightGrey,
                                         child: Center(
@@ -135,40 +136,45 @@ class ProductCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // Content Section - Use Expanded with flex (increased to ensure product name is visible)
+                    // Content Section
                     Expanded(
-                      flex: 45, // 45% of available space (increased from 40% to ensure product name visibility)
+                      flex: 45, // 45% for content
                       child: ClipRect(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenWidth < 360 ? 4.0 : 5.0,
-                            vertical: screenWidth < 360 ? 3.0 : 4.0,
+                          padding: EdgeInsets.only(
+                            left: screenWidth < 360 ? 8.0 : 10.0,
+                            right: screenWidth < 360 ? 5.0 : 6.0,
+                            top: 1,
+                            bottom: 6,
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // Product Name - Must be visible with proper ellipsis (Blinkit style)
-                              Expanded(
-                                flex: 2, // Give more space to product name
-                                child: _buildProductName(nameFontSize, screenWidth),
+                              // Thin divider close to product name
+                              Container(
+                                height: 0.5,
+                                margin: const EdgeInsets.only(bottom: 3),
+                                color: Colors.grey.withValues(alpha: 0.2),
                               ),
-                              SizedBox(height: screenWidth < 360 ? 0.5 : 1),
+                              // Product Name
+                              _buildProductName(nameFontSize, screenWidth),
+                              const SizedBox(height: 1),
                               // Weight/Unit Display - Optional, can be removed if space is tight
                               if (product.unit != null || (product.hasVariants && product.variants != null && product.variants!.isNotEmpty))
-                                Flexible(
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
                                   child: Text(
                                     _getWeightDisplay(),
                                     style: TextStyle(
-                                      fontSize: screenWidth < 360 ? 7.5 : 8.5,
-                                      color: AppTheme.grey,
-                                      fontWeight: FontWeight.w400,
+                                      fontSize: screenWidth < 360 ? 9.0 : 10.0,
+                                      color: AppTheme.darkGrey,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              SizedBox(height: screenWidth < 360 ? 1 : 2),
                               // Price and ADD Button in same row (Blinkit style) - Saves space
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -180,13 +186,10 @@ class ProductCard extends StatelessWidget {
                                     child: _buildPriceDisplay(product, currencyFormat, priceFontSize, hasDiscount),
                                   ),
                                   SizedBox(width: screenWidth < 360 ? 2 : 3),
-                                  // ADD Button or Quantity Selector on the right - Fixed size to prevent overflow
-                                  SizedBox(
-                                    width: screenWidth < 360 ? 60 : screenWidth < 400 ? 70 : 80,
-                                    child: quantity > 0
-                                        ? _buildQuantitySelector(context, cartProvider, quantity, responsive, screenWidth)
-                                        : _buildAddButton(context, cartProvider, isAdding, buttonFontSize, screenWidth, variantCount),
-                                  ),
+                                  // ADD Button or Quantity Selector on the right
+                                  quantity > 0
+                                      ? _buildQuantitySelector(context, cartProvider, quantity, responsive, screenWidth)
+                                      : _buildAddButton(context, cartProvider, isAdding, buttonFontSize, screenWidth, variantCount),
                                 ],
                               ),
                             ],
@@ -202,7 +205,7 @@ class ProductCard extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
@@ -397,22 +400,41 @@ class ProductCard extends StatelessWidget {
         ((product.hasVariants && product.variants != null && product.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
          (!product.hasVariants && product.stock > 0));
     
-    // Make ADD button larger to reduce empty space
-    final buttonWidth = variantCount > 1 
-        ? (screenWidth < 360 ? 68.0 : 78.0)
-        : (screenWidth < 360 ? 64.0 : 74.0);
-    final buttonHeight = screenWidth < 360 ? 30.0 : 34.0;
-    
+    // ADD button sizing - compact width
+    final buttonWidth = variantCount > 1
+        ? (screenWidth < 360 ? 58.0 : 66.0)
+        : (screenWidth < 360 ? 52.0 : 60.0);
+    final buttonHeight = screenWidth < 360 ? 26.0 : 30.0;
+
     return Container(
       width: buttonWidth,
       height: buttonHeight,
+      margin: const EdgeInsets.only(right: 2, bottom: 4),
       decoration: BoxDecoration(
-        color: isAvailable && !isAdding ? AppTheme.primaryGreen : AppTheme.grey.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(6),
+        gradient: isAvailable && !isAdding
+            ? const LinearGradient(
+                colors: [
+                  Color(0xFFE8F5E9),  // light green
+                  Colors.white,       // white (middle)
+                  Color(0xFFE8F5E9),  // light green
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                stops: [0.0, 0.5, 1.0],
+              )
+            : null,
+        color: isAvailable && !isAdding ? null : AppTheme.grey.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(10),
+        border: isAvailable && !isAdding
+            ? Border.all(color: const Color(0xFF0C831F), width: 1.5)
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          hoverColor: const Color(0xFF0C831F).withValues(alpha: 0.08),
+          splashColor: const Color(0xFF0C831F).withValues(alpha: 0.15),
+          highlightColor: const Color(0xFF0C831F).withValues(alpha: 0.05),
           onTap: (isAvailable && !isAdding)
               ? () async {
                   if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
@@ -429,7 +451,7 @@ class ProductCard extends StatelessWidget {
                   }
                 }
               : null,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(10),
       child: Container(
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -439,7 +461,7 @@ class ProductCard extends StatelessWidget {
                 width: screenWidth < 360 ? 14 : 16,
                 child: const CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0C831F)),
                 ),
               )
             : variantCount > 1
@@ -455,7 +477,7 @@ class ProductCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: screenWidth < 360 ? 11 : 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: const Color(0xFF0C831F),
                             height: 1.0,
                             letterSpacing: 0.2,
                           ),
@@ -466,7 +488,7 @@ class ProductCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: screenWidth < 360 ? 8.5 : 9.5,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.95),
+                            color: const Color(0xFF0C831F).withValues(alpha: 0.8),
                             height: 1.0,
                           ),
                         ),
@@ -478,7 +500,7 @@ class ProductCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: screenWidth < 360 ? 12 : 13,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: const Color(0xFF0C831F),
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -504,20 +526,29 @@ class ProductCard extends StatelessWidget {
         (product.hasVariants && variantCount == 1);
     final canDecrement = quantity > 0;
     
-    // Ultra-compact sizing to prevent overflow - More compact on smaller devices
-    final height = screenWidth < 360 ? 22.0 : screenWidth < 400 ? 24.0 : 26.0;
+    // Sizing matched to ADD button height, wider to expand from left
+    final height = screenWidth < 360 ? 26.0 : 30.0;
     final iconSize = screenWidth < 360 ? 12.0 : screenWidth < 400 ? 14.0 : 16.0;
     final fontSize = screenWidth < 360 ? 11.0 : screenWidth < 400 ? 12.0 : 13.0;
-    final buttonWidth = screenWidth < 360 ? 20.0 : screenWidth < 400 ? 22.0 : 24.0;
+    final buttonWidth = screenWidth < 360 ? 22.0 : screenWidth < 400 ? 24.0 : 26.0;
     final horizontalPadding = screenWidth < 360 ? 3.0 : screenWidth < 400 ? 4.0 : 6.0;
-    final maxWidth = screenWidth < 360 ? 60.0 : screenWidth < 400 ? 70.0 : 80.0;
-    
+    final maxWidth = screenWidth < 360 ? 80.0 : screenWidth < 400 ? 88.0 : 96.0;
+
     return Container(
       height: height,
       constraints: BoxConstraints(maxWidth: maxWidth),
       decoration: BoxDecoration(
-        color: AppTheme.primaryGreen,
-        borderRadius: BorderRadius.circular(6),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF0A5C18),  // dark green
+            Color(0xFF1B8A2E),  // lighter green (middle)
+            Color(0xFF0A5C18),  // dark green
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          stops: [0.0, 0.5, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -718,7 +749,7 @@ class ProductCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: AppTheme.lightGrey),
                             ),
                             child: Row(
@@ -740,7 +771,16 @@ class ProductCard extends StatelessWidget {
                                   Container(
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryGreen,
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF0A5C18),
+                                          Color(0xFF1B8A2E),
+                                          Color(0xFF0A5C18),
+                                        ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                        stops: [0.0, 0.5, 1.0],
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
@@ -755,35 +795,27 @@ class ProductCard extends StatelessWidget {
                                             }
                                           },
                                           child: Container(
-                                            width: 24,
-                                            height: 24,
-                                            margin: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.white,
-                                              shape: BoxShape.circle,
+                                            width: 32,
+                                            height: 32,
+                                            alignment: Alignment.center,
+                                            child: const Text(
+                                              '–',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                                height: 1.0,
+                                              ),
                                             ),
-                                            child: Icon(Icons.remove, size: 14, color: AppTheme.primaryGreen),
                                           ),
                                         ),
                                         Container(
-                                          constraints: const BoxConstraints(minWidth: 20),
-                                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                                          child: const DefaultTextStyle(
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                            child: Text(''),
-                                          ),
-                                        ),
-                                        Container(
-                                          constraints: const BoxConstraints(minWidth: 20),
-                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          constraints: const BoxConstraints(minWidth: 24),
+                                          alignment: Alignment.center,
                                           child: Text(
                                             qty.toString(),
                                             style: const TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.bold,
                                               color: Colors.white,
                                             ),
@@ -797,39 +829,68 @@ class ProductCard extends StatelessWidget {
                                             }
                                           },
                                           child: Container(
-                                            width: 24,
-                                            height: 24,
-                                            margin: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.white,
-                                              shape: BoxShape.circle,
+                                            width: 32,
+                                            height: 32,
+                                            alignment: Alignment.center,
+                                            child: const Text(
+                                              '+',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                                height: 1.0,
+                                              ),
                                             ),
-                                            child: Icon(Icons.add, size: 14, color: AppTheme.primaryGreen),
                                           ),
                                         ),
                                       ],
                                     ),
                                   )
                                 else
-                                  SizedBox(
+                                  Container(
                                     height: 32,
-                                    child: ElevatedButton(
-                                      onPressed: available
-                                          ? () async {
-                                              await cp.addItem(product, variant: v);
-                                            }
+                                    decoration: BoxDecoration(
+                                      gradient: available
+                                          ? const LinearGradient(
+                                              colors: [
+                                                Color(0xFFE8F5E9),
+                                                Colors.white,
+                                                Color(0xFFE8F5E9),
+                                              ],
+                                              begin: Alignment.centerLeft,
+                                              end: Alignment.centerRight,
+                                              stops: [0.0, 0.5, 1.0],
+                                            )
                                           : null,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: available ? AppTheme.primaryGreen : AppTheme.grey.withOpacity(0.3),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        textStyle: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: screenWidth < 360 ? 12 : 13,
+                                      color: available ? null : AppTheme.grey.withValues(alpha: 0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: available
+                                          ? Border.all(color: const Color(0xFF0C831F), width: 1.5)
+                                          : null,
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: available
+                                            ? () async {
+                                                await cp.addItem(product, variant: v);
+                                              }
+                                            : null,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          child: Center(
+                                            child: Text(
+                                              available ? 'ADD' : 'Out of Stock',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: screenWidth < 360 ? 12 : 13,
+                                                color: available ? const Color(0xFF0C831F) : AppTheme.grey,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      child: Text(available ? 'ADD' : 'Out of Stock'),
                                     ),
                                   ),
                               ],

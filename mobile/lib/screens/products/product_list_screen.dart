@@ -156,7 +156,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
               displayTitle,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontFamily: 'RoundedSans',
               ),
             );
           },
@@ -336,7 +335,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   final responsive = Responsive(context);
                   final crossAxisCount = responsive.getGridColumns();
                   final screenWidth = MediaQuery.of(context).size.width;
-                  final aspectRatio = screenWidth < 360 ? 0.54 : screenWidth < 400 ? 0.56 : 0.58;
+                  final aspectRatio = screenWidth < 360 ? 0.50 : screenWidth < 400 ? 0.52 : 0.54;
 
                   return SliverPadding(
                     padding: EdgeInsets.only(

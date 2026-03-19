@@ -82,7 +82,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.grey,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
             ],
@@ -101,7 +100,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           'Order #${order.id}',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontFamily: 'RoundedSans',
             color: AppTheme.black,
           ),
         ),
@@ -194,7 +192,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: statusColor,
-              fontFamily: 'RoundedSans',
             ),
           ),
           const SizedBox(height: 8),
@@ -204,7 +201,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             style: TextStyle(
               fontSize: 14,
               color: AppTheme.grey,
-              fontFamily: 'RoundedSans',
             ),
           ),
         ],
@@ -251,7 +247,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.red,
-                      fontFamily: 'RoundedSans',
                     ),
                   ),
                 ),
@@ -291,7 +286,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           fontSize: 14,
                           fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                           color: isCompleted ? AppTheme.grey : AppTheme.grey.withOpacity(0.5),
-                          fontFamily: 'RoundedSans',
                         ),
                       ),
                     ),
@@ -337,7 +331,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
             ],
@@ -401,7 +394,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              fontFamily: 'RoundedSans',
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -414,7 +406,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.grey,
-                                fontFamily: 'RoundedSans',
                               ),
                             ),
                           ],
@@ -433,7 +424,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                     fontSize: 12,
                                     color: AppTheme.primaryGreen,
                                     fontWeight: FontWeight.w600,
-                                    fontFamily: 'RoundedSans',
                                   ),
                                 ),
                               ),
@@ -444,7 +434,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppTheme.grey,
-                                    fontFamily: 'RoundedSans',
                                   ),
                                 ),
                               ],
@@ -462,7 +451,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.grey,
-                            fontFamily: 'RoundedSans',
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -472,7 +460,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryGreen,
-                            fontFamily: 'RoundedSans',
                           ),
                         ),
                       ],
@@ -513,7 +500,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
             ],
@@ -546,7 +532,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.primaryGreen,
-                        fontFamily: 'RoundedSans',
                       ),
                     ),
                   ),
@@ -555,7 +540,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   style: const TextStyle(
                     fontSize: 14,
                     height: 1.5,
-                    fontFamily: 'RoundedSans',
                   ),
                 ),
               ],
@@ -594,7 +578,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
             ],
@@ -626,7 +609,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
               Text(
@@ -635,7 +617,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.primaryGreen,
-                  fontFamily: 'RoundedSans',
                 ),
               ),
             ],
@@ -660,7 +641,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: AppTheme.grey,
-                fontFamily: 'RoundedSans',
               ),
             ),
           ],
@@ -671,7 +651,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: valueColor ?? AppTheme.grey,
-            fontFamily: 'RoundedSans',
           ),
         ),
       ],
