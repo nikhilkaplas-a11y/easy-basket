@@ -12,11 +12,11 @@ class AppTheme {
   static const Color darkGrey = Color(0xFF424242);
 
   static ThemeData get lightTheme {
-    final baseTextTheme = GoogleFonts.plusJakartaSansTextTheme();
+    final baseTextTheme = GoogleFonts.poppinsTextTheme();
 
     return ThemeData(
       useMaterial3: true,
-      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      fontFamily: GoogleFonts.poppins().fontFamily,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryGreen,
         primary: primaryGreen,
@@ -27,7 +27,7 @@ class AppTheme {
         backgroundColor: white,
         elevation: 0,
         iconTheme: const IconThemeData(color: black),
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.poppins(
           color: black,
           fontSize: 20,
           fontWeight: FontWeight.bold,
@@ -69,7 +69,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),

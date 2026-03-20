@@ -437,12 +437,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                             const Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 16),
                                             const SizedBox(width: 6),
                                             ConstrainedBox(
-                                              constraints: const BoxConstraints(maxWidth: 160),
+                                              constraints: const BoxConstraints(maxWidth: 180),
                                               child: Text(
                                                 defaultAddress != null
                                                     ? defaultAddress.tag != null
-                                                        ? '${defaultAddress.tag!.toUpperCase()} - ${defaultAddress.addressLine1}'
-                                                        : defaultAddress.addressLine1
+                                                        ? '${defaultAddress.tag!.toUpperCase()} - ${defaultAddress.addressLine1}${defaultAddress.addressLine2 != null ? ', ${defaultAddress.addressLine2}' : ''}, ${defaultAddress.city}'
+                                                        : '${defaultAddress.addressLine1}${defaultAddress.addressLine2 != null ? ', ${defaultAddress.addressLine2}' : ''}, ${defaultAddress.city}'
                                                     : 'Add delivery address',
                                                 style: TextStyle(
                                                   fontSize: 13,
@@ -812,22 +812,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            SizedBox(
-                              height: 240,
-                              child: ListView.separated(
-                                controller: _productScrollController,
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                itemCount: productProvider.products.length,
-                                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                                itemBuilder: (context, index) {
-                                  final product = productProvider.products[index];
-                                  return SizedBox(
-                                    width: 175,
-                                    child: ProductCard(product: product),
-                                  );
-                                },
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final inStockProducts = productProvider.products.where((p) =>
+                                  p.isAvailable &&
+                                  ((p.hasVariants && p.variants != null && p.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+                                   (!p.hasVariants && p.stock > 0))
+                                ).toList();
+                                return SizedBox(
+                                  height: 240,
+                                  child: ListView.separated(
+                                    controller: _productScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                    itemCount: inStockProducts.length,
+                                    separatorBuilder: (context, index) => const SizedBox(width: 12),
+                                    itemBuilder: (context, index) {
+                                      return SizedBox(
+                                        width: 175,
+                                        child: ProductCard(product: inStockProducts[index]),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),

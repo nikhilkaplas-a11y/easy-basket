@@ -103,7 +103,20 @@ class ProductProvider with ChangeNotifier {
           rethrow;
         }
       }).toList();
-      
+
+      // Sort: in-stock products first, out-of-stock at the bottom
+      _products.sort((a, b) {
+        final aOutOfStock = !a.isAvailable ||
+            ((a.hasVariants && a.variants != null && !a.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+             (!a.hasVariants && a.stock <= 0));
+        final bOutOfStock = !b.isAvailable ||
+            ((b.hasVariants && b.variants != null && !b.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+             (!b.hasVariants && b.stock <= 0));
+        if (!aOutOfStock && bOutOfStock) return -1;
+        if (aOutOfStock && !bOutOfStock) return 1;
+        return 0;
+      });
+
       print('Fetched ${_products.length} products for categoryId: $categoryId');
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');

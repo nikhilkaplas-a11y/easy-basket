@@ -77,21 +77,21 @@ class ProductCard extends StatelessWidget {
                 children: [
                     // Image Section with Discount Badge - Use Expanded with flex
                     Expanded(
-                      flex: 55, // 55% for image
+                      flex: 58, // 58% for image
                       child: Stack(
                         children: [
                           ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                            borderRadius: BorderRadius.circular(16),
                             child: SizedBox(
                               width: double.infinity,
                               height: double.infinity,
                               child: product.imageUrl != null
                                   ? CachedNetworkImage(
                                       imageUrl: product.imageUrl!,
-                                      fit: BoxFit.contain,
+                                      fit: BoxFit.cover,
                                       alignment: Alignment.center,
                                       placeholder: (context, url) => Container(
-                                        color: AppTheme.lightGrey,
+                                        color: const Color(0xFFF8F8F8),
                                         child: Center(
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
@@ -100,14 +100,14 @@ class ProductCard extends StatelessWidget {
                                         ),
                                       ),
                                       errorWidget: (context, url, error) => Container(
-                                        color: AppTheme.lightGrey,
+                                        color: const Color(0xFFF8F8F8),
                                         child: Icon(Icons.image, size: responsive.iconSize(40), color: AppTheme.grey),
                                       ),
                                       fadeInDuration: const Duration(milliseconds: 300),
                                       fadeOutDuration: const Duration(milliseconds: 100),
                                     )
                                   : Container(
-                                      color: AppTheme.lightGrey,
+                                      color: const Color(0xFFF8F8F8),
                                       child: Icon(Icons.image, size: responsive.iconSize(40), color: AppTheme.grey),
                                     ),
                             ),
@@ -138,7 +138,7 @@ class ProductCard extends StatelessWidget {
                     ),
                     // Content Section
                     Expanded(
-                      flex: 45, // 45% for content
+                      flex: 42, // 42% for content
                       child: ClipRect(
                         child: Padding(
                           padding: EdgeInsets.only(
@@ -151,12 +151,6 @@ class ProductCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // Thin divider close to product name
-                              Container(
-                                height: 0.5,
-                                margin: const EdgeInsets.only(bottom: 3),
-                                color: Colors.grey.withValues(alpha: 0.2),
-                              ),
                               // Product Name
                               _buildProductName(nameFontSize, screenWidth),
                               const SizedBox(height: 1),
@@ -209,38 +203,28 @@ class ProductCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              // Out of Stock Banner - Transparent overlay at top
+              // Out of Stock Banner
               if (isOutOfStock)
                 Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
+                  top: 8,
+                  right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.75),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                      ),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.block,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 6),
+                        Icon(Icons.block, size: 12, color: Colors.white),
+                        SizedBox(width: 4),
                         Text(
                           'Out of Stock',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
                           ),
                         ),
                       ],

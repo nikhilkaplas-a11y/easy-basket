@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/cart_provider.dart';
-import '../utils/theme.dart';
 
 /// Reusable floating cart bar widget (Blinkit/Swiggy style)
 /// Shows cart summary with item count and total amount
@@ -27,7 +26,12 @@ class FloatingCartBar extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppTheme.primaryGreen,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0A5C18), Color(0xFF1B8A2E), Color(0xFF0A5C18)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                stops: [0.0, 0.5, 1.0],
+              ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -37,7 +41,7 @@ class FloatingCartBar extends StatelessWidget {
                   spreadRadius: 0,
                 ),
                 BoxShadow(
-                  color: AppTheme.primaryGreen.withOpacity(0.4),
+                  color: const Color(0xFF0A5C18).withOpacity(0.4),
                   blurRadius: 18,
                   offset: const Offset(0, 3),
                   spreadRadius: 0,
@@ -60,7 +64,7 @@ class FloatingCartBar extends StatelessWidget {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
