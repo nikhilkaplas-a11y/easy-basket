@@ -19,7 +19,7 @@ class AppConfig {
   
   // App Configuration (version is for Play Store / release, not tied to backend API)
   static const String appName = 'Easy Basket';
-  static const String appVersion = '3.0.0';
+  static const String appVersion = '10.0.0';
   
   // Development OTP (for testing)
   static const String devOTP = '1234';
