@@ -101,7 +101,7 @@ AppDataSource.initialize()
     }
     console.log('');
     
-    // Start auto-cancel service — pending orders cancel after 30 min
+    // Auto-cancel: pending orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
     OrderAutoCancelService.start();
 
     app.listen(PORT, () => {
