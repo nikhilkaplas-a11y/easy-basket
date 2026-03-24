@@ -442,14 +442,11 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                     if (_currentStep > 0) const SizedBox(width: 12),
                     Expanded(
                       flex: _currentStep == 0 ? 1 : 2,
-                      child: ElevatedButton(
+                      child: AppTheme.gradientButton(
                         onPressed: _currentStep == 2
                             ? (_isSaving ? null : _updateAddress)
                             : _nextStep,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: AppTheme.primaryGreen,
-                        ),
+                        height: 52,
                         child: _isSaving
                             ? const SizedBox(
                                 height: 20,
@@ -459,7 +456,8 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : Text(_currentStep == 2 ? 'Update Address' : 'Continue'),
+                            : Text(_currentStep == 2 ? 'Update Address' : 'Continue',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -622,22 +620,26 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
 
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
+          child: AppTheme.gradientButton(
             onPressed: _isLoadingLocation ? null : _getCurrentLocation,
-            icon: _isLoadingLocation
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Icon(Icons.my_location),
-            label: Text(_isLoadingLocation ? 'Getting Location...' : 'Update Location'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: AppTheme.primaryGreen,
+            height: 52,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _isLoadingLocation
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.my_location, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(_isLoadingLocation ? 'Getting Location...' : 'Update Location',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+              ],
             ),
           ),
         ),
@@ -881,23 +883,24 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
   Widget _buildTagSelector() {
     return Row(
       children: [
-        Icon(Icons.label_outline, size: 18, color: AppTheme.grey),
-        const SizedBox(width: 8),
+        Icon(Icons.label_outline, size: 16, color: AppTheme.grey),
+        const SizedBox(width: 6),
         Text(
           'Save as',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          style: TextStyle(
+            fontSize: 12,
             fontWeight: FontWeight.w500,
             color: AppTheme.grey,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: Row(
             children: _tags.map((tag) {
               final isSelected = _selectedTag == tag['value'];
               return Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: 4),
                   child: InkWell(
                     onTap: () {
                       setState(() {
@@ -906,37 +909,40 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                       decoration: BoxDecoration(
-                        color: isSelected 
-                            ? AppTheme.primaryGreen 
+                        color: isSelected
+                            ? AppTheme.primaryGreen
                             : AppTheme.lightGrey,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected 
-                              ? AppTheme.primaryGreen 
+                          color: isSelected
+                              ? AppTheme.primaryGreen
                               : AppTheme.lightGrey,
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            tag['icon'] as IconData,
-                            size: 16,
-                            color: isSelected ? AppTheme.white : tag['color'] as Color,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            tag['label'] as String,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isSelected ? AppTheme.white : AppTheme.black,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              tag['icon'] as IconData,
+                              size: 14,
+                              color: isSelected ? AppTheme.white : tag['color'] as Color,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 3),
+                            Text(
+                              tag['label'] as String,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected ? AppTheme.white : AppTheme.black,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

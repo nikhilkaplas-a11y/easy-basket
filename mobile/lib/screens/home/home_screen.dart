@@ -16,6 +16,7 @@ import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/floating_cart_bar.dart';
+import '../../widgets/active_order_bar.dart';
 import '../../models/category_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -73,8 +74,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
       productProvider.fetchProducts();
       
-      // Fetch addresses if user is authenticated
+      // Fetch addresses and orders if user is authenticated
       if (authProvider.token != null) {
+        orderProvider.fetchOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
         orderProvider.fetchAddresses(authProvider.token!).then((_) async {
           // If no addresses, auto-detect location in background (seamless onboarding)
           if (orderProvider.addresses.isEmpty && mounted) {
@@ -436,8 +438,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                           children: [
                                             const Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 16),
                                             const SizedBox(width: 6),
-                                            ConstrainedBox(
-                                              constraints: const BoxConstraints(maxWidth: 180),
+                                            Flexible(
                                               child: Text(
                                                 defaultAddress != null
                                                     ? defaultAddress.tag != null
@@ -852,12 +853,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               },
             ),
           ),
-          // Floating Cart Bar
+          // Active Order Bar (replaces cart bar when active orders exist)
+          // Cart bar shows when no active orders
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: const FloatingCartBar(),
+            child: Consumer<OrderProvider>(
+              builder: (context, orderProvider, _) {
+                final hasActiveOrders = orderProvider.orders.any(
+                  (o) => !['delivered', 'cancelled'].contains(o.status),
+                );
+                if (hasActiveOrders) {
+                  return const ActiveOrderBar();
+                }
+                return const FloatingCartBar();
+              },
+            ),
           ),
         ],
       ),

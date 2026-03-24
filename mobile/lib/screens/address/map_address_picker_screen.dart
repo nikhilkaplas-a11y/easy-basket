@@ -534,26 +534,28 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
                     // Confirm Button
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      child: AppTheme.gradientButton(
                         onPressed: (_isGettingAddress || _selectedAddress.isEmpty || _selectedAddress == 'Loading location...')
                             ? null
                             : _confirmSelection,
-                        icon: _isGettingAddress
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Icon(Icons.check_circle),
-                        label: Text(_isGettingAddress ? 'Loading address...' : 'Confirm Location'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: AppTheme.primaryGreen,
-                          foregroundColor: AppTheme.white,
-                          disabledBackgroundColor: AppTheme.grey,
+                        height: 52,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _isGettingAddress
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Text(_isGettingAddress ? 'Loading address...' : 'Confirm Location',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ],
                         ),
                       ),
                     ),
@@ -613,12 +615,17 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
+            AppTheme.gradientButton(
               onPressed: _getCurrentLocation,
-              icon: const Icon(Icons.my_location),
-              label: const Text('Use Current Location'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              height: 52,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.my_location, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('Use Current Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                ],
               ),
             ),
             if (_selectedAddress != 'Loading location...' && _selectedAddress != 'Location permission denied') ...[

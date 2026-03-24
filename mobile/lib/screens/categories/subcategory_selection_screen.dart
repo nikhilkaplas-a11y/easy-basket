@@ -109,12 +109,16 @@ class _SubcategorySelectionScreenState extends State<SubcategorySelectionScreen>
                         ),
                       ),
                       const SizedBox(height: 24),
-                      ElevatedButton.icon(
+                      AppTheme.gradientButton(
                         onPressed: () => context.push('/products?categoryId=${widget.parentCategoryId}'),
-                        icon: const Icon(Icons.shopping_bag),
-                        label: const Text('View All Products'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shopping_bag, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('View All Products', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ],
                         ),
                       ),
                     ],

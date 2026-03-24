@@ -365,17 +365,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 width: double.infinity,
-                child: ElevatedButton(
+                child: AppTheme.gradientButton(
                   onPressed: _isSaving ? null : _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: AppTheme.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
+                  height: 52,
                   child: _isSaving
                       ? const SizedBox(
                           height: 20,
@@ -387,10 +379,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         )
                       : const Text(
                           'Save Changes',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                         ),
                 ),
               ),

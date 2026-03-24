@@ -99,67 +99,83 @@ class _AddressListScreenState extends State<AddressListScreen> {
     final orderProvider = Provider.of<OrderProvider>(context);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF6F6F6),
       appBar: AppBar(
-        title: const Text('Select Address'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: const Text('Select Address', style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => context.push('/address/add'),
-          ),
-        ],
       ),
-      // Hide FAB when "Continue to Payment" button is visible to prevent overlap
-      floatingActionButton: (_isFromCheckout && _selectedAddressId != null)
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => context.push('/address/add'),
-              backgroundColor: AppTheme.primaryGreen,
-              foregroundColor: AppTheme.white,
-              icon: const Icon(Icons.add_location_alt),
-              label: const Text('Add Address'),
-            ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: (orderProvider.isLoading || _isUpdating || _isCheckingService)
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen)))
           : orderProvider.addresses.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.location_off, size: 100, color: AppTheme.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No addresses found',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: AppTheme.grey,
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(20),
                         ),
+                        child: const Icon(Icons.location_off_outlined, size: 48, color: AppTheme.primaryGreen),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
+                      const Text('No addresses found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text('Add a delivery address to get started', style: TextStyle(fontSize: 13, color: AppTheme.grey)),
+                      const SizedBox(height: 20),
+                      AppTheme.gradientButton(
                         onPressed: () => context.push('/address/add'),
-                        child: const Text('Add Address'),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: const Text('Add Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
                     ],
                   ),
                 )
               : Column(
                   children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Row(
+                        children: [
+                          Text('Your Addresses', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.grey)),
+                          const Spacer(),
+                          Text('${orderProvider.addresses.length} saved', style: TextStyle(fontSize: 12, color: AppTheme.grey)),
+                        ],
+                      ),
+                    ),
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: orderProvider.addresses.length,
                         itemBuilder: (context, index) {
                           final address = orderProvider.addresses[index];
                           final isSelected = _selectedAddressId == address.id;
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            color: isSelected ? AppTheme.primaryGreen.withOpacity(0.1) : null,
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFF0C831F) : Colors.transparent,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
                             child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
                               onTap: () async {
                                 if (kDebugMode) {
                                   print('👆 [TAP] User tapped on address ID: ${address.id}, Pincode: ${address.pincode}');
@@ -237,199 +253,163 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                   _updateDefaultAddress(address.id);
                                 }
                               },
-                              child: ListTile(
-                                leading: Radio<int>(
-                                  value: address.id,
-                                  groupValue: _selectedAddressId,
-                                  onChanged: (value) async {
-                                    if (value == null) return;
-                                    
-                                    if (kDebugMode) {
-                                      print('🔘 [RADIO] User selected address ID: $value');
-                                      print('📍 Current selected address ID: $_selectedAddressId');
-                                    }
-                                    
-                                    // Find the CLICKED address
-                                    final clickedAddress = orderProvider.addresses.firstWhere(
-                                      (addr) => addr.id == value,
-                                    );
-                                    
-                                    if (kDebugMode) {
-                                      print('🔘 [RADIO] Checking service for clicked address ID: ${clickedAddress.id}, Pincode: ${clickedAddress.pincode}');
-                                      print('🔘 [RADIO] Is default: ${clickedAddress.isDefault}, Is from checkout: $_isFromCheckout');
-                                    }
-                                    
-                                    // If clicking on default address and not from checkout, check service and navigate to home
-                                    if (clickedAddress.isDefault && !_isFromCheckout) {
-                                      final isServiceable = await _checkServiceAvailability(clickedAddress);
-                                      
-                                      // CRITICAL: Check if widget is still mounted before using context
-                                      if (!mounted) {
-                                        if (kDebugMode) {
-                                          print('⚠️ [RADIO] Widget no longer mounted, skipping navigation');
-                                        }
-                                        return;
-                                      }
-                                      
-                                      if (isServiceable) {
-                                        // Default address is serviceable, navigate to home
-                                        if (kDebugMode) {
-                                          print('✅ [RADIO] Default address is serviceable, navigating to home');
-                                        }
-                                        if (mounted) {
-                                          setState(() => _selectedAddressId = value);
-                                        }
-                                        
-                                        // Navigate to home using router reference to avoid context issues
-                                        if (mounted && _router != null) {
-                                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                                            if (mounted && _router != null) {
-                                              _router!.go('/home');
-                                            }
-                                          });
-                                        }
-                                        return;
-                                      } else {
-                                        // Default address is not serviceable, service not available screen is already shown
-                                        if (kDebugMode) {
-                                          print('🚫 [RADIO] Default address is not serviceable');
-                                        }
-                                        return;
-                                      }
-                                    }
-                                    
-                                    // Check service availability for the CLICKED address
-                                    final isServiceable = await _checkServiceAvailability(clickedAddress);
-                                    
-                                    if (!isServiceable) {
-                                      // Service not available - screen is already shown
-                                      // Don't update selection, keep current selection
-                                      if (kDebugMode) {
-                                        print('🚫 [RADIO] Service not available for clicked address ID: ${clickedAddress.id}');
-                                      }
-                                      return;
-                                    }
-                                    
-                                    // Update selection only if serviceable
-                                    if (kDebugMode) {
-                                      print('✅ [RADIO] Service available, updating selection to address ID: $value');
-                                    }
-                                    setState(() => _selectedAddressId = value);
-                                    
-                                    // If not from checkout, update default immediately
-                                    if (!_isFromCheckout) {
-                                      _updateDefaultAddress(value);
-                                    }
-                                  },
-                                ),
-                                title: Row(
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (address.tag != null) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryGreen.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          address.tag!.toUpperCase(),
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.primaryGreen,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    Text(
-                                      address.isDefault ? 'Default Address' : 'Address',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                    // Radio / selected indicator
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Icon(
+                                        isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                        color: isSelected ? const Color(0xFF0C831F) : AppTheme.grey,
+                                        size: 20,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                subtitle: Text(
-                                  address.fullAddress,
-                                ),
-                                trailing: _isFromCheckout
-                                    ? null
-                                    : Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                    const SizedBox(width: 12),
+                                    // Address content
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, size: 20),
-                                            color: AppTheme.primaryGreen,
-                                            onPressed: () {
-                                              context.push('/address/edit', extra: address);
-                                            },
-                                            tooltip: 'Edit address',
+                                          // Tag + Default badge row
+                                          Row(
+                                            children: [
+                                              if (address.tag != null) ...[
+                                                Icon(
+                                                  address.tag == 'home' ? Icons.home_rounded
+                                                      : address.tag == 'office' ? Icons.work_rounded
+                                                      : Icons.location_on_rounded,
+                                                  size: 16,
+                                                  color: const Color(0xFF0C831F),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  address.tag!.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                              ],
+                                              if (address.tag == null)
+                                                const Text(
+                                                  'ADDRESS',
+                                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black),
+                                                ),
+                                              if (address.isDefault) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFE8F5E9),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: const Text(
+                                                    'DEFAULT',
+                                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF0C831F)),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
-                                          const Icon(Icons.chevron_right, color: AppTheme.grey),
+                                          const SizedBox(height: 6),
+                                          // Full address
+                                          Text(
+                                            address.fullAddress,
+                                            style: TextStyle(fontSize: 13, color: AppTheme.darkGrey, height: 1.4),
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ],
                                       ),
+                                    ),
+                                    // Edit button
+                                    if (!_isFromCheckout)
+                                      GestureDetector(
+                                        onTap: () => context.push('/address/edit', extra: address),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF5F5F5),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.grey),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
                         },
                       ),
                     ),
-                    // Only show "Continue to Payment" button if:
-                    // 1. User came from checkout flow (has items in cart)
-                    // 2. An address is selected
-                    if (_isFromCheckout && _selectedAddressId != null)
-                      Container(
-                        padding: const EdgeInsets.all(16),
+                    // Bottom buttons
+                    SafeArea(
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                         decoration: BoxDecoration(
-                          color: AppTheme.white,
+                          color: Colors.white,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.07),
                               blurRadius: 10,
                               offset: const Offset(0, -2),
                             ),
                           ],
                         ),
-                        child: SafeArea(
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isCheckingService ? null : () async {
-                                // Check service availability before proceeding to payment
-                                if (_selectedAddressId != null) {
-                                  final selectedAddress = orderProvider.addresses.firstWhere(
-                                    (addr) => addr.id == _selectedAddressId,
-                                  );
-                                  
-                                  final isServiceable = await _checkServiceAvailability(selectedAddress);
-                                  
-                                  if (isServiceable) {
-                                    if (mounted) {
-                                      context.push('/payment', extra: _selectedAddressId);
-                                    }
-                                  }
-                                }
-                              },
-                              child: _isCheckingService
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.white),
-                                      ),
-                                    )
-                                  : const Text('Continue to Payment'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryGreen,
-                                foregroundColor: AppTheme.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Add New Address button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: () => context.push('/address/add'),
+                                icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                                label: const Text('Add New Address', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF0C831F),
+                                  side: const BorderSide(color: Color(0xFF0C831F), width: 1.5),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
                             ),
-                          ),
+                            // Continue to Payment (only from checkout)
+                            if (_isFromCheckout && _selectedAddressId != null) ...[
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: AppTheme.gradientButton(
+                                  onPressed: _isCheckingService ? null : () async {
+                                    if (_selectedAddressId != null) {
+                                      final selectedAddress = orderProvider.addresses.firstWhere(
+                                        (addr) => addr.id == _selectedAddressId,
+                                      );
+                                      final isServiceable = await _checkServiceAvailability(selectedAddress);
+                                      if (isServiceable && mounted) {
+                                        context.push('/payment', extra: _selectedAddressId);
+                                      }
+                                    }
+                                  },
+                                  height: 48,
+                                  child: _isCheckingService
+                                      ? const SizedBox(
+                                          height: 20, width: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                                        )
+                                      : const Text('Continue to Payment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
+                    ),
                   ],
                 ),
     );

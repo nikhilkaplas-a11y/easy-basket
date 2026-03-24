@@ -534,13 +534,7 @@ class _GreenButton extends StatelessWidget {
       height: 54,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: isLoading
-              ? null
-              : const LinearGradient(
-                  colors: [Color(0xFF1DB954), Color(0xFF0C831F)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+          gradient: isLoading ? null : AppTheme.primaryGradient,
           color: isLoading ? Colors.grey.shade200 : null,
           borderRadius: BorderRadius.circular(14),
           boxShadow: isLoading

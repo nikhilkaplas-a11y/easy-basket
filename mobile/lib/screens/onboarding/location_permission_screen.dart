@@ -106,24 +106,16 @@ class LocationPermissionScreen extends StatelessWidget {
               // Primary Action - Grant Permission
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: AppTheme.gradientButton(
                   onPressed: () => _requestPermissionAgain(context),
-                  icon: const Icon(Icons.location_on, size: 22),
-                  label: const Text(
-                    'Grant Location Permission',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: AppTheme.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
+                  height: 54,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.location_on, size: 22, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('Grant Location Permission', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ],
                   ),
                 ),
               ),

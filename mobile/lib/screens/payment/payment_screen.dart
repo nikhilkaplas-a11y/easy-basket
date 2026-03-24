@@ -316,6 +316,9 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       return itemMap;
     }).toList();
 
+    // Refresh token before creating order to avoid 401
+    await authProvider.refreshAccessToken();
+
     // First create the order in our system
     final order = await orderProvider.createOrder(
       token: authProvider.token!,
@@ -462,141 +465,241 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF6F6F6),
       appBar: AppBar(
-        title: const Text('Payment'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: const Text('Payment', style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
-          // Order Summary
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Order Summary',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+          // Order Summary Card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF0C831F)),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  ...cartProvider.items.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                '${item.product.name} x ${item.quantity}',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              currencyFormat.format(item.total),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                  const Divider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const SizedBox(width: 8),
+                    const Text('Order Summary', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    Text('${cartProvider.items.length} items', style: TextStyle(fontSize: 12, color: AppTheme.grey)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...cartProvider.items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
                     children: [
-                      const Text(
-                        'Total:',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          '${item.product.name} x ${item.quantity}',
+                          style: const TextStyle(fontSize: 13, color: Colors.black87),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
-                        currencyFormat.format(cartProvider.totalAmount),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryGreen,
-                        ),
+                        currencyFormat.format(item.total),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Payment Method
-          const Text(
-            'Payment Method',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+                )),
+                Container(height: 0.5, color: const Color(0xFFE0E0E0)),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text(
+                      currencyFormat.format(cartProvider.totalAmount),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.black),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
-          RadioListTile<String>(
-            title: const Text('Online Payment (Razorpay)'),
-            subtitle: const Text('Cards, UPI, Wallets, Netbanking'),
+
+          // Payment Method
+          const Text('Payment Method', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+
+          // Online Payment tile
+          _buildPaymentTile(
+            title: 'Online Payment',
+            subtitle: 'Cards, UPI, Wallets, Netbanking',
+            icon: Icons.payment_rounded,
             value: 'razorpay',
-            groupValue: _selectedPaymentMethod,
-            onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
           ),
-          RadioListTile<String>(
-            title: const Text('Cash on Delivery'),
-            subtitle: const Text('Pay when you receive'),
+          const SizedBox(height: 8),
+
+          // COD tile
+          _buildPaymentTile(
+            title: 'Cash on Delivery',
+            subtitle: 'Pay when you receive',
+            icon: Icons.money_rounded,
             value: 'cash',
-            groupValue: _selectedPaymentMethod,
-            onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
           ),
-          const SizedBox(height: 24),
-          // Notes
-          TextField(
-            controller: _notesController,
-            decoration: const InputDecoration(
-              labelText: 'Delivery Notes (Optional)',
-              hintText: 'Any special instructions...',
+          const SizedBox(height: 16),
+
+          // Delivery Notes
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2)),
+              ],
             ),
-            maxLines: 3,
-          ),
-          const SizedBox(height: 32),
-          Consumer<OrderProvider>(
-            builder: (context, orderProvider, _) => ElevatedButton(
-              onPressed: (orderProvider.isLoading || _isProcessingPayment) ? null : _placeOrder,
-              child: (orderProvider.isLoading || _isProcessingPayment)
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    _selectedPaymentMethod == 'razorpay' ? 'Pay & Place Order' : 'Place Order',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Delivery Notes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _notesController,
+                  maxLines: 2,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Any special instructions... (optional)',
+                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
+                    filled: true,
+                    fillColor: const Color(0xFFF6F6F6),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: AppTheme.primaryGreen,
-                foregroundColor: Colors.white,
-              ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+
+      // Sticky bottom CTA — Blinkit style
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 10, offset: const Offset(0, -2)),
+            ],
+          ),
+          child: Consumer<OrderProvider>(
+            builder: (context, orderProvider, _) => Row(
+              children: [
+                // Total on left
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                    const SizedBox(height: 2),
+                    Text(
+                      currencyFormat.format(cartProvider.totalAmount),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                // Place Order button
+                Expanded(
+                  child: AppTheme.gradientButton(
+                    onPressed: (orderProvider.isLoading || _isProcessingPayment) ? null : _placeOrder,
+                    height: 48,
+                    child: (orderProvider.isLoading || _isProcessingPayment)
+                        ? const SizedBox(
+                            height: 20, width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            _selectedPaymentMethod == 'razorpay' ? 'Pay & Place Order' : 'Place Order',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String value,
+  }) {
+    final isSelected = _selectedPaymentMethod == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPaymentMethod = value),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE8F5E9) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0C831F) : const Color(0xFFE0E0E0),
+            width: isSelected ? 1.5 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: isSelected ? const Color(0xFF0C831F) : AppTheme.grey,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF0C831F).withValues(alpha: 0.1) : const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: isSelected ? const Color(0xFF0C831F) : AppTheme.grey),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isSelected ? Colors.black : AppTheme.darkGrey)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

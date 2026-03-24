@@ -369,13 +369,10 @@ class _VariantManagementDialogState extends State<VariantManagementDialog> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
+                    child: AppTheme.gradientButton(
                       onPressed: () => Navigator.pop(context, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('Done'),
+                      height: 46,
+                      child: const Text('Done', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                     ),
                   ),
                 ],
@@ -816,11 +813,9 @@ class _AddEditVariantDialogState extends State<_AddEditVariantDialog> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
+                      child: AppTheme.gradientButton(
                         onPressed: _isLoading ? null : _saveVariant,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                        ),
+                        height: 46,
                         child: _isLoading
                             ? const SizedBox(
                                 height: 20,
@@ -832,6 +827,7 @@ class _AddEditVariantDialogState extends State<_AddEditVariantDialog> {
                               )
                             : Text(
                                 widget.variant == null ? 'Create' : 'Update',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                               ),
                       ),
                     ),

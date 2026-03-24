@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { AppDataSource } from './config/database';
 import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
+import { OrderAutoCancelService } from './services/order-auto-cancel.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.routes';
@@ -100,6 +101,9 @@ AppDataSource.initialize()
     }
     console.log('');
     
+    // Start auto-cancel service — pending orders cancel after 30 min
+    OrderAutoCancelService.start();
+
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
     });
