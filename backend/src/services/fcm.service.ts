@@ -29,6 +29,23 @@ function formatFcmError(error: unknown): string {
   }
 }
 
+/**
+ * Token is not valid for this Firebase project (stale app install, wrong project, or truncated token).
+ * Safe to clear DB token so the next app open registers a new one.
+ */
+function isPermanentFcmTokenFailure(error: unknown): boolean {
+  const o = typeof error === 'object' && error !== null ? (error as { code?: string; message?: string }) : null;
+  const code = o?.code ?? '';
+  const msg = (o?.message ?? (error instanceof Error ? error.message : String(error))) as string;
+  if (code === 'messaging/registration-token-not-registered') return true;
+  if (code === 'messaging/invalid-registration-token') return true;
+  if (code === 'messaging/unregistered') return true;
+  // HTTP NOT_FOUND from FCM — common text when token does not exist for this sender/project
+  if (/requested entity was not found/i.test(msg)) return true;
+  if (/not a valid fcm registration token/i.test(msg)) return true;
+  return false;
+}
+
 export class FCMService {
   private static initialized = false;
 
@@ -65,20 +82,23 @@ export class FCMService {
     }
   }
 
-  static async sendNotification(
+  /**
+   * Low-level send; returns error object on failure so callers can clear stale DB tokens.
+   */
+  private static async deliverToToken(
     fcmToken: string,
     title: string,
     body: string,
     data?: Record<string, string>,
     context?: string
-  ): Promise<boolean> {
+  ): Promise<{ ok: true } | { ok: false; error: unknown }> {
     const ctx = context ? `[${context}] ` : '';
 
     if (!this.initialized) {
       const msg = 'FCM not initialized (check FIREBASE_SERVICE_ACCOUNT on this PM2 instance)';
       console.warn(`⚠️ [FCM] ${ctx}${msg}`);
       fcmEmitFailureLine(ctx.trim() || 'send', msg);
-      return false;
+      return { ok: false, error: new Error(msg) };
     }
 
     const token = fcmToken.trim();
@@ -93,7 +113,7 @@ export class FCMService {
     if (token.length < 10) {
       const msg = `token empty/invalid (len=${token.length})`;
       fcmEmitFailureLine(ctx.trim() || 'send', msg);
-      return false;
+      return { ok: false, error: new Error(msg) };
     }
 
     const tokenPreview = token.length >= 20 ? `${token.substring(0, 20)}...` : token;
@@ -111,12 +131,23 @@ export class FCMService {
         data: data || {},
       });
       console.log(`✅ [FCM] ${ctx}Notification sent successfully. Message ID: ${response}`);
-      return true;
+      return { ok: true };
     } catch (error: unknown) {
       const detail = formatFcmError(error);
       fcmEmitFailureLine(ctx.trim() || 'send', detail);
-      return false;
+      return { ok: false, error };
     }
+  }
+
+  static async sendNotification(
+    fcmToken: string,
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+    context?: string
+  ): Promise<boolean> {
+    const r = await this.deliverToToken(fcmToken, title, body, data, context);
+    return r.ok;
   }
 
   static async sendNotificationToUser(
@@ -172,19 +203,34 @@ export class FCMService {
         console.log(
           `📤 [FCM] Sending to user ${user.id} (${user.phoneNumber}), token: ${user.fcmToken.substring(0, 20)}...`
         );
-        const sent = await this.sendNotification(
-          user.fcmToken,
+        const rawToken = user.fcmToken;
+        const result = await this.deliverToToken(
+          rawToken,
           title,
           body,
           data,
           `role=${role} userId=${user.id}`
         );
-        if (sent) {
+        if (result.ok) {
           successCount++;
           console.log(`✅ [FCM] Notification sent successfully to user ${user.id}`);
         } else {
+          if (isPermanentFcmTokenFailure(result.error)) {
+            try {
+              const u = await userRepository.findOneBy({ id: user.id });
+              if (u?.fcmToken && u.fcmToken.trim() === rawToken.trim()) {
+                u.fcmToken = null;
+                await userRepository.save(u);
+                console.warn(
+                  `[FCM] Cleared dead fcmToken for user ${user.id} (${user.phoneNumber}) — open app again to register push. If this repeats, verify mobile google-services.json project matches server FIREBASE_SERVICE_ACCOUNT.`
+                );
+              }
+            } catch (e) {
+              console.error('[FCM] Failed to clear stale fcmToken:', e);
+            }
+          }
           const hint =
-            'Check log line [FCM][SEND_FAILED] above for Firebase code (e.g. messaging/registration-token-not-registered)';
+            'See [FCM][SEND_FAILED] above. "Requested entity was not found" = token invalid for this Firebase project or stale; re-login on device or fix project mismatch.';
           console.error(
             `❌ [FCM] Notification failed for user ${user.id} (${user.phoneNumber}) — ${hint}`
           );
