@@ -1,23 +1,32 @@
 import * as admin from 'firebase-admin';
+import * as util from 'util';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
 
+/** PM2 / aggregators sometimes hide stderr; mirror critical lines to stdout too. */
+function fcmEmitFailureLine(context: string, detail: string): void {
+  const line = `[FCM][SEND_FAILED] ${context} | ${detail}`;
+  process.stdout.write(`${line}\n`);
+  process.stderr.write(`${line}\n`);
+  console.error(line);
+}
+
 function formatFcmError(error: unknown): string {
-  if (error instanceof Error) {
-    return `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ''}`;
-  }
-  if (typeof error === 'object' && error !== null) {
-    try {
+  try {
+    if (error instanceof Error) {
+      return `${error.name}: ${error.message}${error.stack ? ` | ${error.stack}` : ''}`;
+    }
+    if (typeof error === 'object' && error !== null) {
       const o = error as Record<string, unknown>;
       const code = o.code != null ? String(o.code) : '';
       const msg = o.message != null ? String(o.message) : '';
       const details = o.errorInfo ?? o.httpErrorCode ?? '';
-      return JSON.stringify({ code, message: msg, details, raw: String(error) });
-    } catch {
-      return String(error);
+      return JSON.stringify({ code, message: msg, details }) + util.inspect(error, { depth: 3, breakLength: 120 });
     }
+    return String(error);
+  } catch {
+    return util.inspect(error, { depth: 2 });
   }
-  return String(error);
 }
 
 export class FCMService {
@@ -66,17 +75,35 @@ export class FCMService {
     const ctx = context ? `[${context}] ` : '';
 
     if (!this.initialized) {
-      console.warn(`⚠️ [FCM] ${ctx}FCM not initialized, skipping notification`);
+      const msg = 'FCM not initialized (check FIREBASE_SERVICE_ACCOUNT on this PM2 instance)';
+      console.warn(`⚠️ [FCM] ${ctx}${msg}`);
+      fcmEmitFailureLine(ctx.trim() || 'send', msg);
       return false;
     }
 
-    const tokenPreview =
-      fcmToken.length >= 20 ? `${fcmToken.substring(0, 20)}...` : `${fcmToken} (short token?)`;
+    const token = fcmToken.trim();
+    if (token.length < 120) {
+      console.warn(
+        `⚠️ [FCM] ${ctx}tokenLen=${token.length} is unusually short (typical FCM token ~140–180). Check MySQL column for fcmToken (use VARCHAR(512)+utf8mb4) — truncation causes Send failed.`
+      );
+    }
+    if (token.length !== fcmToken.length) {
+      console.warn(`⚠️ [FCM] ${ctx}Token had leading/trailing whitespace; trimmed before send`);
+    }
+    if (token.length < 10) {
+      const msg = `token empty/invalid (len=${token.length})`;
+      fcmEmitFailureLine(ctx.trim() || 'send', msg);
+      return false;
+    }
+
+    const tokenPreview = token.length >= 20 ? `${token.substring(0, 20)}...` : token;
 
     try {
-      console.log(`📤 [FCM] ${ctx}Sending notification to token: ${tokenPreview}`);
+      console.log(
+        `📤 [FCM] ${ctx}Sending notification tokenLen=${token.length} preview=${tokenPreview}`
+      );
       const response = await admin.messaging().send({
-        token: fcmToken,
+        token,
         notification: {
           title,
           body,
@@ -86,8 +113,8 @@ export class FCMService {
       console.log(`✅ [FCM] ${ctx}Notification sent successfully. Message ID: ${response}`);
       return true;
     } catch (error: unknown) {
-      // Always one line + structured detail so PM2 / log aggregators never show an "empty" error
-      console.error(`❌ [FCM] ${ctx}Send failed: ${formatFcmError(error)}`);
+      const detail = formatFcmError(error);
+      fcmEmitFailureLine(ctx.trim() || 'send', detail);
       return false;
     }
   }
@@ -156,8 +183,13 @@ export class FCMService {
           successCount++;
           console.log(`✅ [FCM] Notification sent successfully to user ${user.id}`);
         } else {
+          const hint =
+            'Check log line [FCM][SEND_FAILED] above for Firebase code (e.g. messaging/registration-token-not-registered)';
           console.error(
-            `❌ [FCM] Notification failed for user ${user.id} (${user.phoneNumber}) — see Send failed line above for Firebase reason`
+            `❌ [FCM] Notification failed for user ${user.id} (${user.phoneNumber}) — ${hint}`
+          );
+          process.stdout.write(
+            `[FCM][USER_FAIL] userId=${user.id} phone=${user.phoneNumber} | ${hint}\n`
           );
         }
       } else {

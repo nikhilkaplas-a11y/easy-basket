@@ -29,7 +29,8 @@ export class User {
   @Column({ default: 'customer' }) // customer, admin, delivery
   role!: string;
 
-  @Column({ nullable: true })
+  /** Full FCM device tokens are ~140–180 chars; avoid VARCHAR(255) truncation in MySQL. */
+  @Column({ type: 'varchar', length: 512, nullable: true, charset: 'utf8mb4' })
   fcmToken!: string;
 
   @Column({ default: true })
