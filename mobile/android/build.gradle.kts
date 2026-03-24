@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Firebase removed - no longer needed
+        classpath("com.google.gms:google-services:4.4.0")
     }
 }
 

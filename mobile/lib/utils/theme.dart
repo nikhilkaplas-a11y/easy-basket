@@ -11,6 +11,49 @@ class AppTheme {
   static const Color lightGrey = Color(0xFFF5F5F5);
   static const Color darkGrey = Color(0xFF424242);
 
+  // Gradient for primary buttons
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFF0A5C18), Color(0xFF1B8A2E), Color(0xFF0A5C18)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    stops: [0.0, 0.5, 1.0],
+  );
+
+  static BoxDecoration get gradientButtonDecoration => BoxDecoration(
+    gradient: primaryGradient,
+    borderRadius: BorderRadius.circular(12),
+  );
+
+  /// Wraps any child (usually ElevatedButton) with the brand gradient
+  static Widget gradientButton({
+    required VoidCallback? onPressed,
+    required Widget child,
+    double? width,
+    double height = 48,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 24),
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: onPressed != null ? primaryGradient : null,
+        color: onPressed == null ? grey.withValues(alpha: 0.3) : null,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: padding,
+            child: Center(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+
   static ThemeData get lightTheme {
     final baseTextTheme = GoogleFonts.poppinsTextTheme();
 

@@ -461,17 +461,16 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      child: AppTheme.gradientButton(
                         onPressed: _detectLocation,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Try Again'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                          foregroundColor: AppTheme.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                        height: 52,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Try Again', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ],
                         ),
                       ),
                     ),
@@ -570,24 +569,16 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                     // Action Buttons
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      child: AppTheme.gradientButton(
                         onPressed: _confirmAndSave,
-                        icon: const Icon(Icons.check_circle),
-                        label: const Text(
-                          'Confirm & Continue',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                          foregroundColor: AppTheme.white,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
+                        height: 54,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.white, size: 22),
+                            SizedBox(width: 8),
+                            Text('Confirm & Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ],
                         ),
                       ),
                     ),

@@ -9,6 +9,7 @@ import { User } from '../entities/User';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { PaymentService } from '../services/payment.service';
 import { FCMService } from '../services/fcm.service';
+import { OrderInventoryService } from '../services/order-inventory.service';
 
 export class OrderController {
   static async createOrder(req: AuthRequest, res: Response): Promise<void> {
@@ -190,15 +191,17 @@ export class OrderController {
         }
       }
 
-      // Send notification to admin
-      console.log(`📤 [ORDER] Sending notification to admin for order #${order.id}`);
-      const notificationCount = await FCMService.sendNotificationToRole(
-        'admin',
-        'New Order Received',
-        `Order #${order.id} for ₹${totalAmount}`,
-        { orderId: order.id.toString(), type: 'new_order' }
+      console.log(`📤 [ORDER] Queued admin notification for order #${order.id}`);
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToRole(
+            'admin',
+            'New Order Received',
+            `Order #${order.id} for ₹${totalAmount}`,
+            { orderId: order.id.toString(), type: 'new_order' }
+          ),
+        `notify admins new order #${order.id}`
       );
-      console.log(`📤 [ORDER] Notification sent to ${notificationCount} admin user(s)`);
 
       res.status(201).json({
         order,
@@ -301,7 +304,7 @@ export class OrderController {
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
         where: { id: Number(id), user: { id: userId } },
-        relations: ['items', 'items.product'],
+        relations: ['items', 'items.product', 'items.variant'],
       });
 
       if (!order) {
@@ -314,25 +317,20 @@ export class OrderController {
         return;
       }
 
-      // Restore product stock
-      const productRepository = AppDataSource.getRepository(Product);
-      for (const item of order.items) {
-        const product = await productRepository.findOneBy({ id: item.product.id });
-        if (product) {
-          product.stock += item.quantity;
-          await productRepository.save(product);
-        }
-      }
+      await OrderInventoryService.restoreReservedStockForItems(order.items);
 
       order.status = 'cancelled';
       await orderRepository.save(order);
 
-      // Notify admin
-      await FCMService.sendNotificationToRole(
-        'admin',
-        'Order Cancelled',
-        `Order #${order.id} has been cancelled`,
-        { orderId: order.id.toString(), type: 'order_cancelled' }
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToRole(
+            'admin',
+            'Order Cancelled',
+            `Order #${order.id} has been cancelled`,
+            { orderId: order.id.toString(), type: 'order_cancelled' }
+          ),
+        `notify admins customer cancelled #${order.id}`
       );
 
       res.json({ message: 'Order cancelled successfully', order });

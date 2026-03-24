@@ -236,17 +236,10 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 const SizedBox(height: 32),
                 
                 // Manual redirect button
-                ElevatedButton(
+                AppTheme.gradientButton(
                   onPressed: () => context.go('/orders'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: const Text('View Orders'),
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: const Text('View Orders', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                 ),
               ],
             ),

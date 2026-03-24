@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
@@ -19,10 +20,15 @@ import 'services/razorpay_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Initialize Firebase (required for FCM notifications — mobile only)
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
+  }
+
   // Initialize SharedPreferences
   final prefs = await SharedPreferences.getInstance();
-  
+
   // Initialize Razorpay (only for mobile platforms, not web)
   if (!kIsWeb) {
     RazorpayService.initialize();

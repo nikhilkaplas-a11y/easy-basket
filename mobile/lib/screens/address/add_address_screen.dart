@@ -532,14 +532,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     if (_currentStep > 0) const SizedBox(width: 12),
                     Expanded(
                       flex: _currentStep == 0 ? 1 : 2,
-                      child: ElevatedButton(
+                      child: AppTheme.gradientButton(
                         onPressed: _currentStep == 2
                             ? (_isSaving ? null : _saveAddress)
                             : _nextStep,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: AppTheme.primaryGreen,
-                        ),
+                        height: 52,
                         child: _isSaving
                             ? const SizedBox(
                                 height: 20,
@@ -549,7 +546,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : Text(_currentStep == 2 ? 'Save Address' : 'Continue'),
+                            : Text(_currentStep == 2 ? 'Save Address' : 'Continue',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -715,22 +713,26 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         // Action Buttons
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
+          child: AppTheme.gradientButton(
             onPressed: _isLoadingLocation ? null : _getCurrentLocation,
-            icon: _isLoadingLocation
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Icon(Icons.my_location),
-            label: Text(_isLoadingLocation ? 'Getting Location...' : 'Use Current Location'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: AppTheme.primaryGreen,
+            height: 52,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _isLoadingLocation
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.my_location, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(_isLoadingLocation ? 'Getting Location...' : 'Use Current Location',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+              ],
             ),
           ),
         ),
@@ -744,6 +746,25 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               side: BorderSide(color: AppTheme.primaryGreen),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              // Skip location step — go directly to details step
+              setState(() {
+                _currentStep = 1;
+              });
+            },
+            icon: const Icon(Icons.edit_location_alt_outlined),
+            label: const Text('Enter Location Manually'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(color: AppTheme.grey),
+              foregroundColor: AppTheme.darkGrey,
             ),
           ),
         ),
@@ -782,199 +803,194 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Minimal Header
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            'Complete your address',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'All fields marked with * are required',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppTheme.grey,
+        // Step indicator
+        Text('Step 2 of 3', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.grey)),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: 0.66,
+            backgroundColor: const Color(0xFFE0E0E0),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0C831F)),
+            minHeight: 4,
           ),
         ),
         const SizedBox(height: 20),
 
-        // Address Tag Selection - Compact
+        // Save as — tag chips
         _buildTagSelector(),
         const SizedBox(height: 20),
 
-        // Main Address Section - Card
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.lightGrey, width: 1),
+        // Address Details section
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2)),
+            ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.home_outlined, size: 20, color: AppTheme.primaryGreen),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Address',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                // Address Line 1
-                TextFormField(
-                  controller: _addressLine1Controller,
-                  decoration: const InputDecoration(
-                    labelText: 'House/Flat No., Building *',
-                    hintText: 'e.g., 123, Green Apartments',
-                    prefixIcon: Icon(Icons.home_outlined, size: 20),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.home_outlined, size: 16, color: Color(0xFF0C831F)),
                   ),
-                  style: const TextStyle(fontSize: 15),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                  const SizedBox(width: 8),
+                  const Text('Address Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _addressLine1Controller,
+                decoration: InputDecoration(
+                  hintText: 'House/Flat No., Building *',
+                  hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
+                  filled: true,
+                  fillColor: const Color(0xFFF6F6F6),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  prefixIcon: Icon(Icons.home_outlined, size: 18, color: AppTheme.grey),
                 ),
-                const SizedBox(height: 12),
-
-                // Address Line 2 - Optional
-                TextFormField(
-                  controller: _addressLine2Controller,
-                  decoration: const InputDecoration(
-                    labelText: 'Street, Area',
-                    hintText: 'Optional',
-                    prefixIcon: Icon(Icons.streetview_outlined, size: 20),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  ),
-                  style: const TextStyle(fontSize: 15),
+                style: const TextStyle(fontSize: 14),
+                validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _addressLine2Controller,
+                decoration: InputDecoration(
+                  hintText: 'Street, Area (Optional)',
+                  hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
+                  filled: true,
+                  fillColor: const Color(0xFFF6F6F6),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  prefixIcon: Icon(Icons.streetview_outlined, size: 18, color: AppTheme.grey),
                 ),
-              ],
-            ),
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        // Location Section - Card
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.lightGrey, width: 1),
+        // Location section
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2)),
+            ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 20, color: AppTheme.primaryGreen),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Location',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // City and State - Side by side
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _cityController,
-                        decoration: const InputDecoration(
-                          labelText: 'City *',
-                          hintText: 'City',
-                          prefixIcon: Icon(Icons.location_city_outlined, size: 20),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                        ),
-                        style: const TextStyle(fontSize: 15),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _stateController,
-                        decoration: const InputDecoration(
-                          labelText: 'State *',
-                          hintText: 'State',
-                          prefixIcon: Icon(Icons.map_outlined, size: 20),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                        ),
-                        style: const TextStyle(fontSize: 15),
-                        validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Pincode
-                TextFormField(
-                  controller: _pincodeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Pincode *',
-                    hintText: '6-digit pincode',
-                    prefixIcon: Icon(Icons.pin_outlined, size: 20),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.location_on_outlined, size: 16, color: Colors.blue),
                   ),
-                  style: const TextStyle(fontSize: 15),
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  validator: (value) {
-                    if (value?.isEmpty ?? true) return 'Required';
-                    final cleanPincode = value!.replaceAll(RegExp(r'[^0-9]'), '');
-                    if (cleanPincode.length != 6) return 'Must be 6 digits';
-                    return null;
-                  },
+                  const SizedBox(width: 8),
+                  const Text('Location', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cityController,
+                      decoration: InputDecoration(
+                        hintText: 'City *',
+                        hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
+                        filled: true,
+                        fillColor: const Color(0xFFF6F6F6),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        prefixIcon: Icon(Icons.location_city_outlined, size: 18, color: AppTheme.grey),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _stateController,
+                      decoration: InputDecoration(
+                        hintText: 'State *',
+                        hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
+                        filled: true,
+                        fillColor: const Color(0xFFF6F6F6),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        prefixIcon: Icon(Icons.map_outlined, size: 18, color: AppTheme.grey),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                      validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _pincodeController,
+                decoration: InputDecoration(
+                  hintText: 'Pincode *',
+                  hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
+                  filled: true,
+                  fillColor: const Color(0xFFF6F6F6),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  prefixIcon: Icon(Icons.pin_outlined, size: 18, color: AppTheme.grey),
+                  counterText: '',
                 ),
-              ],
-            ),
+                style: const TextStyle(fontSize: 14),
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  final cleanPincode = value!.replaceAll(RegExp(r'[^0-9]'), '');
+                  if (cleanPincode.length != 6) return 'Must be 6 digits';
+                  return null;
+                },
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        // Additional Details - Collapsible
+        // Additional Details
         _buildAdditionalDetailsSection(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        // Default Address Toggle - Compact
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.lightGrey, width: 1),
+        // Default Address Toggle
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2)),
+            ],
           ),
           child: SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            title: const Text(
-              'Set as default address',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-            ),
+            title: const Text('Set as default address', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
             value: _isDefault,
             onChanged: (value) => setState(() => _isDefault = value),
-            activeColor: AppTheme.primaryGreen,
+            activeColor: const Color(0xFF0C831F),
           ),
         ),
       ],
@@ -982,71 +998,57 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   Widget _buildTagSelector() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.label_outline, size: 18, color: AppTheme.grey),
-        const SizedBox(width: 8),
-        Text(
-          'Save as',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: AppTheme.grey,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Row(
-            children: _tags.map((tag) {
-              final isSelected = _selectedTag == tag['value'];
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedTag = isSelected ? null : tag['value'] as String;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: isSelected 
-                            ? AppTheme.primaryGreen 
-                            : AppTheme.lightGrey,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected 
-                              ? AppTheme.primaryGreen 
-                              : AppTheme.lightGrey,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            tag['icon'] as IconData,
-                            size: 16,
-                            color: isSelected ? AppTheme.white : tag['color'] as Color,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            tag['label'] as String,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isSelected ? AppTheme.white : AppTheme.black,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
+        const Text('Save as', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: _tags.map((tag) {
+            final isSelected = _selectedTag == tag['value'];
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedTag = isSelected ? null : tag['value'] as String;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF0C831F) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF0C831F) : const Color(0xFFE0E0E0),
+                    width: 1.5,
+                  ),
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: const Color(0xFF0C831F).withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 2))]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      tag['icon'] as IconData,
+                      size: 16,
+                      color: isSelected ? Colors.white : tag['color'] as Color,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      tag['label'] as String,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              );
-            }).toList(),
-          ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );

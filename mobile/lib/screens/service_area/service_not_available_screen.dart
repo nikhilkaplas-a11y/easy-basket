@@ -167,35 +167,29 @@ class ServiceNotAvailableScreen extends StatelessWidget {
               // Primary Action Button - Add/Change Address
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: AppTheme.gradientButton(
                   onPressed: () {
                     if (isOnboardingFlow) {
-                      // During onboarding, go directly to add address screen
                       context.push('/address/add');
                     } else {
-                      // If user has addresses, go to address list
                       context.push('/addresses');
                     }
                   },
-                  icon: Icon(
-                    isOnboardingFlow ? Icons.add_location : Icons.location_on,
-                    size: 22,
-                  ),
-                  label: Text(
-                    isOnboardingFlow ? 'Add Serviceable Address' : 'Change Address',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: AppTheme.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
+                  height: 54,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isOnboardingFlow ? Icons.add_location : Icons.location_on,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isOnboardingFlow ? 'Add Serviceable Address' : 'Change Address',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                      ),
+                    ],
                   ),
                 ),
               ),

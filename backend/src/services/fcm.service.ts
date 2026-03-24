@@ -5,6 +5,15 @@ import { User } from '../entities/User';
 export class FCMService {
   private static initialized = false;
 
+  /**
+   * Run notification I/O off the request path. Failures are logged only and never reject callers.
+   */
+  static enqueue(task: () => Promise<unknown>, label: string): void {
+    void Promise.resolve()
+      .then(task)
+      .catch((error) => console.error(`❌ [FCM] ${label}:`, error));
+  }
+
   static initialize(): void {
     if (this.initialized) {
       return;

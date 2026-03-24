@@ -121,18 +121,23 @@ export class AdminController {
 
         // Notify delivery boy
         if (deliveryBoy.fcmToken) {
-          await FCMService.sendNotification(
-            deliveryBoy.fcmToken,
-            'New Delivery Assignment',
-            `Order #${order.id} assigned to you`,
-            { orderId: order.id.toString(), type: 'order_assigned' }
+          const token = deliveryBoy.fcmToken;
+          const oid = order.id;
+          FCMService.enqueue(
+            () =>
+              FCMService.sendNotification(
+                token,
+                'New Delivery Assignment',
+                `Order #${oid} assigned to you`,
+                { orderId: oid.toString(), type: 'order_assigned' }
+              ),
+            `notify delivery boy assignment order #${oid}`
           );
         }
       }
 
       await orderRepository.save(order);
 
-      // Notify customer
       if (order.user.fcmToken) {
         let notificationTitle = 'Order Update';
         let notificationBody = `Your order #${order.id} status: ${status}`;
@@ -148,11 +153,16 @@ export class AdminController {
           notificationBody = `Your order #${order.id} has been delivered. Thank you!`;
         }
 
-        await FCMService.sendNotification(
-          order.user.fcmToken,
-          notificationTitle,
-          notificationBody,
-          { orderId: order.id.toString(), status, type: 'order_status_update' }
+        const token = order.user.fcmToken;
+        const oid = order.id;
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotification(token, notificationTitle, notificationBody, {
+              orderId: oid.toString(),
+              status,
+              type: 'order_status_update',
+            }),
+          `notify customer order status #${oid} → ${status}`
         );
       }
 

@@ -98,20 +98,29 @@ export class DeliveryController {
           notificationBody = `Your order #${order.id} has been delivered. Thank you!`;
         }
 
-        await FCMService.sendNotification(
-          order.user.fcmToken,
-          notificationTitle,
-          notificationBody,
-          { orderId: order.id.toString(), status, type: 'order_status_update' }
+        const token = order.user.fcmToken;
+        const oid = order.id;
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotification(token, notificationTitle, notificationBody, {
+              orderId: oid.toString(),
+              status,
+              type: 'order_status_update',
+            }),
+          `notify customer delivery status #${oid}`
         );
       }
 
-      // Notify admin
-      await FCMService.sendNotificationToRole(
-        'admin',
-        'Order Status Updated',
-        `Order #${order.id} status updated to ${status} by delivery boy`,
-        { orderId: order.id.toString(), status, type: 'order_status_update' }
+      const oid = order.id;
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToRole(
+            'admin',
+            'Order Status Updated',
+            `Order #${oid} status updated to ${status} by delivery boy`,
+            { orderId: oid.toString(), status, type: 'order_status_update' }
+          ),
+        `notify admins delivery status #${oid}`
       );
 
       res.json(order);
@@ -257,22 +266,31 @@ export class DeliveryController {
       order.deliveryBoy = deliveryBoy;
       await orderRepository.save(order);
 
-      // Notify customer
       if (order.user.fcmToken) {
-        await FCMService.sendNotification(
-          order.user.fcmToken,
-          'Order Assigned',
-          `Order #${order.id} has been assigned to a delivery agent`,
-          { orderId: order.id.toString(), type: 'order_assigned' }
+        const token = order.user.fcmToken;
+        const oid = order.id;
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotification(
+              token,
+              'Order Assigned',
+              `Order #${oid} has been assigned to a delivery agent`,
+              { orderId: oid.toString(), type: 'order_assigned' }
+            ),
+          `notify customer order assigned #${oid}`
         );
       }
 
-      // Notify admin
-      await FCMService.sendNotificationToRole(
-        'admin',
-        'Order Accepted by Delivery Agent',
-        `Order #${order.id} has been accepted by delivery agent`,
-        { orderId: order.id.toString(), type: 'order_accepted_by_delivery' }
+      const oid = order.id;
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToRole(
+            'admin',
+            'Order Accepted by Delivery Agent',
+            `Order #${oid} has been accepted by delivery agent`,
+            { orderId: oid.toString(), type: 'order_accepted_by_delivery' }
+          ),
+        `notify admins delivery accepted #${oid}`
       );
 
       res.json(order);
