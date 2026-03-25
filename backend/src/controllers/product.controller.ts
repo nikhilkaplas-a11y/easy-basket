@@ -54,7 +54,7 @@ export class ProductController {
 
   static async getAllProducts(req: Request, res: Response): Promise<void> {
     try {
-      const { categoryId, search, limit } = req.query;
+      const { categoryId, search, limit, page } = req.query;
       const productRepository = AppDataSource.getRepository(Product);
       const queryBuilder = productRepository
         .createQueryBuilder('product')
@@ -104,11 +104,16 @@ export class ProductController {
         );
       }
 
-      // Add limit to prevent fetching too many records (default 50 for search, or if specified)
-      if (limit) {
-        queryBuilder.take(Number(limit));
-      } else if (search) {
-        queryBuilder.take(50);
+      // Pagination support
+      // limit = kitne products ek page mein (default: all, search: 50)
+      // page = kaunsa page (1, 2, 3...) — offset calculate hota hai: (page-1) * limit
+      const takeLimit = limit ? Number(limit) : (search ? 50 : undefined);
+      if (takeLimit) {
+        queryBuilder.take(takeLimit);
+        if (page) {
+          const pageNum = Math.max(1, Number(page));
+          queryBuilder.skip((pageNum - 1) * takeLimit);
+        }
       }
 
       const products = await queryBuilder.getMany();

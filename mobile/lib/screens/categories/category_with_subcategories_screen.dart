@@ -440,29 +440,53 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                   ],
                 ),
               )
-            : RefreshIndicator(
-                onRefresh: () {
-                  final categoryId = _selectedSubcategoryId ?? (_subcategories.isNotEmpty ? _subcategories.first.id : widget.parentCategoryId);
-                  return _loadProducts(categoryId);
+            : NotificationListener<ScrollNotification>(
+                // Bottom ke paas pahunche → next page load karo
+                onNotification: (scrollInfo) {
+                  if (scrollInfo is ScrollEndNotification &&
+                      scrollInfo.metrics.extentAfter < 200) {
+                    if (provider.hasMore && !provider.isLoadingMore) {
+                      provider.loadMoreProducts();
+                    }
+                  }
+                  return false;
                 },
-                child: GridView.builder(
-                  padding: EdgeInsets.only(
-                    left: screenWidth < 360 ? 8 : 12,
-                    right: screenWidth < 360 ? 8 : 12,
-                    top: screenWidth < 360 ? 8 : 12,
-                    bottom: cartItemCount > 0 ? 120 : 24, // Extra padding when cart bar is visible
-                  ),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    // More granular aspect ratio for better text rendering on small screens
-                    childAspectRatio: screenWidth < 360 ? 0.52 : screenWidth < 400 ? 0.54 : 0.56,
-                    crossAxisSpacing: screenWidth < 360 ? 8 : 12,
-                    mainAxisSpacing: screenWidth < 360 ? 8 : 12,
-                  ),
-                  itemCount: provider.products.length,
-                  itemBuilder: (context, index) {
-                    return ProductCard(product: provider.products[index]);
+                child: RefreshIndicator(
+                  onRefresh: () {
+                    final categoryId = _selectedSubcategoryId ?? (_subcategories.isNotEmpty ? _subcategories.first.id : widget.parentCategoryId);
+                    return _loadProducts(categoryId);
                   },
+                  child: GridView.builder(
+                    padding: EdgeInsets.only(
+                      left: screenWidth < 360 ? 8 : 12,
+                      right: screenWidth < 360 ? 8 : 12,
+                      top: screenWidth < 360 ? 8 : 12,
+                      bottom: cartItemCount > 0 ? 120 : 24,
+                    ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: screenWidth < 360 ? 0.52 : screenWidth < 400 ? 0.54 : 0.56,
+                      crossAxisSpacing: screenWidth < 360 ? 8 : 12,
+                      mainAxisSpacing: screenWidth < 360 ? 8 : 12,
+                    ),
+                    // +1 for loading indicator at bottom
+                    itemCount: provider.products.length + (provider.isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index >= provider.products.length) {
+                        // Loading indicator at bottom
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                            ),
+                          ),
+                        );
+                      }
+                      return ProductCard(product: provider.products[index]);
+                    },
+                  ),
                 ),
               );
   }

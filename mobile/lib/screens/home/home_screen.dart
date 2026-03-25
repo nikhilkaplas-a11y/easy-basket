@@ -69,14 +69,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
       productProvider.fetchCategories();
-      productProvider.fetchProducts().then((_) {
+      // limit: 15 → sirf 15 products fetch karo (snack it away section ke liye)
+      // Kyun: 568 products fetch karna sirf 15 dikhane ke liye = 95% data waste
+      productProvider.fetchProducts(limit: 15).then((_) {
         if (mounted) _startAutoScroll();
       });
-      productProvider.fetchProducts();
       
       // Fetch addresses and orders if user is authenticated
       if (authProvider.token != null) {
-        orderProvider.fetchOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
+        // status: 'active' → sirf pending/accepted/preparing/out_for_delivery
+        // fields: 'light' → sirf id, status, totalAmount (0 JOINs, ~90% faster)
+        // Kyun: Home pe sirf active order bar dikhana hai — full product data nahi chahiye
+        orderProvider.fetchOrders(authProvider.token!, getUpdatedToken: () => authProvider.token, status: 'active', fields: 'light');
         orderProvider.fetchAddresses(authProvider.token!).then((_) async {
           // If no addresses, auto-detect location in background (seamless onboarding)
           if (orderProvider.addresses.isEmpty && mounted) {
@@ -225,15 +229,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _startSearchHintRotation() {
     _searchHintTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
-      // Flip forward (0 → 1): current text flips away
+
+      // Text halfway (0.5) pe change karo — jab text sideways hai aur dikhta nahi
+      // Kyun: Agar forward complete hone ke baad change karo toh briefly purana text flash hota hai
+      bool hasChanged = false;
+      void listener(AnimationStatus status) {
+        // Jab forward animation chal rahi hai aur halfway cross ho jaye → text change karo
+      }
+
       _searchFlipController.forward().then((_) {
         if (!mounted) return;
-        setState(() {
-          _currentHintIndex = (_currentHintIndex + 1) % _searchHints.length;
-        });
-        // Flip back (1 → 0): new text flips in
+        // Forward complete — ab text change karo (agar halfway pe nahi hua)
+        if (!hasChanged) {
+          setState(() {
+            _currentHintIndex = (_currentHintIndex + 1) % _searchHints.length;
+          });
+        }
+        // Reverse — naya text flip hoke aata hai
         _searchFlipController.reverse();
       });
+
+      // Halfway pe text change karo
+      late VoidCallback halfwayListener;
+      halfwayListener = () {
+        if (_searchFlipAnim.value >= 0.5 && !hasChanged) {
+          hasChanged = true;
+          if (mounted) {
+            setState(() {
+              _currentHintIndex = (_currentHintIndex + 1) % _searchHints.length;
+            });
+          }
+          _searchFlipAnim.removeListener(halfwayListener);
+        }
+      };
+      _searchFlipAnim.addListener(halfwayListener);
     });
   }
 
@@ -853,22 +882,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               },
             ),
           ),
-          // Active Order Bar (replaces cart bar when active orders exist)
-          // Cart bar shows when no active orders
+          // Bottom bars — Cart bar + Active order bar dono dikhenge
+          // Cart bar upar, Active order bar neeche
+          // Kyun: User ko dono info chahiye — cart mein kya hai + order ka status
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: Consumer<OrderProvider>(
-              builder: (context, orderProvider, _) {
-                final hasActiveOrders = orderProvider.orders.any(
-                  (o) => !['delivered', 'cancelled'].contains(o.status),
-                );
-                if (hasActiveOrders) {
-                  return const ActiveOrderBar();
-                }
-                return const FloatingCartBar();
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                FloatingCartBar(),     // Cart bar — upar
+                ActiveOrderBar(),      // Active orders — neeche
+              ],
             ),
           ),
         ],

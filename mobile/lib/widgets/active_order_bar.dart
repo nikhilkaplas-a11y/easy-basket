@@ -6,19 +6,38 @@ import '../providers/order_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/order_model.dart';
 
-/// Active order bar — shows at bottom of home screen when orders are in progress
-/// Replaces cart bar when active orders exist (like Blinkit/Zepto)
-class ActiveOrderBar extends StatelessWidget {
+/// Active order bar — home screen ke bottom pe dikhta hai jab orders active hain
+/// Multiple orders hain toh horizontal scroll hota hai (Zomato/Blinkit style)
+/// Kyun: User ko pata rahe ki order ka kya status hai bina orders page khole
+class ActiveOrderBar extends StatefulWidget {
   const ActiveOrderBar({super.key});
 
-  // Terminal states — order khatam
+  @override
+  State<ActiveOrderBar> createState() => _ActiveOrderBarState();
+}
+
+class _ActiveOrderBarState extends State<ActiveOrderBar> {
+  // Terminal states — order khatam, dikhana nahi
   static const _terminalStatuses = ['delivered', 'cancelled'];
+
+  // PageController — horizontal scroll ke liye
+  // Kyun: PageView use kar rahe hain taki ek ek card snap ho, free scroll nahi
+  final PageController _pageController = PageController(
+    viewportFraction: 0.92, // 92% width — thoda adjacent card ka hint dikhega
+  );
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose(); // Memory leak se bachao — controller dispose karo
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer2<OrderProvider, AuthProvider>(
       builder: (context, orderProvider, authProvider, _) {
-        // Filter active orders only
+        // Sirf active orders filter karo
         final activeOrders = orderProvider.orders
             .where((o) => !_terminalStatuses.contains(o.status))
             .toList();
@@ -28,13 +47,54 @@ class ActiveOrderBar extends StatelessWidget {
         return SafeArea(
           top: false,
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            margin: const EdgeInsets.only(bottom: 12),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: activeOrders.map((order) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _OrderBarItem(order: order),
-              )).toList(),
+              children: [
+                // Horizontal scrollable order cards
+                // Kyun: Agar 3 orders hain toh vertically stack karna bahut jagah leta hai
+                // Horizontal swipe = compact + modern
+                SizedBox(
+                  height: 76,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: activeOrders.length,
+                    onPageChanged: (index) {
+                      setState(() => _currentPage = index);
+                    },
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: _OrderCard(order: activeOrders[index]),
+                      );
+                    },
+                  ),
+                ),
+                // Page indicator dots — sirf tab dikhao jab 2+ orders hain
+                // Kyun: 1 order pe dots dikhana unnecessary hai
+                if (activeOrders.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(activeOrders.length, (index) {
+                      final isActive = index == _currentPage;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        height: 6,
+                        // Active dot wider hota hai — visual feedback ki kaunsa card dikh raha hai
+                        width: isActive ? 20 : 6,
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? const Color(0xFF0A5C18)
+                              : const Color(0xFFD0D0D0),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ],
             ),
           ),
         );
@@ -43,10 +103,12 @@ class ActiveOrderBar extends StatelessWidget {
   }
 }
 
-class _OrderBarItem extends StatelessWidget {
+/// Individual order card — ek active order ka status dikhata hai
+/// Tap karne pe order tracking screen pe le jaata hai
+class _OrderCard extends StatelessWidget {
   final OrderModel order;
 
-  const _OrderBarItem({required this.order});
+  const _OrderCard({required this.order});
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +120,8 @@ class _OrderBarItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
+          // Gradient — status ke hisaab se color change hota hai
+          // pending=orange, accepted=blue, preparing=purple, out_for_delivery=green
           gradient: LinearGradient(
             colors: [statusInfo.color, statusInfo.color.withValues(alpha: 0.85)],
             begin: Alignment.centerLeft,
@@ -74,21 +138,21 @@ class _OrderBarItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Status icon
+            // Status icon — pastel circle mein
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(statusInfo.icon, color: Colors.white, size: 22),
+              child: Icon(statusInfo.icon, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
-            // Order info
+            // Order info — ID + status + amount
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     'Order #${order.id} • ${statusInfo.label}',
@@ -109,7 +173,7 @@ class _OrderBarItem extends StatelessWidget {
                 ],
               ),
             ),
-            // Track button
+            // Track button — white pill, tap pe order detail khulta hai
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
@@ -131,6 +195,8 @@ class _OrderBarItem extends StatelessWidget {
     );
   }
 
+  /// Status ke hisaab se color, icon, label decide karo
+  /// Kyun: Har status ka alag visual feedback hona chahiye — user ko turant pata chale
   _StatusInfo _getStatusInfo(String status) {
     switch (status) {
       case 'pending':
@@ -138,28 +204,28 @@ class _OrderBarItem extends StatelessWidget {
           label: 'Order Placed',
           subtitle: 'Confirming your order...',
           icon: Icons.schedule_rounded,
-          color: const Color(0xFFFF9800), // orange
+          color: const Color(0xFFFF9800),
         );
       case 'accepted':
         return _StatusInfo(
           label: 'Confirmed',
           subtitle: 'Order accepted by store',
           icon: Icons.check_circle_rounded,
-          color: const Color(0xFF2196F3), // blue
+          color: const Color(0xFF2196F3),
         );
       case 'preparing':
         return _StatusInfo(
           label: 'Preparing',
           subtitle: 'Being packed with care',
           icon: Icons.inventory_2_rounded,
-          color: const Color(0xFF9C27B0), // purple
+          color: const Color(0xFF9C27B0),
         );
       case 'out_for_delivery':
         return _StatusInfo(
           label: 'On the way',
           subtitle: 'Arriving soon!',
           icon: Icons.delivery_dining_rounded,
-          color: const Color(0xFF0A5C18), // dark green
+          color: const Color(0xFF0A5C18),
         );
       default:
         return _StatusInfo(

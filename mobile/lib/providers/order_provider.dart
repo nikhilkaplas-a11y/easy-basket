@@ -18,19 +18,27 @@ class OrderProvider with ChangeNotifier {
 
   OrderProvider({required this.apiService});
 
-  Future<void> fetchOrders(String token, {String? Function()? getUpdatedToken}) async {
+  Future<void> fetchOrders(String token, {String? Function()? getUpdatedToken, String? status, String? fields}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      // Build endpoint with query params
+      // status=active → sirf active orders (home screen ke liye)
+      // fields=light → sirf id, status, totalAmount (0 JOINs, ~90% faster)
+      final params = <String>[];
+      if (status != null) params.add('status=$status');
+      if (fields != null) params.add('fields=$fields');
+      final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+      final endpoint = '/orders$query';
+
       if (kDebugMode) {
-        print('🔄 Fetching orders from API...');
+        print('🔄 Fetching orders from API... (status: ${status ?? 'all'})');
       }
-      
-      // API service will automatically handle token refresh if needed
+
       final response = await apiService.get(
-        '/orders', 
+        endpoint,
         token: token,
         getUpdatedToken: getUpdatedToken,
       );

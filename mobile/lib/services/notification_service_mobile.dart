@@ -4,8 +4,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
+import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/order_provider.dart';
 
 // Background message handler — must be top-level function (not inside class)
 // Kyun: Flutter requires background handlers to be top-level
@@ -150,6 +152,7 @@ class NotificationService {
 
   // ── 5. Foreground listener ──
   // Kyun: Jab app KHULI hai tab notification aaye toh in-app banner dikhao
+  // + agar order related notification hai toh orders refresh karo (active order bar update hoga)
   void _listenForeground() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('📩 [FCM] Foreground message: ${message.notification?.title}');
@@ -157,13 +160,38 @@ class NotificationService {
       final notification = message.notification;
       if (notification == null) return;
 
-      // In-app banner dikhao (5-6 seconds ke liye)
+      // In-app banner dikhao
       _showInAppBanner(
         title: notification.title ?? 'Easy Basket',
         body: notification.body ?? '',
         data: message.data,
       );
+
+      // Order related notification hai? → Orders refresh karo
+      // Kyun: Active order bar pe turant status update dikhao — bina polling ke
+      final type = message.data['type'] as String? ?? '';
+      if (type.contains('order')) {
+        _refreshOrders();
+      }
     });
+  }
+
+  // ── Orders refresh karo (FCM trigger pe) ──
+  // Kyun: Jab order status change ho toh active order bar turant update ho
+  void _refreshOrders() {
+    if (_context == null || _authProvider?.token == null) return;
+
+    try {
+      final orderProvider = Provider.of<OrderProvider>(_context!, listen: false);
+      orderProvider.fetchOrders(
+        _authProvider!.token!,
+        status: 'active',
+        fields: 'light',
+      );
+      debugPrint('🔄 [FCM] Orders refreshed after order notification');
+    } catch (e) {
+      debugPrint('❌ [FCM] Error refreshing orders: $e');
+    }
   }
 
   // ── 6. Notification tap handler ──

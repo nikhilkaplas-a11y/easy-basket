@@ -222,9 +222,42 @@ export class OrderController {
         return;
       }
 
+      const { status, fields } = req.query;
       const orderRepository = AppDataSource.getRepository(Order);
+
+      // Build where condition
+      // status=active → sirf pending/accepted/preparing/out_for_delivery (home screen ke liye)
+      // status=delivered/cancelled → sirf wo status
+      // no status → sab orders (orders page ke liye)
+      let whereCondition: any = { user: { id: userId } };
+
+      if (status === 'active') {
+        whereCondition = [
+          { user: { id: userId }, status: 'pending' },
+          { user: { id: userId }, status: 'accepted' },
+          { user: { id: userId }, status: 'preparing' },
+          { user: { id: userId }, status: 'out_for_delivery' },
+        ];
+      } else if (status && typeof status === 'string') {
+        whereCondition = { user: { id: userId }, status };
+      }
+
+      // fields=light → minimal data, 0 JOINs (home screen active order bar ke liye)
+      // Kyun: Home screen pe sirf id, status, totalAmount chahiye
+      // 6 JOINs lagana unnecessary hai — ~90% faster response
+      if (fields === 'light') {
+        const orders = await orderRepository.find({
+          where: whereCondition,
+          select: ['id', 'status', 'totalAmount', 'createdAt', 'updatedAt'],
+          order: { createdAt: 'DESC' },
+        });
+        res.json(orders);
+        return;
+      }
+
+      // Full data — orders page, order detail ke liye (6 JOINs)
       const orders = await orderRepository.find({
-        where: { user: { id: userId } },
+        where: whereCondition,
         relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
         order: { createdAt: 'DESC' },
       });

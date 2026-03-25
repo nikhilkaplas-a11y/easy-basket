@@ -167,7 +167,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ),
       body: Stack(
         children: [
-          CustomScrollView(
+          NotificationListener<ScrollNotification>(
+            // Jab user scroll karke bottom ke paas pahunche (200px pehle) → next page load karo
+            // Kyun: User ko wait nahi karna chahiye — content ready mile scroll karne se pehle
+            onNotification: (scrollInfo) {
+              if (scrollInfo is ScrollEndNotification &&
+                  scrollInfo.metrics.extentAfter < 200) {
+                final provider = Provider.of<ProductProvider>(context, listen: false);
+                if (provider.hasMore && !provider.isLoadingMore) {
+                  provider.loadMoreProducts();
+                }
+              }
+              return false;
+            },
+            child: CustomScrollView(
             slivers: [
               // 1. Search Bar (Pinned)
               SliverToBoxAdapter(
@@ -342,7 +355,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       left: responsive.padding.left,
                       right: responsive.padding.right,
                       top: responsive.padding.top,
-                      bottom: MediaQuery.of(context).padding.bottom + 120, // Space for cart bar
+                      bottom: 16,
                     ),
                     sliver: SliverGrid(
                       delegate: SliverChildBuilderDelegate(
@@ -361,8 +374,32 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   );
                 },
               ),
+
+              // Load more indicator — jab user bottom pe pahunche toh next page load ho
+              Consumer<ProductProvider>(
+                builder: (context, provider, _) {
+                  if (provider.isLoadingMore) {
+                    return const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  // Bottom padding for cart bar
+                  return SliverToBoxAdapter(
+                    child: SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
+                  );
+                },
+              ),
             ],
           ),
+          ), // Close NotificationListener
 
           // Floating Cart Bar
           Positioned(

@@ -10,12 +10,19 @@ class ProductProvider with ChangeNotifier {
   List<CategoryModel> _categories = [];
   List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;  // Infinite scroll ke liye — next page load ho raha hai
+  bool _hasMore = true;          // Aur products hain ya nahi
+  int _currentPage = 1;          // Current page number
+  int? _currentCategoryId;       // Current category filter (pagination mein reuse)
+  String? _currentSearch;        // Current search filter (pagination mein reuse)
   String? _error;
 
   List<ProductModel> get products => _products;
   List<CategoryModel> get categories => _categories;
   List<Map<String, dynamic>> get suggestions => _suggestions;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
+  bool get hasMore => _hasMore;
   String? get error => _error;
 
   ProductProvider({required this.apiService});
@@ -71,60 +78,132 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchProducts({int? categoryId, String? search}) async {
+  Future<void> fetchProducts({int? categoryId, String? search, int? limit, int? page}) async {
     _isLoading = true;
     _error = null;
+
+    // Store current filters for loadMore to reuse
+    _currentCategoryId = categoryId;
+    _currentSearch = search;
+    _currentPage = 1;
+    _hasMore = true;
+
     notifyListeners();
 
     try {
-      String endpoint = '/products';
-      if (categoryId != null) {
-        endpoint += '?categoryId=$categoryId';
-      }
-      if (search != null && search.isNotEmpty) {
-        endpoint += categoryId != null ? '&search=$search' : '?search=$search';
-      }
+      // Build endpoint with query params
+      final params = <String>[];
+      if (categoryId != null) params.add('categoryId=$categoryId');
+      if (search != null && search.isNotEmpty) params.add('search=$search');
+      // Default limit=20 for paginated screens, custom limit for home
+      final useLimit = limit ?? 20;
+      params.add('limit=$useLimit');
+      params.add('page=1');
+      final query = '?${params.join('&')}';
+      String endpoint = '/products$query';
 
       final response = await apiService.get(endpoint);
-      // Backend returns array directly: res.json(products)
       final List<dynamic> data = response is List ? response : [];
-      
-      // Clear products when filtering by category to show fresh results
-      if (categoryId != null) {
-        _products = [];
-      }
-      
+
+      // Fresh fetch — replace products list
       _products = data.map((json) {
         try {
           return ProductModel.fromJson(json as Map<String, dynamic>);
         } catch (e) {
-          print('Error parsing product: $e');
-          print('Product JSON: $json');
+          if (kDebugMode) {
+            print('Error parsing product: $e');
+          }
           rethrow;
         }
       }).toList();
 
-      // Sort: in-stock products first, out-of-stock at the bottom
-      _products.sort((a, b) {
-        final aOutOfStock = !a.isAvailable ||
-            ((a.hasVariants && a.variants != null && !a.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
-             (!a.hasVariants && a.stock <= 0));
-        final bOutOfStock = !b.isAvailable ||
-            ((b.hasVariants && b.variants != null && !b.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
-             (!b.hasVariants && b.stock <= 0));
-        if (!aOutOfStock && bOutOfStock) return -1;
-        if (aOutOfStock && !bOutOfStock) return 1;
-        return 0;
-      });
+      // Agar returned products < limit → aur products nahi hain
+      _hasMore = data.length >= useLimit;
 
-      print('Fetched ${_products.length} products for categoryId: $categoryId');
+      // Sort: in-stock first, out-of-stock bottom
+      _sortProducts();
+
+      if (kDebugMode) {
+        print('Fetched ${_products.length} products (page 1, limit $useLimit, hasMore: $_hasMore)');
+      }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
-      print('Error fetching products: $_error');
+      if (kDebugMode) {
+        print('Error fetching products: $_error');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Infinite scroll — next page load karo aur existing list mein append karo
+  /// Kyun: User scroll kare toh aur products dikhao bina purani list replace kiye
+  Future<void> loadMoreProducts() async {
+    // Agar already loading hai ya aur products nahi hain → skip
+    if (_isLoadingMore || !_hasMore) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      _currentPage++;
+      final params = <String>[];
+      if (_currentCategoryId != null) params.add('categoryId=$_currentCategoryId');
+      if (_currentSearch != null && _currentSearch!.isNotEmpty) params.add('search=$_currentSearch');
+      params.add('limit=20');
+      params.add('page=$_currentPage');
+      final endpoint = '/products?${params.join('&')}';
+
+      final response = await apiService.get(endpoint);
+      final List<dynamic> data = response is List ? response : [];
+
+      final newProducts = data.map((json) {
+        try {
+          return ProductModel.fromJson(json as Map<String, dynamic>);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error parsing product: $e');
+          }
+          rethrow;
+        }
+      }).toList();
+
+      // Append — purani list mein naye products jodo
+      _products.addAll(newProducts);
+
+      // Agar returned < 20 → aur nahi hain
+      _hasMore = newProducts.length >= 20;
+
+      _sortProducts();
+
+      if (kDebugMode) {
+        print('Loaded page $_currentPage: ${newProducts.length} products (total: ${_products.length}, hasMore: $_hasMore)');
+      }
+    } catch (e) {
+      _currentPage--; // Revert page number on failure
+      if (kDebugMode) {
+        print('Error loading more products: $e');
+      }
+    } finally {
+      _isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  /// Sort: in-stock products first, out-of-stock at bottom
+  void _sortProducts() {
+    _products.sort((a, b) {
+      final aOutOfStock = !a.isAvailable ||
+          ((a.hasVariants && a.variants != null && !a.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+           (!a.hasVariants && a.stock <= 0));
+      final bOutOfStock = !b.isAvailable ||
+          ((b.hasVariants && b.variants != null && !b.variants!.any((v) => v.isAvailable && v.stock > 0)) ||
+           (!b.hasVariants && b.stock <= 0));
+      if (!aOutOfStock && bOutOfStock) return -1;
+      if (aOutOfStock && !bOutOfStock) return 1;
+      return 0;
+    });
   }
 
   Future<ProductModel?> fetchProductById(int id) async {
