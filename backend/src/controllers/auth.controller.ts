@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 
 import { AppDataSource } from '../config/database';
-import { FCMService } from '../services/fcm.service';
 import { TwilioService } from '../services/twilio.service';
 import { User } from '../entities/User';
 import { RefreshToken } from '../entities/RefreshToken';
@@ -81,16 +80,15 @@ export class AuthController {
       if (!user) {
         user = userRepository.create({ phoneNumber });
         await userRepository.save(user);
+      }
+
+      if (fcmToken) {
+        console.log(`📱 [AUTH] Updating FCM token for user ${user.id} (${user.phoneNumber})`);
+        user.fcmToken = fcmToken.trim();
+        await userRepository.save(user);
+        console.log(`✅ [AUTH] FCM token updated successfully`);
       } else {
-        // Update FCM token if provided
-        if (fcmToken) {
-          console.log(`📱 [AUTH] Updating FCM token for user ${user.id} (${user.phoneNumber})`);
-          user.fcmToken = fcmToken;
-          await userRepository.save(user);
-          console.log(`✅ [AUTH] FCM token updated successfully`);
-        } else {
-          console.log(`⚠️ [AUTH] No FCM token provided for user ${user.id}`);
-        }
+        console.log(`⚠️ [AUTH] No FCM token provided for user ${user.id}`);
       }
 
       // Generate Access Token (short-lived: 15 minutes)
@@ -193,6 +191,35 @@ export class AuthController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error updating profile' });
+    }
+  }
+
+  static async updateFcmToken(req: AuthRequest, res: Response): Promise<void> {
+    const userId = req.user?.id;
+    const { fcmToken } = req.body as { fcmToken?: string };
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+    if (!fcmToken || typeof fcmToken !== 'string' || fcmToken.trim().length < 10) {
+      res.status(400).json({ message: 'Valid fcmToken is required' });
+      return;
+    }
+
+    try {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOneBy({ id: userId });
+      if (!user) {
+        res.status(404).json({ message: 'User not found' });
+        return;
+      }
+      user.fcmToken = fcmToken.trim();
+      await userRepository.save(user);
+      res.json({ message: 'FCM token updated' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error updating FCM token' });
     }
   }
 

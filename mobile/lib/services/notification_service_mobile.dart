@@ -90,6 +90,7 @@ class NotificationService {
 
     _isInitialized = true;
     debugPrint('✅ [FCM] Notification service initialized');
+    await _sendTokenToBackend();
   }
 
   // ── 1. Permission maango ──
@@ -331,9 +332,18 @@ class NotificationService {
   // Kyun: Backend ko token chahiye taki wo notification bhej sake is device pe
   Future<void> _sendTokenToBackend() async {
     if (_fcmToken == null) return;
+    final jwt = _authProvider?.token;
+    if (jwt == null || jwt.isEmpty) {
+      debugPrint('⚠️ [FCM] Skipping /auth/fcm-token — no access token yet');
+      return;
+    }
 
     try {
-      await _apiService.post('/auth/fcm-token', {'fcmToken': _fcmToken});
+      await _apiService.post(
+        '/auth/fcm-token',
+        {'fcmToken': _fcmToken},
+        token: jwt,
+      );
       debugPrint('✅ [FCM] Token sent to backend');
     } catch (e) {
       debugPrint('❌ [FCM] Error sending token to backend: $e');

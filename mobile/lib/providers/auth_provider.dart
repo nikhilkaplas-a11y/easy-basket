@@ -199,6 +199,12 @@ class AuthProvider with ChangeNotifier {
       await prefs.setString('user_data', userJsonString);
 
       notifyListeners();
+
+      // Re-register push token via /auth/fcm-token only (not mixed into refresh body)
+      if (!kIsWeb) {
+        NotificationService().ensureTokenSent();
+      }
+
       return true;
     } catch (e) {
       // Refresh failed, logout user
