@@ -99,14 +99,22 @@ export class DeliveryController {
         }
 
         const token = order.user.fcmToken;
+        const customerId = order.user.id;
         const oid = order.id;
         FCMService.enqueue(
           () =>
-            FCMService.sendNotification(token, notificationTitle, notificationBody, {
-              orderId: oid.toString(),
-              status,
-              type: 'order_status_update',
-            }),
+            FCMService.sendNotification(
+              token,
+              notificationTitle,
+              notificationBody,
+              {
+                orderId: oid.toString(),
+                status,
+                type: 'order_status_update',
+              },
+              `delivery-status order=#${oid} customerId=${customerId}`,
+              customerId
+            ),
           `notify customer delivery status #${oid}`
         );
       }
@@ -268,6 +276,7 @@ export class DeliveryController {
 
       if (order.user.fcmToken) {
         const token = order.user.fcmToken;
+        const customerId = order.user.id;
         const oid = order.id;
         FCMService.enqueue(
           () =>
@@ -275,7 +284,9 @@ export class DeliveryController {
               token,
               'Order Assigned',
               `Order #${oid} has been assigned to a delivery agent`,
-              { orderId: oid.toString(), type: 'order_assigned' }
+              { orderId: oid.toString(), type: 'order_assigned' },
+              `delivery-claim customerId=${customerId} order=#${oid}`,
+              customerId
             ),
           `notify customer order assigned #${oid}`
         );

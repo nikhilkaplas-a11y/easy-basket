@@ -46,6 +46,18 @@ function isPermanentFcmTokenFailure(error: unknown): boolean {
   return false;
 }
 
+async function clearStoredFcmTokenIfMatches(userId: number, rawToken: string): Promise<void> {
+  const userRepository = AppDataSource.getRepository(User);
+  const u = await userRepository.findOneBy({ id: userId });
+  if (!u?.fcmToken || u.fcmToken.trim() !== rawToken.trim()) return;
+  const phone = u.phoneNumber;
+  u.fcmToken = null;
+  await userRepository.save(u);
+  console.warn(
+    `[FCM] Cleared dead fcmToken for user ${userId} (${phone}) — open app again to register push. If this repeats, verify google-services.json project_id matches server FIREBASE_SERVICE_ACCOUNT.`
+  );
+}
+
 export class FCMService {
   private static initialized = false;
 
@@ -139,14 +151,25 @@ export class FCMService {
     }
   }
 
+  /**
+   * @param userIdForStaleTokenCleanup When set and FCM returns a permanent token error, that user's stored token is cleared so the next login refreshes it.
+   */
   static async sendNotification(
     fcmToken: string,
     title: string,
     body: string,
     data?: Record<string, string>,
-    context?: string
+    context?: string,
+    userIdForStaleTokenCleanup?: number
   ): Promise<boolean> {
     const r = await this.deliverToToken(fcmToken, title, body, data, context);
+    if (!r.ok && userIdForStaleTokenCleanup != null && isPermanentFcmTokenFailure(r.error)) {
+      try {
+        await clearStoredFcmTokenIfMatches(userIdForStaleTokenCleanup, fcmToken);
+      } catch (e) {
+        console.error('[FCM] Failed to clear stale fcmToken:', e);
+      }
+    }
     return r.ok;
   }
 
@@ -163,7 +186,7 @@ export class FCMService {
       return false;
     }
 
-    return this.sendNotification(user.fcmToken, title, body, data, `userId=${userId}`);
+    return this.sendNotification(user.fcmToken, title, body, data, `userId=${userId}`, userId);
   }
 
   static async sendNotificationToRole(
@@ -217,14 +240,7 @@ export class FCMService {
         } else {
           if (isPermanentFcmTokenFailure(result.error)) {
             try {
-              const u = await userRepository.findOneBy({ id: user.id });
-              if (u?.fcmToken && u.fcmToken.trim() === rawToken.trim()) {
-                u.fcmToken = null;
-                await userRepository.save(u);
-                console.warn(
-                  `[FCM] Cleared dead fcmToken for user ${user.id} (${user.phoneNumber}) — open app again to register push. If this repeats, verify mobile google-services.json project matches server FIREBASE_SERVICE_ACCOUNT.`
-                );
-              }
+              await clearStoredFcmTokenIfMatches(user.id, rawToken);
             } catch (e) {
               console.error('[FCM] Failed to clear stale fcmToken:', e);
             }

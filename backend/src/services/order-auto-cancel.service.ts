@@ -80,14 +80,17 @@ export class OrderAutoCancelService {
 
         const oid = order.id;
         const userToken = order.user?.fcmToken;
-        if (userToken) {
+        const customerId = order.user?.id;
+        if (userToken && customerId != null) {
           FCMService.enqueue(
             () =>
               FCMService.sendNotification(
                 userToken,
                 'Order Cancelled',
                 `Order #${oid} was auto-cancelled — not confirmed within ${windowMins} minutes. Please try again.`,
-                { orderId: oid.toString(), type: 'ORDER_CANCELLED' }
+                { orderId: oid.toString(), type: 'ORDER_CANCELLED' },
+                `auto-cancel customerId=${customerId} order=#${oid}`,
+                customerId
               ),
             `auto-cancel notify customer #${oid}`
           );

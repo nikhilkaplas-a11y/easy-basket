@@ -123,13 +123,16 @@ export class AdminController {
         if (deliveryBoy.fcmToken) {
           const token = deliveryBoy.fcmToken;
           const oid = order.id;
+          const deliveryUserId = deliveryBoy.id;
           FCMService.enqueue(
             () =>
               FCMService.sendNotification(
                 token,
                 'New Delivery Assignment',
                 `Order #${oid} assigned to you`,
-                { orderId: oid.toString(), type: 'order_assigned' }
+                { orderId: oid.toString(), type: 'order_assigned' },
+                `admin-assign-delivery order=#${oid} deliveryUserId=${deliveryUserId}`,
+                deliveryUserId
               ),
             `notify delivery boy assignment order #${oid}`
           );
@@ -154,14 +157,22 @@ export class AdminController {
         }
 
         const token = order.user.fcmToken;
+        const customerId = order.user.id;
         const oid = order.id;
         FCMService.enqueue(
           () =>
-            FCMService.sendNotification(token, notificationTitle, notificationBody, {
-              orderId: oid.toString(),
-              status,
-              type: 'order_status_update',
-            }),
+            FCMService.sendNotification(
+              token,
+              notificationTitle,
+              notificationBody,
+              {
+                orderId: oid.toString(),
+                status,
+                type: 'order_status_update',
+              },
+              `admin-order-status order=#${oid} customerId=${customerId} → ${status}`,
+              customerId
+            ),
           `notify customer order status #${oid} → ${status}`
         );
       }
