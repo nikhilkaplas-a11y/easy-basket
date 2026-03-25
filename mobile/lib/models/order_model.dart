@@ -123,8 +123,7 @@ class OrderModel {
     return OrderModel(
       id: json['id'] as int,
       user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
-      deliveryAddress:
-          AddressModel.fromJson(json['deliveryAddress'] as Map<String, dynamic>),
+      deliveryAddress: AddressModel.fromJson(json['deliveryAddress'] as Map<String, dynamic>),
       items: (json['items'] as List<dynamic>)
           .map((item) => OrderItemModel.fromJson(item as Map<String, dynamic>))
           .toList(),

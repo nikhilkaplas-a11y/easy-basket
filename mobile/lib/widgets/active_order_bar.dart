@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../providers/order_provider.dart';
 import '../providers/auth_provider.dart';
-import '../models/order_model.dart';
+import '../models/active_order_model.dart';
 
 /// Active order bar — home screen ke bottom pe dikhta hai jab orders active hain
 /// Multiple orders hain toh horizontal scroll hota hai (Zomato/Blinkit style)
@@ -17,9 +17,6 @@ class ActiveOrderBar extends StatefulWidget {
 }
 
 class _ActiveOrderBarState extends State<ActiveOrderBar> {
-  // Terminal states — order khatam, dikhana nahi
-  static const _terminalStatuses = ['delivered', 'cancelled'];
-
   // PageController — horizontal scroll ke liye
   // Kyun: PageView use kar rahe hain taki ek ek card snap ho, free scroll nahi
   final PageController _pageController = PageController(
@@ -37,10 +34,8 @@ class _ActiveOrderBarState extends State<ActiveOrderBar> {
   Widget build(BuildContext context) {
     return Consumer2<OrderProvider, AuthProvider>(
       builder: (context, orderProvider, authProvider, _) {
-        // Sirf active orders filter karo
-        final activeOrders = orderProvider.orders
-            .where((o) => !_terminalStatuses.contains(o.status))
-            .toList();
+        // activeOrders already filtered from backend (status=active&fields=light)
+        final activeOrders = orderProvider.activeOrders;
 
         if (activeOrders.isEmpty) return const SizedBox.shrink();
 
@@ -106,7 +101,7 @@ class _ActiveOrderBarState extends State<ActiveOrderBar> {
 /// Individual order card — ek active order ka status dikhata hai
 /// Tap karne pe order tracking screen pe le jaata hai
 class _OrderCard extends StatelessWidget {
-  final OrderModel order;
+  final ActiveOrderModel order;
 
   const _OrderCard({required this.order});
 

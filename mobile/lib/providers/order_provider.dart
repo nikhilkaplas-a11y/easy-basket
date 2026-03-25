@@ -1,17 +1,20 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../models/order_model.dart';
+import '../models/active_order_model.dart';
 import '../models/address_model.dart';
 
 class OrderProvider with ChangeNotifier {
   final ApiService apiService;
 
   List<OrderModel> _orders = [];
+  List<ActiveOrderModel> _activeOrders = [];  // Lightweight — sirf home screen ke liye
   List<AddressModel> _addresses = [];
   bool _isLoading = false;
   String? _error;
 
   List<OrderModel> get orders => _orders;
+  List<ActiveOrderModel> get activeOrders => _activeOrders;
   List<AddressModel> get addresses => _addresses;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -72,6 +75,81 @@ class OrderProvider with ChangeNotifier {
     }
   }
 
+  /// Lightweight fetch — sirf active orders ke liye (home screen)
+  /// Kyun: Full OrderModel mein 6 JOINs hote hain — heavy
+  /// ActiveOrderModel mein 0 JOINs, sirf 4 fields — ~90% faster
+  Future<void> fetchActiveOrders(String token, {String? Function()? getUpdatedToken}) async {
+    try {
+      if (kDebugMode) {
+        print('🔄 Fetching active orders (light)...');
+      }
+
+      final response = await apiService.get(
+        '/orders?status=active&fields=light',
+        token: token,
+        getUpdatedToken: getUpdatedToken,
+      );
+
+      final List<dynamic> data = response is List ? response : [];
+      _activeOrders = data.map((json) {
+        try {
+          return ActiveOrderModel.fromJson(json as Map<String, dynamic>);
+        } catch (e) {
+          if (kDebugMode) {
+            print('❌ Error parsing active order: $e');
+            print('Order data: $json');
+          }
+          rethrow;
+        }
+      }).toList();
+
+      if (kDebugMode) {
+        print('✅ Fetched ${_activeOrders.length} active orders');
+      }
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching active orders: $e');
+      }
+    }
+  }
+
+  /// Active orders list ko full order data se sync karo
+  /// Kyun: Tracking screen pe polling se naya status aata hai (full OrderModel)
+  /// Wo status _activeOrders mein bhi reflect hona chahiye (home screen ke liye)
+  ///
+  /// 3 cases:
+  /// 1. Order active hai aur _activeOrders mein hai → status update karo
+  /// 2. Order active hai but _activeOrders mein nahi → add karo
+  /// 3. Order delivered/cancelled ho gaya → _activeOrders se hatao
+  void _syncActiveOrder(OrderModel order) {
+    final isTerminal = order.status == 'delivered' || order.status == 'cancelled';
+    final activeIndex = _activeOrders.indexWhere((a) => a.id == order.id);
+
+    if (isTerminal) {
+      // Order khatam — active list se hatao
+      if (activeIndex >= 0) {
+        _activeOrders.removeAt(activeIndex);
+      }
+    } else {
+      // Order abhi active hai
+      final updatedActive = ActiveOrderModel(
+        id: order.id,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+      );
+
+      if (activeIndex >= 0) {
+        // Already hai — update karo
+        _activeOrders[activeIndex] = updatedActive;
+      } else {
+        // Nahi hai — add karo
+        _activeOrders.insert(0, updatedActive);
+      }
+    }
+  }
+
   Future<OrderModel?> fetchOrderById(int id, String token) async {
     _isLoading = true;
     _error = null;
@@ -84,13 +162,16 @@ class OrderProvider with ChangeNotifier {
       // Add or update the order in the list to prevent glitches during navigation
       final existingIndex = _orders.indexWhere((o) => o.id == id);
       if (existingIndex >= 0) {
-        // Update existing order
         _orders[existingIndex] = order;
       } else {
-        // Add new order to the list
         _orders.insert(0, order);
       }
-      
+
+      // Sync active orders list — taki home screen pe bhi latest status dikhe
+      // Kyun: _activeOrders alag list hai (lightweight). Jab full order ka status
+      // change ho toh activeOrders mein bhi reflect hona chahiye.
+      _syncActiveOrder(order);
+
       _isLoading = false;
       notifyListeners();
       

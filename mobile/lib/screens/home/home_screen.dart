@@ -77,10 +77,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       // Fetch addresses and orders if user is authenticated
       if (authProvider.token != null) {
-        // status: 'active' → sirf pending/accepted/preparing/out_for_delivery
-        // fields: 'light' → sirf id, status, totalAmount (0 JOINs, ~90% faster)
-        // Kyun: Home pe sirf active order bar dikhana hai — full product data nahi chahiye
-        orderProvider.fetchOrders(authProvider.token!, getUpdatedToken: () => authProvider.token, status: 'active', fields: 'light');
+        // Lightweight fetch — sirf active orders (id, status, totalAmount)
+        // Kyun: Home pe sirf active order bar dikhana hai — full data nahi chahiye
+        orderProvider.fetchActiveOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
         orderProvider.fetchAddresses(authProvider.token!).then((_) async {
           // If no addresses, auto-detect location in background (seamless onboarding)
           if (orderProvider.addresses.isEmpty && mounted) {

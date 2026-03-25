@@ -87,18 +87,18 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
     if (_order == null) return;
 
     final address = _order!.deliveryAddress;
-    
+
     // Use exact coordinates if available (more accurate for instant delivery)
     if (address.latitude != null && address.longitude != null) {
       try {
         final lat = double.parse(address.latitude!);
         final lng = double.parse(address.longitude!);
-        
+
         // Open Google Maps with exact coordinates for turn-by-turn navigation
         final url = Uri.parse(
           'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving'
         );
-        
+
         if (await canLaunchUrl(url)) {
           await launchUrl(url, mode: LaunchMode.externalApplication);
         } else {
@@ -146,13 +146,13 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
     if (_order == null) return;
 
     final address = _order!.deliveryAddress;
-    
+
     // Use exact coordinates if available
     if (address.latitude != null && address.longitude != null) {
       try {
         final lat = double.parse(address.latitude!);
         final lng = double.parse(address.longitude!);
-        
+
         // Navigate to map view screen with route
         context.push('/delivery/map', extra: {
           'destinationLat': lat,

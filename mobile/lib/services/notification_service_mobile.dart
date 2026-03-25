@@ -183,11 +183,7 @@ class NotificationService {
 
     try {
       final orderProvider = Provider.of<OrderProvider>(_context!, listen: false);
-      orderProvider.fetchOrders(
-        _authProvider!.token!,
-        status: 'active',
-        fields: 'light',
-      );
+      orderProvider.fetchActiveOrders(_authProvider!.token!);
       debugPrint('🔄 [FCM] Orders refreshed after order notification');
     } catch (e) {
       debugPrint('❌ [FCM] Error refreshing orders: $e');

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -21,27 +22,64 @@ class OrderTrackingScreen extends StatefulWidget {
 
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   bool _hasFetched = false;
+  Timer? _pollingTimer;  // Har 15 sec order status refresh karne ke liye
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchOrderIfNeeded();
+      _fetchOrder();
+      _startPolling();
     });
   }
 
-  void _fetchOrderIfNeeded() {
-    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+  @override
+  void dispose() {
+    // Timer cancel karo — nahi toh memory leak hoga
+    // Kyun: Screen band ho but timer chalta rahe = unnecessary API calls
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Order data fetch karo — pehli baar aur polling dono ke liye
+  void _fetchOrder() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    final orderExists = orderProvider.orders.any((o) => o.id == widget.orderId);
-    
-    if (!orderExists && authProvider.accessToken != null) {
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+
+    if (authProvider.accessToken != null) {
       if (kDebugMode) {
         print('🔄 Fetching order ${widget.orderId}...');
       }
       orderProvider.fetchOrderById(widget.orderId, authProvider.accessToken!);
     }
+  }
+
+  /// Har 15 sec order status refresh karo
+  /// Kyun: Admin status change kare toh user ko turant dikhe
+  /// FCM primary hai but polling backup — in case FCM miss ho jaye
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted) return;
+
+      // Agar order delivered/cancelled hai toh polling band karo
+      // Kyun: Terminal state — status ab change nahi hoga
+      final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+      final order = orderProvider.orders.where((o) => o.id == widget.orderId).firstOrNull;
+      if (order != null && (order.status == 'delivered' || order.status == 'cancelled')) {
+        _pollingTimer?.cancel();
+        if (kDebugMode) {
+          print('⏹️ Polling stopped — order ${widget.orderId} is ${order.status}');
+        }
+        return;
+      }
+
+      _fetchOrder();
+    });
+  }
+
+  // Legacy — kept for backward compatibility
+  void _fetchOrderIfNeeded() {
+    _fetchOrder();
   }
 
   @override

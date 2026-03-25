@@ -350,9 +350,8 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (order.user.phoneNumber != null)
-                        Text(
-                          order.user.phoneNumber!,
+                      Text(
+                          order.user.phoneNumber,
                           style: TextStyle(
                             fontSize: 14,
                             color: AppTheme.grey,

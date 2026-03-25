@@ -1,15 +1,13 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 class AppConfig {
   // Backend API Configuration
   
   // Production API URL
-  // static const String apiBaseUrl = 'https://api.easybasket.in/api';
+  static const String apiBaseUrl = 'https://api.easybasket.in/api';
 
   // Alternative URLs (uncomment if needed):
   // For local development (web only):
 
-  static const String apiBaseUrl = 'http://localhost:3000/api';
+  //static const String apiBaseUrl = 'http://localhost:3000/api';
   
   // For Android emulator:
   // static const String apiBaseUrl = 'http://10.0.2.2:3000/api';
