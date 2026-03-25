@@ -14,6 +14,19 @@ function formatBirthday(birthday: Date | string | null | undefined): string | nu
   return String(birthday).split('T')[0];
 }
 
+function normalizePhoneNumber(input: unknown): string | null {
+  if (input == null) return null;
+  const s = String(input).replace(/\s/g, '').trim();
+  return s.length > 0 ? s : null;
+}
+
+/** Coerce client payloads (JSON may send numbers or odd types). */
+function normalizeFcmToken(input: unknown): string | null {
+  if (input == null || input === '') return null;
+  const s = typeof input === 'string' ? input.trim() : String(input).trim();
+  return s.length >= 10 ? s : null;
+}
+
 export class AuthController {
   static async login(req: Request, res: Response): Promise<void> {
     const { phoneNumber } = req.body;
@@ -41,7 +54,9 @@ export class AuthController {
   }
 
   static async verify(req: Request, res: Response): Promise<void> {
-    const { phoneNumber, otp, fcmToken } = req.body;
+    const phoneNumber = normalizePhoneNumber(req.body?.phoneNumber);
+    const otp = req.body?.otp != null ? String(req.body.otp).trim() : '';
+    const fcmCandidate = normalizeFcmToken(req.body?.fcmToken);
 
     if (!phoneNumber || !otp) {
       res.status(400).json({ message: 'Phone number and OTP are required' });
@@ -82,11 +97,18 @@ export class AuthController {
         await userRepository.save(user);
       }
 
-      if (fcmToken) {
-        console.log(`📱 [AUTH] Updating FCM token for user ${user.id} (${user.phoneNumber})`);
-        user.fcmToken = fcmToken.trim();
-        await userRepository.save(user);
-        console.log(`✅ [AUTH] FCM token updated successfully`);
+      if (fcmCandidate) {
+        try {
+          console.log(`📱 [AUTH] Updating FCM token for user ${user.id} (${user.phoneNumber})`);
+          user.fcmToken = fcmCandidate;
+          await userRepository.save(user);
+          console.log(`✅ [AUTH] FCM token updated successfully`);
+        } catch (fcmErr: unknown) {
+          const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
+          console.error(
+            `❌ [AUTH] FCM token not saved for user ${user.id}: ${msg}. If ER_DATA_TOO_LONG, run: ALTER TABLE user MODIFY fcmToken VARCHAR(512) NULL;`
+          );
+        }
       } else {
         console.log(`⚠️ [AUTH] No FCM token provided for user ${user.id}`);
       }
@@ -169,9 +191,10 @@ export class AuthController {
           user.birthday = new Date(birthday);
         }
       }
-      if (fcmToken) {
+      const profileFcm = normalizeFcmToken(fcmToken);
+      if (profileFcm) {
         console.log(`📱 [AUTH] Updating FCM token via profile update for user ${userId}`);
-        user.fcmToken = fcmToken;
+        user.fcmToken = profileFcm;
         console.log(`✅ [AUTH] FCM token updated via profile update`);
       }
 
@@ -196,13 +219,13 @@ export class AuthController {
 
   static async updateFcmToken(req: AuthRequest, res: Response): Promise<void> {
     const userId = req.user?.id;
-    const { fcmToken } = req.body as { fcmToken?: string };
+    const normalized = normalizeFcmToken(req.body?.fcmToken);
 
     if (!userId) {
       res.status(401).json({ message: 'Authentication required' });
       return;
     }
-    if (!fcmToken || typeof fcmToken !== 'string' || fcmToken.trim().length < 10) {
+    if (!normalized) {
       res.status(400).json({ message: 'Valid fcmToken is required' });
       return;
     }
@@ -214,7 +237,7 @@ export class AuthController {
         res.status(404).json({ message: 'User not found' });
         return;
       }
-      user.fcmToken = fcmToken.trim();
+      user.fcmToken = normalized;
       await userRepository.save(user);
       res.json({ message: 'FCM token updated' });
     } catch (error) {
