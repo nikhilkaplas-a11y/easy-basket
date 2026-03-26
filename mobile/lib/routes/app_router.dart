@@ -38,6 +38,7 @@ import '../models/address_model.dart';
 import '../screens/service_area/service_not_available_screen.dart';
 import '../screens/onboarding/location_detection_screen.dart';
 import '../screens/onboarding/location_permission_screen.dart';
+import '../core/startup_deep_link.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -55,6 +56,11 @@ class AppRouter {
 
       // If authenticated, check role and redirect accordingly
       if (isAuthenticated) {
+        final coldStart = StartupDeepLink.takePendingAtEntryRoute(currentLocation);
+        if (coldStart != null) {
+          return coldStart;
+        }
+
         final userRole = authProvider.user?.role;
         
         // Admin users

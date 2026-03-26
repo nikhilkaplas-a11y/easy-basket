@@ -9,6 +9,7 @@ import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/order_provider.dart';
 import '../routes/app_router.dart';
+import '../core/startup_deep_link.dart';
 
 // Background message handler — must be top-level function (not inside class)
 // Kyun: Flutter requires background handlers to be top-level
@@ -87,7 +88,7 @@ class NotificationService {
     _listenNotificationTap();
 
     // 8. Check — agar app notification tap se khuli hai (cold start)
-    _handleInitialMessage();
+    _handleInitialMessageRefreshOnly();
 
     _isInitialized = true;
     debugPrint('✅ [FCM] Notification service initialized');
@@ -214,33 +215,15 @@ class NotificationService {
 
   // ── 7. Cold start check ──
   // Kyun: Agar app band thi aur user ne notification tap karke kholi toh navigate karo
-  Future<void> _handleInitialMessage() async {
-    final message = await _messaging.getInitialMessage();
-    if (message != null) {
-      debugPrint('🚀 [FCM] App opened from notification (cold): ${message.notification?.title}');
-      await _deferDeepLinkUntilPastSplash(message);
-    }
-  }
-
-  /// Splash used to call go(/home) after 2s and wiped a push(order) done at 1s.
-  /// Wait until router left /splash (and /login for returners) before deep link.
-  Future<void> _deferDeepLinkUntilPastSplash(RemoteMessage message) async {
-    for (var i = 0; i < 80; i++) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      try {
-        if (_context == null || !_context!.mounted) continue;
-        final path = GoRouterState.of(_context!).uri.path;
-        if (path != '/splash' && path != '/login') {
-          _maybeRefreshOrdersFromPayload(message.data);
-          _navigateFromNotification(message.data);
-          return;
-        }
-      } catch (_) {
-        // Router not ready yet
-      }
-    }
-    _maybeRefreshOrdersFromPayload(message.data);
-    _navigateFromNotification(message.data);
+  /// Cold-start navigation is handled in [main] + [StartupDeepLink] + GoRouter redirect
+  /// (getInitialMessage is read once). Here we only refresh the order bar if needed.
+  void _handleInitialMessageRefreshOnly() {
+    final data = StartupDeepLink.takePendingRefreshData();
+    if (data == null) return;
+    debugPrint('🚀 [FCM] Cold start refresh from pending notification data');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeRefreshOrdersFromPayload(data);
+    });
   }
 
   // ── In-app banner dikhao (foreground) ──

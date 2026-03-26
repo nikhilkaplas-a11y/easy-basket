@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'core/startup_deep_link.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
-import 'services/cart_service.dart';
 import 'services/notification_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
@@ -22,13 +23,28 @@ import 'widgets/app_lifecycle_refresh.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize SharedPreferences before Firebase cold-start route (needs role from prefs)
+  final prefs = await SharedPreferences.getInstance();
+
   // Initialize Firebase (required for FCM notifications — mobile only)
   if (!kIsWeb) {
     await Firebase.initializeApp();
+    // Single read of getInitialMessage — used by GoRouter redirect (no home → order flash)
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null &&
+        prefs.getString('access_token') != null &&
+        prefs.getString('user_data') != null) {
+      final role = StartupDeepLink.readRoleFromPrefs(prefs);
+      final data = <String, dynamic>{};
+      initial.data.forEach((k, v) {
+        data[k.toString()] = v is String ? v : v.toString();
+      });
+      final path = routePathFromFcmData(data, role);
+      if (path != null) {
+        StartupDeepLink.registerColdStart(route: path, refreshData: data);
+      }
+    }
   }
-
-  // Initialize SharedPreferences
-  final prefs = await SharedPreferences.getInstance();
 
   // Initialize Razorpay (only for mobile platforms, not web)
   if (!kIsWeb) {
