@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node --max-old-space-size=2048 ./node_modules/typescript/lib/tsc.js",
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "seed": "ts-node src/scripts/seed.ts",
