@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -16,11 +18,22 @@ class _SplashScreenState extends State<SplashScreen> {
     _navigateToNext();
   }
 
+  /// Do not use a long fixed delay + go(home): it races FCM cold-start deep links and
+  /// replaces the stack, so users land on home instead of order detail.
   void _navigateToNext() {
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        context.go('/home');
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 120), () {
+        if (!mounted) return;
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        if (!auth.isAuthenticated) {
+          context.go('/login');
+          return;
+        }
+        final path = GoRouterState.of(context).uri.path;
+        if (path == '/splash') {
+          context.go('/home');
+        }
+      });
     });
   }
 

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/order_provider.dart';
+import '../routes/app_router.dart';
 
 // Background message handler — must be top-level function (not inside class)
 // Kyun: Flutter requires background handlers to be top-level
@@ -216,12 +217,30 @@ class NotificationService {
   Future<void> _handleInitialMessage() async {
     final message = await _messaging.getInitialMessage();
     if (message != null) {
-      debugPrint('🚀 [FCM] App opened from notification: ${message.notification?.title}');
-      Future.delayed(const Duration(seconds: 1), () {
-        _maybeRefreshOrdersFromPayload(message.data);
-        _navigateFromNotification(message.data);
-      });
+      debugPrint('🚀 [FCM] App opened from notification (cold): ${message.notification?.title}');
+      await _deferDeepLinkUntilPastSplash(message);
     }
+  }
+
+  /// Splash used to call go(/home) after 2s and wiped a push(order) done at 1s.
+  /// Wait until router left /splash (and /login for returners) before deep link.
+  Future<void> _deferDeepLinkUntilPastSplash(RemoteMessage message) async {
+    for (var i = 0; i < 80; i++) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      try {
+        if (_context == null || !_context!.mounted) continue;
+        final path = GoRouterState.of(_context!).uri.path;
+        if (path != '/splash' && path != '/login') {
+          _maybeRefreshOrdersFromPayload(message.data);
+          _navigateFromNotification(message.data);
+          return;
+        }
+      } catch (_) {
+        // Router not ready yet
+      }
+    }
+    _maybeRefreshOrdersFromPayload(message.data);
+    _navigateFromNotification(message.data);
   }
 
   // ── In-app banner dikhao (foreground) ──
@@ -303,27 +322,60 @@ class NotificationService {
   void _navigateFromNotification(Map<String, dynamic> data) {
     if (_context == null) return;
 
-    final type = data['type'] as String? ?? '';
-    final orderId = data['orderId'] as String?;
-    final productId = data['productId'] as String?;
-    final categoryId = data['categoryId'] as String?;
+    final type = (data['type'] as String? ?? '').toLowerCase();
+    final orderIdRaw = data['orderId']?.toString();
+    final productId = data['productId']?.toString();
+    final categoryId = data['categoryId']?.toString();
 
-    debugPrint('🧭 [FCM] Navigate — type: $type, orderId: $orderId');
+    debugPrint('🧭 [FCM] Navigate — type: $type, orderId: $orderIdRaw');
 
-    // Type se decide karo kahan jaana hai
-    if (type.contains('order') && orderId != null) {
-      _context!.push('/order/$orderId');
-    } else if (type.contains('payment') && orderId != null) {
-      _context!.push('/order/$orderId');
-    } else if (type.contains('promo') && categoryId != null) {
-      _context!.push('/categories/$categoryId/products', extra: {
-        'parentCategoryName': data['categoryName'] ?? 'Offers',
-      });
-    } else if (type.startsWith('STOCK_') && productId != null) {
-      _context!.push('/product/$productId');
+    if (type.contains('promo') && categoryId != null && categoryId.isNotEmpty) {
+      final cid = int.tryParse(categoryId);
+      if (cid != null) {
+        _context!.push('/categories/$cid/products', extra: {
+          'parentCategoryName': data['categoryName'] ?? 'Offers',
+        });
+      }
+      return;
+    }
+
+    if (type.startsWith('stock_') && productId != null && productId.isNotEmpty) {
+      final pid = int.tryParse(productId);
+      if (pid != null) _context!.push('/product/$pid');
+      return;
+    }
+
+    final isOrderContext =
+        type.contains('order') || type.contains('payment') || (orderIdRaw != null && orderIdRaw.isNotEmpty);
+
+    if (isOrderContext && orderIdRaw != null && orderIdRaw.isNotEmpty) {
+      final orderId = int.tryParse(orderIdRaw);
+      if (orderId == null) {
+        _pushDefaultHubForRole();
+        return;
+      }
+      final role = _authProvider?.user?.role;
+      if (role == 'admin') {
+        AppRouter.router.push('/admin/orders/$orderId');
+      } else if (role == 'delivery') {
+        AppRouter.router.push('/delivery/order/$orderId');
+      } else {
+        AppRouter.router.push('/order/$orderId');
+      }
+      return;
+    }
+
+    _pushDefaultHubForRole();
+  }
+
+  void _pushDefaultHubForRole() {
+    final role = _authProvider?.user?.role;
+    if (role == 'admin') {
+      AppRouter.router.push('/admin/orders');
+    } else if (role == 'delivery') {
+      AppRouter.router.push('/delivery/orders');
     } else {
-      // Default — orders screen pe le jao
-      _context!.push('/orders');
+      AppRouter.router.push('/orders');
     }
   }
 
