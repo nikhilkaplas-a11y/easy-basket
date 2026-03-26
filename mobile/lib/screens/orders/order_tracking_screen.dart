@@ -2,13 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/order_model.dart';
 import '../../utils/theme.dart';
 import '../../utils/date_utils.dart';
+import '../../utils/navigation_utils.dart';
 import 'package:intl/intl.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
@@ -99,36 +99,41 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     // Show loading state if order is not found and provider is loading
     if (order == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Order Details'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+      return popScopeWithRoleHubFallback(
+        context,
+        Scaffold(
+          appBar: AppBar(
+            title: const Text('Order Details'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => popOrRoleHub(context),
+            ),
           ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                orderProvider.isLoading ? 'Loading order details...' : 'Order not found',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.grey,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Text(
+                  orderProvider.isLoading ? 'Loading order details...' : 'Order not found',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppTheme.grey,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    return Scaffold(
+    return popScopeWithRoleHubFallback(
+      context,
+      Scaffold(
       backgroundColor: AppTheme.white, // Changed from lightGrey.withOpacity(0.3) to white
       appBar: AppBar(
         elevation: 0,
@@ -143,7 +148,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.black),
-          onPressed: () => context.pop(),
+          onPressed: () => popOrRoleHub(context),
         ),
       ),
       body: Container(
@@ -171,6 +176,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

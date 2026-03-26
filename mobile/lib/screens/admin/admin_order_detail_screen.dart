@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/order_model.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
+import '../../utils/navigation_utils.dart';
 
 class AdminOrderDetailScreen extends StatefulWidget {
   final int orderId;
@@ -95,43 +95,49 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy • hh:mm a');
 
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Order #${widget.orderId}'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+      return popScopeWithRoleHubFallback(
+        context,
+        Scaffold(
+          appBar: AppBar(
+            title: Text('Order #${widget.orderId}'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => popOrRoleHub(context),
+            ),
           ),
+          body: const Center(child: CircularProgressIndicator()),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null || _order == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Order #${widget.orderId}'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+      return popScopeWithRoleHubFallback(
+        context,
+        Scaffold(
+          appBar: AppBar(
+            title: Text('Order #${widget.orderId}'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => popOrRoleHub(context),
+            ),
           ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppTheme.grey),
-              const SizedBox(height: 16),
-              Text(
-                _error ?? 'Order not found',
-                style: TextStyle(color: AppTheme.grey),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadOrder,
-                child: const Text('Retry'),
-              ),
-            ],
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: AppTheme.grey),
+                const SizedBox(height: 16),
+                Text(
+                  _error ?? 'Order not found',
+                  style: TextStyle(color: AppTheme.grey),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _loadOrder,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -139,12 +145,14 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
 
     final order = _order!;
 
-    return Scaffold(
+    return popScopeWithRoleHubFallback(
+      context,
+      Scaffold(
       appBar: AppBar(
         title: Text('Order #${order.id}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => popOrRoleHub(context),
         ),
         actions: [
           IconButton(
@@ -182,6 +190,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

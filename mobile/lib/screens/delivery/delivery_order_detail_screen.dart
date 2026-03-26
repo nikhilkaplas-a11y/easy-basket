@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
+import '../../utils/navigation_utils.dart';
 import '../../models/order_model.dart';
 
 class DeliveryOrderDetailScreen extends StatefulWidget {
@@ -204,40 +205,48 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Order Details'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+      return popScopeWithRoleHubFallback(
+        context,
+        Scaffold(
+          appBar: AppBar(
+            title: const Text('Order Details'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => popOrRoleHub(context),
+            ),
           ),
+          body: const Center(child: CircularProgressIndicator()),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_order == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Order Details'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+      return popScopeWithRoleHubFallback(
+        context,
+        Scaffold(
+          appBar: AppBar(
+            title: const Text('Order Details'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => popOrRoleHub(context),
+            ),
           ),
+          body: const Center(child: Text('Order not found')),
         ),
-        body: const Center(child: Text('Order not found')),
       );
     }
 
     final order = _order!;
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
 
-    return Scaffold(
+    return popScopeWithRoleHubFallback(
+      context,
+      Scaffold(
       appBar: AppBar(
         title: Text('Order #${order.id}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => popOrRoleHub(context),
         ),
         actions: [
           IconButton(
@@ -615,6 +624,7 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
