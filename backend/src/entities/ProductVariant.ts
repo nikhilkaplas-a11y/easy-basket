@@ -11,15 +11,15 @@ import { Product } from './Product';
 
 /**
  * ProductVariant Entity
- * 
+ *
  * Represents different quantity/weight options for a product.
  * Example: Pulses can have variants like:
  * - 250g (₹50)
- * - 500g (₹95) 
+ * - 500g (₹95)
  * - 1kg (₹180)
  * - 2kg (₹350)
  * - 5kg (₹850)
- * 
+ *
  * Each variant has its own:
  * - Quantity value (e.g., 0.25 for 250g, 1 for 1kg)
  * - Unit (g, kg, piece, etc.)
@@ -116,4 +116,3 @@ export class ProductVariant {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

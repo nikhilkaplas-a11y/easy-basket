@@ -20,7 +20,9 @@ export class TwilioService {
       const accountSid = process.env.TWILIO_ACCOUNT_SID;
       const authToken = process.env.TWILIO_AUTH_TOKEN;
       if (!accountSid || !authToken) {
-        throw new Error('Twilio credentials not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)');
+        throw new Error(
+          'Twilio credentials not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)'
+        );
       }
       TwilioService.client = Twilio(accountSid, authToken);
       TwilioService.verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID || null;
@@ -63,14 +65,15 @@ export class TwilioService {
   /**
    * Send OTP via Twilio Verify (SMS). Phone number is normalized to E.164.
    */
-  static async sendVerification(phoneNumber: string, channel: 'sms' | 'call' = 'sms'): Promise<void> {
+  static async sendVerification(
+    phoneNumber: string,
+    channel: 'sms' | 'call' = 'sms'
+  ): Promise<void> {
     const client = TwilioService.getClient();
     const serviceSid = TwilioService.getVerifyServiceSid();
     const to = TwilioService.normalizePhoneToE164(phoneNumber);
 
-    await client.verify.v2
-      .services(serviceSid)
-      .verifications.create({ to, channel });
+    await client.verify.v2.services(serviceSid).verifications.create({ to, channel });
   }
 
   /**

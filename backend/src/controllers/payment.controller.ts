@@ -81,7 +81,9 @@ export class PaymentController {
 
         if (orderId) {
           const orderRepository = AppDataSource.getRepository(Order);
-          const order = await orderRepository.findOneBy({ id: Number(orderId.replace('ORDER_', '')) });
+          const order = await orderRepository.findOneBy({
+            id: Number(orderId.replace('ORDER_', '')),
+          });
 
           if (order) {
             order.isPaid = true;
@@ -98,4 +100,3 @@ export class PaymentController {
     }
   }
 }
-

@@ -15,4 +15,3 @@ router.put('/:id', authenticate, authorize('admin'), CategoryController.updateCa
 router.delete('/:id', authenticate, authorize('admin'), CategoryController.deleteCategory);
 
 export default router;
-

@@ -17,4 +17,3 @@ router.put('/:id', ServiceAreaController.updateServiceArea);
 router.delete('/:id', ServiceAreaController.deleteServiceArea);
 
 export default router;
-

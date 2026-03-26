@@ -38,7 +38,11 @@ export class PaymentService {
     }
   }
 
-  static async verifyPayment(paymentId: string, orderId: string, signature: string): Promise<boolean> {
+  static async verifyPayment(
+    paymentId: string,
+    orderId: string,
+    signature: string
+  ): Promise<boolean> {
     if (!this.razorpayInstance) {
       return false;
     }
@@ -62,4 +66,3 @@ export class PaymentService {
 
 // Initialize on module load
 PaymentService.initialize();
-

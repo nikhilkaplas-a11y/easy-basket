@@ -12,7 +12,7 @@ const storage = multer.memoryStorage();
  */
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  
+
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -38,4 +38,3 @@ export const upload = multer({
  * Single file upload middleware
  */
 export const uploadSingle = upload.single('file');
-

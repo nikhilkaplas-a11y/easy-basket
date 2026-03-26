@@ -47,4 +47,3 @@ export class OTPService {
     return this.verifyOTP(phoneNumber, otp);
   }
 }
-

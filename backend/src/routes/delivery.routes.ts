@@ -16,4 +16,3 @@ router.get('/stats', DeliveryController.getDeliveryStats);
 router.get('/earnings', DeliveryController.getEarnings);
 
 export default router;
-

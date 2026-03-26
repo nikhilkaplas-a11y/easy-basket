@@ -43,7 +43,7 @@ export class UploadController {
 
       // Verify entity exists and belongs to admin (or is accessible)
       let entityName: string | undefined;
-      
+
       if (type === 'product') {
         const productRepository = AppDataSource.getRepository(Product);
         const product = await productRepository.findOneBy({ id: entityId });
@@ -127,4 +127,3 @@ export class UploadController {
     }
   }
 }
-

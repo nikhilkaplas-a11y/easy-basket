@@ -17,16 +17,16 @@ export class ProductController {
       }
 
       const productRepository = AppDataSource.getRepository(Product);
-      
+
       // Use raw query for performance and flexibility
       // We want to return unique names that match the search
       // Split query into words and require all of them (AND logic)
       const searchTerms = String(search)
         .trim()
         .split(/\s+/)
-        .map(term => {
-           // If term is very short, don't force it with + as it might not be indexed
-           return term.length <= 2 ? `${term}*` : `+${term}*`;
+        .map((term) => {
+          // If term is very short, don't force it with + as it might not be indexed
+          return term.length <= 2 ? `${term}*` : `+${term}*`;
         })
         .join(' ');
 
@@ -36,10 +36,12 @@ export class ProductController {
         .addSelect('MAX(product.imageUrl)', 'imageUrl') // Pick one image for the name
         .where('product.isAvailable = :isAvailable', { isAvailable: true })
         .andWhere(
-            new Brackets((qb) => {
-                qb.where(`MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`, { search: searchTerms })
-                  .orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
-            })
+          new Brackets((qb) => {
+            qb.where(
+              `MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`,
+              { search: searchTerms }
+            ).orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
+          })
         )
         .groupBy('product.name') // Group by name to get distinct names
         .limit(8)
@@ -71,7 +73,7 @@ export class ProductController {
           'product.minQuantity',
           'product.maxQuantity',
           'product.categoryId',
-          'product.tags'
+          'product.tags',
         ])
         .leftJoinAndSelect('product.category', 'category')
         .leftJoinAndSelect('product.variants', 'variants')
@@ -88,26 +90,28 @@ export class ProductController {
         const searchTerms = String(search)
           .trim()
           .split(/\s+/)
-          .map(term => {
-             // If term is very short, don't force it with + as it might not be indexed
-             // Exception: if the query ONLY has short words, we might need to rely on LIKE mostly
-             return term.length <= 2 ? `${term}*` : `+${term}*`;
+          .map((term) => {
+            // If term is very short, don't force it with + as it might not be indexed
+            // Exception: if the query ONLY has short words, we might need to rely on LIKE mostly
+            return term.length <= 2 ? `${term}*` : `+${term}*`;
           })
           .join(' ');
 
         // Combine FTS with LIKE to catch short words/numbers (e.g., "1L") that FTS might miss
         queryBuilder.andWhere(
-            new Brackets((qb) => {
-                qb.where(`MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`, { search: searchTerms })
-                  .orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
-            })
+          new Brackets((qb) => {
+            qb.where(
+              `MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`,
+              { search: searchTerms }
+            ).orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
+          })
         );
       }
 
       // Pagination support
       // limit = kitne products ek page mein (default: all, search: 50)
       // page = kaunsa page (1, 2, 3...) — offset calculate hota hai: (page-1) * limit
-      const takeLimit = limit ? Number(limit) : (search ? 50 : undefined);
+      const takeLimit = limit ? Number(limit) : search ? 50 : undefined;
       if (takeLimit) {
         queryBuilder.take(takeLimit);
         if (page) {
@@ -117,9 +121,9 @@ export class ProductController {
       }
 
       const products = await queryBuilder.getMany();
-      
+
       // Sort variants by displayOrder for each product
-      products.forEach(product => {
+      products.forEach((product) => {
         if (product.variants) {
           product.variants.sort((a, b) => {
             if (a.displayOrder !== b.displayOrder) {
@@ -129,7 +133,7 @@ export class ProductController {
           });
         }
       });
-      
+
       res.json(products);
     } catch (error) {
       console.error(error);
@@ -216,7 +220,8 @@ export class ProductController {
         return;
       }
 
-      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable, tags } = req.body;
+      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable, tags } =
+        req.body;
 
       if (name) product.name = name;
       if (description !== undefined) product.description = description;

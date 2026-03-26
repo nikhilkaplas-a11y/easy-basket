@@ -31,8 +31,8 @@ export class Category {
    * Parent category for subcategories
    * Null for top-level categories
    */
-  @ManyToOne(() => Category, (category) => category.subcategories, { 
-    nullable: true, 
+  @ManyToOne(() => Category, (category) => category.subcategories, {
+    nullable: true,
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'parentCategoryId' })
@@ -77,4 +77,3 @@ export class Category {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

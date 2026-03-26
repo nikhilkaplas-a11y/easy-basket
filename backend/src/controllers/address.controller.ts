@@ -7,12 +7,14 @@ import { AuthRequest } from '../middleware/auth.middleware';
 // Helper function to calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Radius of the Earth in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in km
 }
@@ -21,9 +23,9 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 function calculateStringSimilarity(str1: string, str2: string): number {
   const longer = str1.length > str2.length ? str1 : str2;
   const shorter = str1.length > str2.length ? str2 : str1;
-  
+
   if (longer.length === 0) return 1.0;
-  
+
   const distance = levenshteinDistance(longer, shorter);
   return (longer.length - distance) / longer.length;
 }
@@ -31,15 +33,15 @@ function calculateStringSimilarity(str1: string, str2: string): number {
 // Levenshtein distance calculation
 function levenshteinDistance(str1: string, str2: string): number {
   const matrix: number[][] = [];
-  
+
   for (let i = 0; i <= str2.length; i++) {
     matrix[i] = [i];
   }
-  
+
   for (let j = 0; j <= str1.length; j++) {
     matrix[0][j] = j;
   }
-  
+
   for (let i = 1; i <= str2.length; i++) {
     for (let j = 1; j <= str1.length; j++) {
       if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
@@ -53,7 +55,7 @@ function levenshteinDistance(str1: string, str2: string): number {
       }
     }
   }
-  
+
   return matrix[str2.length][str1.length];
 }
 
@@ -122,14 +124,14 @@ export class AddressController {
       // Check for duplicate addresses (Blinkit-style: prevent duplicates)
       // Check by coordinates (if provided) or by address details
       let existingAddress = null;
-      
+
       if (latitude && longitude) {
         // Check for addresses with same coordinates (within 50 meters tolerance)
         // Using approximate distance calculation
         const allAddresses = await addressRepository.find({
           where: { user: { id: userId } },
         });
-        
+
         for (const addr of allAddresses) {
           if (addr.latitude && addr.longitude) {
             const distance = calculateDistance(
@@ -139,14 +141,15 @@ export class AddressController {
               parseFloat(addr.longitude)
             );
             // If within 50 meters, consider it duplicate
-            if (distance < 0.05) { // 0.05 km = 50 meters
+            if (distance < 0.05) {
+              // 0.05 km = 50 meters
               existingAddress = addr;
               break;
             }
           }
         }
       }
-      
+
       // If no coordinate match, check by address details (same pincode + similar address)
       if (!existingAddress) {
         const similarAddresses = await addressRepository.find({
@@ -155,7 +158,7 @@ export class AddressController {
             pincode: pincode,
           },
         });
-        
+
         // Check if address line 1 is very similar (fuzzy match)
         for (const addr of similarAddresses) {
           const similarity = calculateStringSimilarity(
@@ -182,18 +185,15 @@ export class AddressController {
         existingAddress.latitude = latitude;
         existingAddress.longitude = longitude;
         existingAddress.tag = tag || null;
-        
+
         // If setting as default, unset other defaults
         if (isDefault) {
-          await addressRepository.update(
-            { user: { id: userId } },
-            { isDefault: false }
-          );
+          await addressRepository.update({ user: { id: userId } }, { isDefault: false });
           existingAddress.isDefault = true;
         } else {
           existingAddress.isDefault = isDefault || false;
         }
-        
+
         await addressRepository.save(existingAddress);
         res.status(200).json({
           ...existingAddress,
@@ -204,10 +204,7 @@ export class AddressController {
 
       // If setting as default, unset other defaults
       if (isDefault) {
-        await addressRepository.update(
-          { user: { id: userId } },
-          { isDefault: false }
-        );
+        await addressRepository.update({ user: { id: userId } }, { isDefault: false });
       }
 
       const address = addressRepository.create({
@@ -276,10 +273,7 @@ export class AddressController {
       if (tag !== undefined) address.tag = tag;
 
       if (isDefault === true) {
-        await addressRepository.update(
-          { user: { id: userId } },
-          { isDefault: false }
-        );
+        await addressRepository.update({ user: { id: userId } }, { isDefault: false });
         address.isDefault = true;
       }
 
@@ -319,4 +313,3 @@ export class AddressController {
     }
   }
 }
-

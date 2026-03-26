@@ -26,8 +26,8 @@ export class OrderItem {
    * Product variant selected (if product has variants)
    * Null if product doesn't have variants
    */
-  @ManyToOne(() => ProductVariant, { 
-    nullable: true, 
+  @ManyToOne(() => ProductVariant, {
+    nullable: true,
     onDelete: 'SET NULL',
     createForeignKeyConstraints: true,
   })
@@ -76,4 +76,3 @@ export class OrderItem {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

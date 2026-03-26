@@ -52,4 +52,3 @@ export function getFileExtension(filename: string): string {
   const allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
   return allowedExts.includes(ext) ? ext : 'jpg';
 }
-

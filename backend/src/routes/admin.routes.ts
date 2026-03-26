@@ -20,4 +20,3 @@ router.put('/products/:id', AdminController.updateProduct);
 router.delete('/products/:id', AdminController.deleteProduct);
 
 export default router;
-

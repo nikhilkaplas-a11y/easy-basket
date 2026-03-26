@@ -49,7 +49,10 @@ export class AuthController {
     } catch (error) {
       console.error('Error sending OTP:', error);
       const message = error instanceof Error ? error.message : 'Error sending OTP';
-      res.status(500).json({ message: 'Error sending OTP', error: process.env.NODE_ENV === 'development' ? message : undefined });
+      res.status(500).json({
+        message: 'Error sending OTP',
+        error: process.env.NODE_ENV === 'development' ? message : undefined,
+      });
     }
   }
 
@@ -156,9 +159,12 @@ export class AuthController {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
       }
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Internal server error',
-        error: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
+        error:
+          process.env.NODE_ENV === 'development' && error instanceof Error
+            ? error.message
+            : undefined,
       });
     }
   }
@@ -328,10 +334,7 @@ export class AuthController {
       } else if (userId) {
         // Revoke all refresh tokens for this user
         const refreshTokenRepository = AppDataSource.getRepository(RefreshToken);
-        await refreshTokenRepository.update(
-          { userId, isActive: true },
-          { isActive: false }
-        );
+        await refreshTokenRepository.update({ userId, isActive: true }, { isActive: false });
       }
 
       res.json({ message: 'Logout successful' });
@@ -341,4 +344,3 @@ export class AuthController {
     }
   }
 }
-

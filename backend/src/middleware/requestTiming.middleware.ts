@@ -13,11 +13,10 @@ export class RequestTimingMiddleware {
       const status = res.statusCode;
       const level = durationMs > 500 ? 'warn' : 'info';
       const message = `[${level.toUpperCase()}] ${method} ${originalUrl} ${status} - ${durationMs.toFixed(2)} ms`;
-      // eslint-disable-next-line no-console
+
       console.log(message);
     });
 
     next();
   }
 }
-

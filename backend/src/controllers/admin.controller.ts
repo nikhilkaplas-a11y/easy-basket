@@ -56,7 +56,14 @@ export class AdminController {
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
         where: { id: Number(id) },
-        relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
+        relations: [
+          'user',
+          'items',
+          'items.product',
+          'items.variant',
+          'deliveryAddress',
+          'deliveryBoy',
+        ],
       });
 
       if (!order) {
@@ -81,7 +88,14 @@ export class AdminController {
         return;
       }
 
-      const validStatuses = ['pending', 'accepted', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+      const validStatuses = [
+        'pending',
+        'accepted',
+        'preparing',
+        'out_for_delivery',
+        'delivered',
+        'cancelled',
+      ];
       if (!validStatuses.includes(status)) {
         res.status(400).json({ message: 'Invalid status' });
         return;
@@ -192,7 +206,9 @@ export class AdminController {
       const skip = (page - 1) * limit;
 
       const userRepository = AppDataSource.getRepository(User);
-      const queryBuilder = userRepository.createQueryBuilder('user').where('user.isActive = :isActive', { isActive: true });
+      const queryBuilder = userRepository
+        .createQueryBuilder('user')
+        .where('user.isActive = :isActive', { isActive: true });
 
       if (role) {
         queryBuilder.andWhere('user.role = :role', { role });
@@ -248,28 +264,22 @@ export class AdminController {
       const userRepository = AppDataSource.getRepository(User);
       const productRepository = AppDataSource.getRepository(Product);
 
-      const [
-        totalOrders,
-        pendingOrders,
-        todayOrders,
-        totalUsers,
-        totalProducts,
-        lowStockProducts,
-      ] = await Promise.all([
-        orderRepository.count(),
-        orderRepository.count({ where: { status: 'pending' } }),
-        orderRepository
-          .createQueryBuilder('order')
-          .where('DATE(order.createdAt) = CURDATE()')
-          .getCount(),
-        userRepository.count({ where: { isActive: true } }),
-        productRepository.count({ where: { isAvailable: true } }),
-        productRepository
-          .createQueryBuilder('product')
-          .where('product.stock < :stock', { stock: 10 })
-          .andWhere('product.isAvailable = :isAvailable', { isAvailable: true })
-          .getCount(),
-      ]);
+      const [totalOrders, pendingOrders, todayOrders, totalUsers, totalProducts, lowStockProducts] =
+        await Promise.all([
+          orderRepository.count(),
+          orderRepository.count({ where: { status: 'pending' } }),
+          orderRepository
+            .createQueryBuilder('order')
+            .where('DATE(order.createdAt) = CURDATE()')
+            .getCount(),
+          userRepository.count({ where: { isActive: true } }),
+          productRepository.count({ where: { isAvailable: true } }),
+          productRepository
+            .createQueryBuilder('product')
+            .where('product.stock < :stock', { stock: 10 })
+            .andWhere('product.isAvailable = :isAvailable', { isAvailable: true })
+            .getCount(),
+        ]);
 
       // Calculate today's revenue
       const todayRevenueResult = await orderRepository
@@ -319,19 +329,21 @@ export class AdminController {
 
       // Filter by category if provided
       if (categoryId) {
-        queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId: Number(categoryId) });
+        queryBuilder.andWhere('product.categoryId = :categoryId', {
+          categoryId: Number(categoryId),
+        });
       }
 
       // Filter by search query if provided - use Full-Text Search like user app
       if (search && String(search).trim().length > 0) {
         const searchTerm = String(search).trim();
-        
+
         // Use Full-Text Search with Boolean Mode for better matching
         // Split query into words and require all of them (AND logic)
         // e.g. "Chia Seeds" -> "+Chia* +Seeds*"
         const searchTerms = searchTerm
           .split(/\s+/)
-          .map(term => {
+          .map((term) => {
             // If term is very short, don't force it with + as it might not be indexed
             return term.length <= 2 ? `${term}*` : `+${term}*`;
           })
@@ -340,7 +352,10 @@ export class AdminController {
         // Combine FTS with LIKE to catch short words/numbers (e.g., "1L") that FTS might miss
         queryBuilder.andWhere(
           new Brackets((qb) => {
-            qb.where(`MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`, { search: searchTerms })
+            qb.where(
+              `MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`,
+              { search: searchTerms }
+            )
               .orWhere('product.name LIKE :likeSearch', { likeSearch: `%${searchTerm}%` })
               .orWhere('product.description LIKE :likeSearch', { likeSearch: `%${searchTerm}%` })
               .orWhere('product.tags LIKE :likeSearch', { likeSearch: `%${searchTerm}%` });
@@ -409,7 +424,8 @@ export class AdminController {
   static async updateProduct(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable, tags } = req.body;
+      const { name, description, price, imageUrl, categoryId, stock, unit, isAvailable, tags } =
+        req.body;
 
       const productRepository = AppDataSource.getRepository(Product);
       const product = await productRepository.findOne({
@@ -473,7 +489,7 @@ export class AdminController {
   static async getDeliveryAgents(req: AuthRequest, res: Response): Promise<void> {
     try {
       const userRepository = AppDataSource.getRepository(User);
-      
+
       // Use query builder for more control and better null handling
       // MySQL doesn't support NULLS LAST, so we use ISNULL to put nulls at the end
       const deliveryAgents = await userRepository
@@ -487,7 +503,7 @@ export class AdminController {
         .getMany();
 
       console.log(`✅ Found ${deliveryAgents.length} active delivery agents`);
-      
+
       if (deliveryAgents.length === 0) {
         console.log('⚠️ No active delivery agents found. Checking all users with delivery role...');
         const allDeliveryUsers = await userRepository.find({
@@ -497,8 +513,10 @@ export class AdminController {
         console.log(`📊 Total users with delivery role: ${allDeliveryUsers.length}`);
         if (allDeliveryUsers.length > 0) {
           console.log('Delivery users found:');
-          allDeliveryUsers.forEach(user => {
-            console.log(`  - ID: ${user.id}, Phone: ${user.phoneNumber}, Name: ${user.name || 'N/A'}, Active: ${user.isActive}`);
+          allDeliveryUsers.forEach((user) => {
+            console.log(
+              `  - ID: ${user.id}, Phone: ${user.phoneNumber}, Name: ${user.name || 'N/A'}, Active: ${user.isActive}`
+            );
           });
           console.log('💡 Tip: Make sure isActive = true for delivery agents');
         } else {
@@ -506,7 +524,7 @@ export class AdminController {
           console.log('💡 Tip: Update user role to "delivery" in database or via Admin Dashboard');
         }
       } else {
-        deliveryAgents.forEach(agent => {
+        deliveryAgents.forEach((agent) => {
           console.log(`  ✓ ${agent.name || 'N/A'} (${agent.phoneNumber})`);
         });
       }
@@ -514,11 +532,10 @@ export class AdminController {
       res.json(deliveryAgents);
     } catch (error) {
       console.error('❌ Error fetching delivery agents:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Error fetching delivery agents',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
 }
-

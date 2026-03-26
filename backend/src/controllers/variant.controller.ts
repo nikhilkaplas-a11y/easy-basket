@@ -12,7 +12,7 @@ export class VariantController {
     try {
       const { productId } = req.params;
       const variantRepository = AppDataSource.getRepository(ProductVariant);
-      
+
       const variants = await variantRepository.find({
         where: { product: { id: Number(productId) } },
         order: { displayOrder: 'ASC', quantity: 'ASC' },
@@ -32,7 +32,18 @@ export class VariantController {
   static async createVariant(req: Request, res: Response): Promise<void> {
     try {
       const { productId } = req.params;
-      const { quantity, unit, label, price, stock, isAvailable, minQuantity, maxQuantity, displayOrder, isDefault } = req.body;
+      const {
+        quantity,
+        unit,
+        label,
+        price,
+        stock,
+        isAvailable,
+        minQuantity,
+        maxQuantity,
+        displayOrder,
+        isDefault,
+      } = req.body;
 
       // Validate required fields
       if (!quantity || !unit || !label || price === undefined) {
@@ -52,10 +63,7 @@ export class VariantController {
 
       // If this is set as default, unset other defaults
       if (isDefault) {
-        await variantRepository.update(
-          { product: { id: product.id } },
-          { isDefault: false }
-        );
+        await variantRepository.update({ product: { id: product.id } }, { isDefault: false });
       }
 
       const variant = variantRepository.create({
@@ -84,28 +92,28 @@ export class VariantController {
       res.status(201).json(variant);
     } catch (error: any) {
       console.error('Error creating variant:', error);
-      
+
       // Return more detailed error message
       if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
-        res.status(409).json({ 
+        res.status(409).json({
           message: 'A variant with this configuration already exists',
-          error: 'DUPLICATE_VARIANT'
+          error: 'DUPLICATE_VARIANT',
         });
         return;
       }
-      
+
       if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
-        res.status(404).json({ 
+        res.status(404).json({
           message: 'Product not found',
-          error: 'PRODUCT_NOT_FOUND'
+          error: 'PRODUCT_NOT_FOUND',
         });
         return;
       }
-      
-      res.status(500).json({ 
+
+      res.status(500).json({
         message: 'Error creating variant',
         error: error.message || 'Unknown error',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
   }
@@ -117,7 +125,18 @@ export class VariantController {
   static async updateVariant(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { quantity, unit, label, price, stock, isAvailable, minQuantity, maxQuantity, displayOrder, isDefault } = req.body;
+      const {
+        quantity,
+        unit,
+        label,
+        price,
+        stock,
+        isAvailable,
+        minQuantity,
+        maxQuantity,
+        displayOrder,
+        isDefault,
+      } = req.body;
 
       const variantRepository = AppDataSource.getRepository(ProductVariant);
       const variant = await variantRepository.findOne({
@@ -195,4 +214,3 @@ export class VariantController {
     }
   }
 }
-

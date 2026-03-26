@@ -23,7 +23,6 @@ import variantRoutes from './routes/variant.routes';
 // Load environment variables FIRST before importing any modules that use them
 dotenv.config();
 
-
 // Re-initialize S3Service after dotenv.config() to ensure env vars are loaded
 // (S3Service.initialize() is called on module load, but env vars might not be ready)
 S3Service.initialize();
@@ -32,12 +31,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // CORS configuration - allow all origins for development
-app.use(cors({
-  origin: true, // Allow all origins
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: true, // Allow all origins
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json());
 app.use(RequestTimingMiddleware.handle);
 
@@ -88,11 +89,21 @@ AppDataSource.initialize()
     console.log('');
     console.log('🔍 Checking AWS S3 configuration...');
     console.log(`   AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID ? '✅ Set' : '❌ Missing'}`);
-    console.log(`   AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`);
-    console.log(`   AWS_S3_BUCKET_NAME: ${process.env.AWS_S3_BUCKET_NAME ? `✅ Set (${process.env.AWS_S3_BUCKET_NAME})` : '❌ Missing'}`);
-    console.log(`   AWS_REGION: ${process.env.AWS_REGION || 'ap-south-1 (Mumbai, India - default)'}`);
-    
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET_NAME) {
+    console.log(
+      `   AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`
+    );
+    console.log(
+      `   AWS_S3_BUCKET_NAME: ${process.env.AWS_S3_BUCKET_NAME ? `✅ Set (${process.env.AWS_S3_BUCKET_NAME})` : '❌ Missing'}`
+    );
+    console.log(
+      `   AWS_REGION: ${process.env.AWS_REGION || 'ap-south-1 (Mumbai, India - default)'}`
+    );
+
+    if (
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY &&
+      process.env.AWS_S3_BUCKET_NAME
+    ) {
       console.log('✅ AWS S3 credentials configured');
       console.log(`📦 S3 Bucket: ${process.env.AWS_S3_BUCKET_NAME}`);
       console.log(`🌍 S3 Region: ${process.env.AWS_REGION || 'ap-south-1 (Mumbai, India)'}`);
@@ -113,7 +124,7 @@ AppDataSource.initialize()
       console.log('   AWS_REGION=ap-south-1 (Mumbai, India - optional, default)');
     }
     console.log('');
-    
+
     // Auto-cancel: pending orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
     OrderAutoCancelService.start();
 
@@ -123,7 +134,7 @@ AppDataSource.initialize()
   })
   .catch((error: any) => {
     console.error('❌ Database connection error:', error.message || error);
-    
+
     // Helpful hints for ETIMEDOUT (can't reach DB host)
     if (error.code === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT')) {
       console.error('');
@@ -132,10 +143,12 @@ AppDataSource.initialize()
       console.error('   2. MySQL is running: mysql is running, or brew services start mysql');
       console.error('   3. If remote DB: firewall, security group, or VPN blocking port 3306');
       console.error('   4. DB_PORT (default 3306) matches your MySQL port');
-      console.error(`   Current: host=${process.env.DB_HOST || 'localhost'} port=${process.env.DB_PORT || '3306'}`);
+      console.error(
+        `   Current: host=${process.env.DB_HOST || 'localhost'} port=${process.env.DB_PORT || '3306'}`
+      );
       console.error('');
     }
-    
+
     // Check for specific index drop error
     if (error.code === 'ER_DROP_INDEX_FK' || error.errno === 1553) {
       console.error('');
@@ -147,7 +160,7 @@ AppDataSource.initialize()
       console.error('   3. Or manually verify the database schema is correct');
       console.error('');
     }
-    
+
     console.error('⚠️  Server will still start, but database operations will fail');
     // Start server anyway (for health checks)
     app.listen(PORT, () => {

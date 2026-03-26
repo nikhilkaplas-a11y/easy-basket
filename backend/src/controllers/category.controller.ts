@@ -12,13 +12,13 @@ export class CategoryController {
       const includeInactive = req.query.includeInactive === 'true';
 
       const categoryRepository = AppDataSource.getRepository(Category);
-      
+
       // Build query
       const queryBuilder = categoryRepository
         .createQueryBuilder('category')
         .leftJoinAndSelect('category.subcategories', 'subcategories')
         .leftJoinAndSelect('category.parentCategory', 'parentCategory');
-      
+
       // Only filter by isActive if includeInactive is not true
       if (!includeInactive) {
         queryBuilder.where('category.isActive = :isActive', { isActive: true });
@@ -26,7 +26,9 @@ export class CategoryController {
 
       // Filter by parent category if provided
       if (parentId) {
-        queryBuilder.andWhere('category.parentCategoryId = :parentId', { parentId: Number(parentId) });
+        queryBuilder.andWhere('category.parentCategoryId = :parentId', {
+          parentId: Number(parentId),
+        });
       } else {
         // Only top-level categories (no parent)
         queryBuilder.andWhere('category.parentCategoryId IS NULL');
@@ -86,16 +88,16 @@ export class CategoryController {
       const { id } = req.params;
       const includeInactive = req.query.includeInactive === 'true';
       const categoryRepository = AppDataSource.getRepository(Category);
-      
-      const whereCondition: any = { 
+
+      const whereCondition: any = {
         parentCategory: { id: Number(id) },
       };
-      
+
       // Only filter by isActive if includeInactive is not true
       if (!includeInactive) {
         whereCondition.isActive = true;
       }
-      
+
       const subcategories = await categoryRepository.find({
         where: whereCondition,
         relations: ['parentCategory'],
@@ -119,7 +121,7 @@ export class CategoryController {
       }
 
       const categoryRepository = AppDataSource.getRepository(Category);
-      
+
       // Check if category with same name already exists under the same parent
       const whereCondition: any = { name: name.trim() };
       if (parentCategoryId) {
@@ -133,9 +135,9 @@ export class CategoryController {
       });
 
       if (existingCategory) {
-        res.status(409).json({ 
+        res.status(409).json({
           message: `Category with name "${name}" already exists${parentCategoryId ? ' in this parent category' : ''}`,
-          error: 'DUPLICATE_CATEGORY_NAME'
+          error: 'DUPLICATE_CATEGORY_NAME',
         });
         return;
       }
@@ -159,26 +161,26 @@ export class CategoryController {
       });
 
       await categoryRepository.save(category);
-      
+
       // Reload with relations
       const savedCategory = await categoryRepository.findOne({
         where: { id: category.id },
         relations: ['parentCategory', 'subcategories'],
       });
-      
+
       res.status(201).json(savedCategory);
     } catch (error: any) {
       console.error('Error creating category:', error);
-      
+
       // Handle duplicate entry error from database
       if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
-        res.status(409).json({ 
+        res.status(409).json({
           message: `Category with name "${req.body.name}" already exists`,
-          error: 'DUPLICATE_CATEGORY_NAME'
+          error: 'DUPLICATE_CATEGORY_NAME',
         });
         return;
       }
-      
+
       res.status(500).json({ message: 'Error creating category' });
     }
   }
@@ -199,8 +201,9 @@ export class CategoryController {
       // Check for duplicate name if name is being updated
       if (name && name.trim() !== category.name) {
         const whereCondition: any = { name: name.trim() };
-        const targetParentId = parentCategoryId !== undefined ? Number(parentCategoryId) : category.parentCategory?.id;
-        
+        const targetParentId =
+          parentCategoryId !== undefined ? Number(parentCategoryId) : category.parentCategory?.id;
+
         if (targetParentId) {
           whereCondition.parentCategory = { id: targetParentId };
         } else {
@@ -212,9 +215,9 @@ export class CategoryController {
         });
 
         if (existingCategory && existingCategory.id !== category.id) {
-          res.status(409).json({ 
+          res.status(409).json({
             message: `Category with name "${name}" already exists${targetParentId ? ' in this parent category' : ''}`,
-            error: 'DUPLICATE_CATEGORY_NAME'
+            error: 'DUPLICATE_CATEGORY_NAME',
           });
           return;
         }
@@ -225,7 +228,9 @@ export class CategoryController {
         if (parentCategoryId === null) {
           category.parentCategory = null;
         } else {
-          const parentCategory = await categoryRepository.findOneBy({ id: Number(parentCategoryId) });
+          const parentCategory = await categoryRepository.findOneBy({
+            id: Number(parentCategoryId),
+          });
           if (!parentCategory) {
             res.status(404).json({ message: 'Parent category not found' });
             return;
@@ -249,16 +254,16 @@ export class CategoryController {
       res.json(category);
     } catch (error: any) {
       console.error('Error updating category:', error);
-      
+
       // Handle duplicate entry error from database
       if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
-        res.status(409).json({ 
+        res.status(409).json({
           message: `Category with name "${req.body.name}" already exists`,
-          error: 'DUPLICATE_CATEGORY_NAME'
+          error: 'DUPLICATE_CATEGORY_NAME',
         });
         return;
       }
-      
+
       res.status(500).json({ message: 'Error updating category' });
     }
   }
@@ -282,4 +287,3 @@ export class CategoryController {
     }
   }
 }
-

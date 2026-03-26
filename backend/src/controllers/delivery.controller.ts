@@ -36,7 +36,7 @@ export class DeliveryController {
       const orders = await queryBuilder.getMany();
       console.log(`✅ Delivery agent ${deliveryBoyId} has ${orders.length} assigned orders`);
       if (orders.length > 0) {
-        console.log(`   Orders: ${orders.map(o => `#${o.id} (${o.status})`).join(', ')}`);
+        console.log(`   Orders: ${orders.map((o) => `#${o.id} (${o.status})`).join(', ')}`);
       }
       res.json(orders);
     } catch (error) {
@@ -64,7 +64,9 @@ export class DeliveryController {
       // Allow delivery agents to update status: accepted -> preparing -> out_for_delivery -> delivered
       const validStatuses = ['accepted', 'preparing', 'out_for_delivery', 'delivered'];
       if (!validStatuses.includes(status)) {
-        res.status(400).json({ message: 'Invalid status. Allowed: accepted, preparing, out_for_delivery, delivered' });
+        res.status(400).json({
+          message: 'Invalid status. Allowed: accepted, preparing, out_for_delivery, delivered',
+        });
         return;
       }
 
@@ -149,25 +151,21 @@ export class DeliveryController {
 
       const orderRepository = AppDataSource.getRepository(Order);
 
-      const [
-        totalDeliveries,
-        pendingDeliveries,
-        todayDeliveries,
-        completedDeliveries,
-      ] = await Promise.all([
-        orderRepository.count({ where: { deliveryBoy: { id: deliveryBoyId } } }),
-        orderRepository.count({
-          where: { deliveryBoy: { id: deliveryBoyId }, status: 'out_for_delivery' },
-        }),
-        orderRepository
-          .createQueryBuilder('order')
-          .where('order.deliveryBoyId = :deliveryBoyId', { deliveryBoyId })
-          .andWhere('DATE(order.createdAt) = CURDATE()')
-          .getCount(),
-        orderRepository.count({
-          where: { deliveryBoy: { id: deliveryBoyId }, status: 'delivered' },
-        }),
-      ]);
+      const [totalDeliveries, pendingDeliveries, todayDeliveries, completedDeliveries] =
+        await Promise.all([
+          orderRepository.count({ where: { deliveryBoy: { id: deliveryBoyId } } }),
+          orderRepository.count({
+            where: { deliveryBoy: { id: deliveryBoyId }, status: 'out_for_delivery' },
+          }),
+          orderRepository
+            .createQueryBuilder('order')
+            .where('order.deliveryBoyId = :deliveryBoyId', { deliveryBoyId })
+            .andWhere('DATE(order.createdAt) = CURDATE()')
+            .getCount(),
+          orderRepository.count({
+            where: { deliveryBoy: { id: deliveryBoyId }, status: 'delivered' },
+          }),
+        ]);
 
       res.json({
         total: totalDeliveries,
@@ -249,10 +247,10 @@ export class DeliveryController {
 
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
-        where: { 
+        where: {
           id: Number(id),
           deliveryBoy: IsNull(), // Only unassigned orders
-          status: 'accepted' // Only accepted orders can be claimed
+          status: 'accepted', // Only accepted orders can be claimed
         },
         relations: ['user', 'deliveryBoy'],
       });
@@ -340,7 +338,7 @@ export class DeliveryController {
       }
 
       const deliveredOrders = await queryBuilder.getMany();
-      
+
       // Calculate earnings (assuming ₹20 per delivery or 5% commission)
       const totalDeliveries = deliveredOrders.length;
       const earningsPerDelivery = 20; // Fixed amount per delivery

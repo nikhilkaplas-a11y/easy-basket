@@ -90,7 +90,9 @@ export class OrderController {
           }
 
           if (variant.product.id !== product.id) {
-            res.status(400).json({ message: `Variant ${item.variantId} does not belong to product ${item.productId}` });
+            res.status(400).json({
+              message: `Variant ${item.variantId} does not belong to product ${item.productId}`,
+            });
             return;
           }
 
@@ -109,9 +111,7 @@ export class OrderController {
           itemPrice = variant.price;
           itemUnit = variant.unit;
           itemStock = variant.stock;
-          displayLabel = item.quantity > 1 
-            ? `${item.quantity} × ${variant.label}`
-            : variant.label;
+          displayLabel = item.quantity > 1 ? `${item.quantity} × ${variant.label}` : variant.label;
         } else {
           // No variant - use product price and stock
           if (product.stock < item.quantity) {
@@ -124,9 +124,7 @@ export class OrderController {
           itemPrice = product.price;
           itemUnit = product.unit || 'piece';
           itemStock = product.stock;
-          displayLabel = item.quantity > 1 
-            ? `${item.quantity} × ${product.name}`
-            : product.name;
+          displayLabel = item.quantity > 1 ? `${item.quantity} × ${product.name}` : product.name;
         }
 
         const itemTotal = itemPrice * item.quantity;
@@ -181,11 +179,7 @@ export class OrderController {
       let paymentOrder = null;
       if (paymentMethod === 'UPI') {
         try {
-          paymentOrder = await PaymentService.createOrder(
-            totalAmount,
-            'INR',
-            `ORDER_${order.id}`
-          );
+          paymentOrder = await PaymentService.createOrder(totalAmount, 'INR', `ORDER_${order.id}`);
         } catch (error) {
           console.error('Payment order creation error:', error);
         }
@@ -258,7 +252,14 @@ export class OrderController {
       // Full data — orders page, order detail ke liye (6 JOINs)
       const orders = await orderRepository.find({
         where: whereCondition,
-        relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
+        relations: [
+          'user',
+          'items',
+          'items.product',
+          'items.variant',
+          'deliveryAddress',
+          'deliveryBoy',
+        ],
         order: { createdAt: 'DESC' },
       });
 
@@ -282,7 +283,14 @@ export class OrderController {
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
         where: { id: Number(id), user: { id: userId } },
-        relations: ['user', 'items', 'items.product', 'items.variant', 'deliveryAddress', 'deliveryBoy'],
+        relations: [
+          'user',
+          'items',
+          'items.product',
+          'items.variant',
+          'deliveryAddress',
+          'deliveryBoy',
+        ],
       });
 
       if (!order) {
@@ -373,4 +381,3 @@ export class OrderController {
     }
   }
 }
-

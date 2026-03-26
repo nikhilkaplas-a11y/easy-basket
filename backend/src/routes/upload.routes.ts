@@ -16,4 +16,3 @@ router.post('/upload-image', uploadSingle, UploadController.uploadImage);
 router.delete('/delete-image', UploadController.deleteImage);
 
 export default router;
-

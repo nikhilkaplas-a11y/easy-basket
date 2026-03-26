@@ -21,7 +21,10 @@ function formatFcmError(error: unknown): string {
       const code = o.code != null ? String(o.code) : '';
       const msg = o.message != null ? String(o.message) : '';
       const details = o.errorInfo ?? o.httpErrorCode ?? '';
-      return JSON.stringify({ code, message: msg, details }) + util.inspect(error, { depth: 3, breakLength: 120 });
+      return (
+        JSON.stringify({ code, message: msg, details }) +
+        util.inspect(error, { depth: 3, breakLength: 120 })
+      );
     }
     return String(error);
   } catch {
@@ -34,7 +37,10 @@ function formatFcmError(error: unknown): string {
  * Safe to clear DB token so the next app open registers a new one.
  */
 function isPermanentFcmTokenFailure(error: unknown): boolean {
-  const o = typeof error === 'object' && error !== null ? (error as { code?: string; message?: string }) : null;
+  const o =
+    typeof error === 'object' && error !== null
+      ? (error as { code?: string; message?: string })
+      : null;
   const code = o?.code ?? '';
   const msg = (o?.message ?? (error instanceof Error ? error.message : String(error))) as string;
   if (code === 'messaging/registration-token-not-registered') return true;
@@ -197,7 +203,7 @@ export class FCMService {
   ): Promise<number> {
     console.log(`📤 [FCM] Sending notification to role: ${role}`);
     console.log(`📤 [FCM] Title: ${title}, Body: ${body}`);
-    
+
     if (!this.initialized) {
       console.warn('⚠️ [FCM] FCM not initialized, skipping notification');
       return 0;
@@ -266,4 +272,3 @@ export class FCMService {
 
 // Initialize on module load
 FCMService.initialize();
-

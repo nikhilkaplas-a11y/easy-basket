@@ -37,4 +37,3 @@ export class ServiceArea {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

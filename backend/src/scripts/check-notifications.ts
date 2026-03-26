@@ -13,7 +13,7 @@ async function checkNotifications() {
     // Check Firebase initialization
     console.log('\n📱 Checking Firebase FCM Service...');
     // FCMService is initialized on module load, so it should be ready
-    
+
     // Check admin users
     console.log('\n👤 Checking admin users...');
     const userRepository = AppDataSource.getRepository(User);
@@ -35,7 +35,7 @@ async function checkNotifications() {
     });
 
     // Test notification sending
-    if (adminUsers.length > 0 && adminUsers.some(u => u.fcmToken)) {
+    if (adminUsers.length > 0 && adminUsers.some((u) => u.fcmToken)) {
       console.log('\n📤 Testing notification send...');
       const result = await FCMService.sendNotificationToRole(
         'admin',
@@ -57,4 +57,3 @@ async function checkNotifications() {
 }
 
 checkNotifications();
-

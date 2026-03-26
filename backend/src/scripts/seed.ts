@@ -17,7 +17,13 @@ async function seed() {
     const serviceAreaRepository = AppDataSource.getRepository(ServiceArea);
 
     const serviceAreas = [
-      { pincode: '140301', city: 'Khanna', state: 'Punjab', country: 'India', notes: 'Added for service' },
+      {
+        pincode: '140301',
+        city: 'Khanna',
+        state: 'Punjab',
+        country: 'India',
+        notes: 'Added for service',
+      },
     ];
 
     for (const sa of serviceAreas) {

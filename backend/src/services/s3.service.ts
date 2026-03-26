@@ -127,7 +127,9 @@ export class S3Service {
       };
     } catch (error) {
       console.error('❌ Error uploading to S3:', error);
-      throw new Error(`Failed to upload image to S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to upload image to S3: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -149,7 +151,9 @@ export class S3Service {
       console.log(`✅ Image deleted from S3: ${key}`);
     } catch (error) {
       console.error('❌ Error deleting from S3:', error);
-      throw new Error(`Failed to delete image from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to delete image from S3: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -160,13 +164,13 @@ export class S3Service {
     try {
       // URL format: https://bucket-name.s3.region.amazonaws.com/products/filename.jpg
       const urlObj = new URL(url);
-      const pathParts = urlObj.pathname.split('/').filter(p => p);
-      
+      const pathParts = urlObj.pathname.split('/').filter((p) => p);
+
       if (pathParts.length >= 2) {
         // Remove bucket name (first part), return rest
         return pathParts.slice(1).join('/');
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error extracting key from URL:', error);
@@ -177,4 +181,3 @@ export class S3Service {
 
 // Initialize on module load
 S3Service.initialize();
-

@@ -21,7 +21,17 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'easy_basket',
   synchronize: false, // Disabled to prevent index drop errors with foreign keys. Schema is already correct.
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Product, Order, Category, Address, OrderItem, RefreshToken, ServiceArea, ProductVariant],
+  entities: [
+    User,
+    Product,
+    Order,
+    Category,
+    Address,
+    OrderItem,
+    RefreshToken,
+    ServiceArea,
+    ProductVariant,
+  ],
   subscribers: [],
   migrations: [],
   extra: {

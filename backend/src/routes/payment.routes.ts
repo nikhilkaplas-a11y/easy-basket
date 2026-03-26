@@ -9,4 +9,3 @@ router.post('/verify', PaymentController.verifyPayment);
 router.post('/webhook/razorpay', PaymentController.razorpayWebhook);
 
 export default router;
-
