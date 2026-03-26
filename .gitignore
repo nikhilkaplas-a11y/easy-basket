@@ -23,7 +23,6 @@ mobile/.env
 *.bak4
 
 # Build outputs
-backend/dist/
 backend/build/
 mobile/build/
 mobile/.dart_tool/
