@@ -29,6 +29,12 @@ module.exports = {
       TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
       TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
       TWILIO_VERIFY_SERVICE_SID: process.env.TWILIO_VERIFY_SERVICE_SID,
+      REDIS_URL: process.env.REDIS_URL,
+      REDIS_HOST: process.env.REDIS_HOST,
+      REDIS_PORT: process.env.REDIS_PORT,
+      REDIS_USERNAME: process.env.REDIS_USERNAME,
+      REDIS_PASSWORD: process.env.REDIS_PASSWORD,
+      REDIS_TLS: process.env.REDIS_TLS,
     },
     // Auto-restart settings
     autorestart: true,
