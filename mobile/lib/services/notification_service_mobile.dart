@@ -235,6 +235,7 @@ class NotificationService {
     if (_context == null) return;
 
     final type = data?['type'] as String? ?? '';
+    final status = data?['status'] as String? ?? '';
     final isAdmin = _authProvider?.user?.role == 'admin';
     final isAdminOrderAction = isAdmin && type == 'new_order';
 
@@ -242,8 +243,6 @@ class NotificationService {
     late OverlayEntry entry;
 
     if (isAdminOrderAction) {
-      // Admin ke liye action banner — Accept/Reject buttons ke saath
-      // Tab tak rahega jab tak action na le ya dismiss na kare
       entry = OverlayEntry(
         builder: (context) => _AdminActionBanner(
           title: title,
@@ -279,13 +278,16 @@ class NotificationService {
         ),
       );
       overlay.insert(entry);
-      // No auto-dismiss — admin ko action lena hai
     } else {
-      // Normal banner — 6 sec ke liye
+      // Status-based banner
+      final isCancelled = status == 'cancelled' || type.contains('cancelled');
       entry = OverlayEntry(
         builder: (context) => _NotificationBanner(
           title: title,
           body: body,
+          status: status,
+          type: type,
+          isCancelled: isCancelled,
           onTap: () {
             entry.remove();
             if (data != null) _navigateFromNotification(data);
@@ -294,7 +296,8 @@ class NotificationService {
         ),
       );
       overlay.insert(entry);
-      Future.delayed(const Duration(seconds: 6), () {
+      // Cancelled = stays 10 sec, normal = 6 sec
+      Future.delayed(Duration(seconds: isCancelled ? 10 : 6), () {
         if (entry.mounted) entry.remove();
       });
     }
@@ -614,17 +617,116 @@ class _AdminActionBannerState extends State<_AdminActionBanner>
   }
 }
 
+// ── Status-based styling helper ──
+class _BannerStyle {
+  final Color bgColor;
+  final Color iconBgColor;
+  final Color iconColor;
+  final Color accentColor;
+  final IconData icon;
+  final String emoji;
+
+  const _BannerStyle({
+    required this.bgColor,
+    required this.iconBgColor,
+    required this.iconColor,
+    required this.accentColor,
+    required this.icon,
+    required this.emoji,
+  });
+
+  static _BannerStyle fromStatus(String status, String type) {
+    final s = status.toLowerCase();
+    final t = type.toLowerCase();
+
+    if (s == 'cancelled' || t.contains('cancelled')) {
+      return const _BannerStyle(
+        bgColor: Color(0xFFFFF5F5),
+        iconBgColor: Color(0xFFFFEBEE),
+        iconColor: Color(0xFFE53935),
+        accentColor: Color(0xFFE53935),
+        icon: Icons.cancel_rounded,
+        emoji: '⚠️',
+      );
+    }
+    if (s == 'delivered' || t.contains('delivered')) {
+      return const _BannerStyle(
+        bgColor: Color(0xFFF1F8E9),
+        iconBgColor: Color(0xFFC8E6C9),
+        iconColor: Color(0xFF2E7D32),
+        accentColor: Color(0xFF2E7D32),
+        icon: Icons.check_circle_rounded,
+        emoji: '✅',
+      );
+    }
+    if (s == 'out_for_delivery') {
+      return const _BannerStyle(
+        bgColor: Color(0xFFE8F5E9),
+        iconBgColor: Color(0xFFC8E6C9),
+        iconColor: Color(0xFF43A047),
+        accentColor: Color(0xFF43A047),
+        icon: Icons.delivery_dining_rounded,
+        emoji: '🚚',
+      );
+    }
+    if (s == 'preparing') {
+      return const _BannerStyle(
+        bgColor: Color(0xFFFFF8E1),
+        iconBgColor: Color(0xFFFFECB3),
+        iconColor: Color(0xFFF57C00),
+        accentColor: Color(0xFFF57C00),
+        icon: Icons.restaurant_rounded,
+        emoji: '🍳',
+      );
+    }
+    if (s == 'accepted' || s == 'confirmed') {
+      return const _BannerStyle(
+        bgColor: Color(0xFFE3F2FD),
+        iconBgColor: Color(0xFFBBDEFB),
+        iconColor: Color(0xFF1565C0),
+        accentColor: Color(0xFF1565C0),
+        icon: Icons.thumb_up_rounded,
+        emoji: '🔵',
+      );
+    }
+    if (s == 'pending' || t.contains('new_order')) {
+      return const _BannerStyle(
+        bgColor: Color(0xFFFFF8E1),
+        iconBgColor: Color(0xFFFFF3E0),
+        iconColor: Color(0xFFFF9800),
+        accentColor: Color(0xFFFF9800),
+        icon: Icons.shopping_bag_rounded,
+        emoji: '🟡',
+      );
+    }
+    // Default — generic notification
+    return const _BannerStyle(
+      bgColor: Color(0xFFF5F5F5),
+      iconBgColor: Color(0xFFE8F5E9),
+      iconColor: Color(0xFF4CAF50),
+      accentColor: Color(0xFF4CAF50),
+      icon: Icons.notifications_active_rounded,
+      emoji: '🔔',
+    );
+  }
+}
+
 // ── In-App Notification Banner Widget ──
-// Kyun: Jab app foreground mein ho tab ye banner top pe slide hoke aata hai
 class _NotificationBanner extends StatefulWidget {
   final String title;
   final String body;
+  final String status;
+  final String type;
+  final bool isCancelled;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
 
   const _NotificationBanner({
     required this.title,
     required this.body,
+    required this.status,
+    required this.type,
+    required this.isCancelled,
     required this.onTap,
     required this.onDismiss,
   });
@@ -641,16 +743,14 @@ class _NotificationBannerState extends State<_NotificationBanner>
   @override
   void initState() {
     super.initState();
-    // Slide animation — upar se neeche aata hai
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1), // upar se
-      end: Offset.zero,           // apni jagah pe
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-
+      begin: const Offset(0, -1.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
   }
 
@@ -663,6 +763,7 @@ class _NotificationBannerState extends State<_NotificationBanner>
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final style = _BannerStyle.fromStatus(widget.status, widget.type);
 
     return Positioned(
       top: 0,
@@ -673,77 +774,115 @@ class _NotificationBannerState extends State<_NotificationBanner>
         child: GestureDetector(
           onTap: widget.onTap,
           onVerticalDragEnd: (details) {
-            // Upar swipe kare toh dismiss
             if (details.primaryVelocity != null && details.primaryVelocity! < 0) {
               widget.onDismiss();
             }
           },
           child: Container(
-            margin: EdgeInsets.only(top: topPadding + 4, left: 12, right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            margin: EdgeInsets.only(top: topPadding + 8, left: 14, right: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              color: style.bgColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: style.accentColor.withValues(alpha: 0.2), width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
+                  color: style.accentColor.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Green icon
+                // Accent bar at top
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.notifications_active_rounded,
-                    color: Color(0xFF4CAF50),
-                    size: 22,
+                    color: style.accentColor,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(3)),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Title + Body
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                  child: Row(
                     children: [
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
+                      // Status icon with colored bg
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: style.iconBgColor,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        child: Icon(style.icon, color: style.iconColor, size: 24),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.body,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                      const SizedBox(width: 12),
+                      // Title + Body
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: widget.isCancelled ? const Color(0xFFE53935) : Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              widget.body,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[700],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 8),
+                      // Action area — Track button or dismiss
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: widget.onDismiss,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.close, size: 14, color: Colors.grey[500]),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Track arrow
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: style.accentColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.arrow_forward_rounded, size: 16, color: style.accentColor),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ),
-                // Close button
-                GestureDetector(
-                  onTap: widget.onDismiss,
-                  child: Icon(
-                    Icons.close,
-                    size: 18,
-                    color: Colors.grey[400],
                   ),
                 ),
               ],
