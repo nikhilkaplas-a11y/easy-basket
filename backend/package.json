@@ -27,6 +27,7 @@
     "multer": "2.0.2",
     "mysql2": "3.15.3",
     "razorpay": "^2.9.2",
+    "redis": "5.11.0",
     "reflect-metadata": "0.2.2",
     "twilio": "5.12.2",
     "typeorm": "0.3.27"

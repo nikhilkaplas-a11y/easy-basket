@@ -4,6 +4,7 @@ import { AppDataSource } from './config/database';
 import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
 import { OrderAutoCancelService } from './services/order-auto-cancel.service';
+import { RedisService } from './services/redis.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.routes';
@@ -66,11 +67,23 @@ app.get('/api/health', (req, res) => {
 });
 
 AppDataSource.initialize()
-  .then(() => {
+  .then(async () => {
     console.log('✅ Database connected successfully');
     console.log(`📊 Database: ${process.env.DB_NAME || 'easy_basket'}`);
     console.log(`🌐 Host: ${process.env.DB_HOST || 'localhost'}`);
-    
+
+    try {
+      await RedisService.pingRequired();
+      console.log('✅ Redis connected (required)');
+    } catch (redisErr) {
+      console.error('❌ Redis is required but unavailable:', (redisErr as Error).message);
+      console.error(
+        '💡 Set REDIS_URL or REDIS_HOST, REDIS_PORT, REDIS_PASSWORD (optional: REDIS_USERNAME, REDIS_TLS).'
+      );
+      await AppDataSource.destroy().catch(() => undefined);
+      process.exit(1);
+    }
+
     // Check S3 initialization status with detailed debugging
     console.log('');
     console.log('🔍 Checking AWS S3 configuration...');
