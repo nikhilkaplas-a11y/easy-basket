@@ -17,6 +17,7 @@ import 'providers/service_area_provider.dart';
 import 'routes/app_router.dart';
 import 'utils/theme.dart';
 import 'services/razorpay_service.dart';
+import 'widgets/app_lifecycle_refresh.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -134,15 +135,19 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         routerConfig: AppRouter.router,
         builder: (context, child) {
-          // Initialize notification service when app is ready (mobile only)
+          final content = child ?? const SizedBox.shrink();
+          // Refetch active orders when app returns from background (FCM alone is not enough).
+          final wrapped = kIsWeb
+              ? content
+              : AppLifecycleRefresh(
+                  child: content,
+                );
           if (!kIsWeb) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               try {
                 final authProvider = Provider.of<AuthProvider>(context, listen: false);
                 final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                
-                // Initialize for all authenticated users (not just admin)
-                // Admin will receive order notifications, customers will receive order updates
+
                 if (authProvider.user != null) {
                   debugPrint('📱 [NOTIFICATION] Initializing for user: ${authProvider.user!.role}');
                   NotificationService().initialize(
@@ -158,7 +163,7 @@ class MyApp extends StatelessWidget {
               }
             });
           }
-          return child!;
+          return wrapped;
         },
       ),
     );

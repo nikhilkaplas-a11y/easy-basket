@@ -158,23 +158,30 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('📩 [FCM] Foreground message: ${message.notification?.title}');
 
+      // Refresh bar even for data-only messages (notification can be null)
+      _maybeRefreshOrdersFromPayload(message.data);
+
       final notification = message.notification;
       if (notification == null) return;
 
-      // In-app banner dikhao
       _showInAppBanner(
         title: notification.title ?? 'Easy Basket',
         body: notification.body ?? '',
         data: message.data,
       );
-
-      // Order related notification hai? → Orders refresh karo
-      // Kyun: Active order bar pe turant status update dikhao — bina polling ke
-      final type = message.data['type'] as String? ?? '';
-      if (type.contains('order')) {
-        _refreshOrders();
-      }
     });
+  }
+
+  /// Any backend payload that signals an order lifecycle change → refetch active orders bar.
+  void _maybeRefreshOrdersFromPayload(Map<String, dynamic> data) {
+    final type = (data['type'] as String? ?? '').toLowerCase();
+    final orderIdRaw = data['orderId']?.toString();
+    final hasOrderId = orderIdRaw != null && orderIdRaw.isNotEmpty;
+    final shouldRefresh =
+        type.contains('order') || (hasOrderId && type.isEmpty);
+    if (shouldRefresh) {
+      _refreshOrders();
+    }
   }
 
   // ── Orders refresh karo (FCM trigger pe) ──
@@ -184,7 +191,10 @@ class NotificationService {
 
     try {
       final orderProvider = Provider.of<OrderProvider>(_context!, listen: false);
-      orderProvider.fetchActiveOrders(_authProvider!.token!);
+      orderProvider.fetchActiveOrders(
+        _authProvider!.token!,
+        getUpdatedToken: () => _authProvider?.token,
+      );
       debugPrint('🔄 [FCM] Orders refreshed after order notification');
     } catch (e) {
       debugPrint('❌ [FCM] Error refreshing orders: $e');
@@ -196,6 +206,7 @@ class NotificationService {
   void _listenNotificationTap() {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('👆 [FCM] Notification tapped: ${message.notification?.title}');
+      _maybeRefreshOrdersFromPayload(message.data);
       _navigateFromNotification(message.data);
     });
   }
@@ -206,8 +217,8 @@ class NotificationService {
     final message = await _messaging.getInitialMessage();
     if (message != null) {
       debugPrint('🚀 [FCM] App opened from notification: ${message.notification?.title}');
-      // Thoda delay do taki app puri load ho jaye
       Future.delayed(const Duration(seconds: 1), () {
+        _maybeRefreshOrdersFromPayload(message.data);
         _navigateFromNotification(message.data);
       });
     }
