@@ -310,12 +310,12 @@ class NotificationService {
 
     debugPrint('🧭 [FCM] Navigate — type: $type, orderId: $orderId');
 
-    // Type ke prefix se decide karo kahan jaana hai
-    if (type.startsWith('ORDER_') && orderId != null) {
+    // Type se decide karo kahan jaana hai
+    if (type.contains('order') && orderId != null) {
       _context!.push('/order/$orderId');
-    } else if (type.startsWith('PAYMENT_') && orderId != null) {
+    } else if (type.contains('payment') && orderId != null) {
       _context!.push('/order/$orderId');
-    } else if (type.startsWith('PROMO_') && categoryId != null) {
+    } else if (type.contains('promo') && categoryId != null) {
       _context!.push('/categories/$categoryId/products', extra: {
         'parentCategoryName': data['categoryName'] ?? 'Offers',
       });
