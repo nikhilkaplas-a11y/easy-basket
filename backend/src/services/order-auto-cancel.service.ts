@@ -86,8 +86,8 @@ export class OrderAutoCancelService {
             () =>
               FCMService.sendNotification(
                 userToken,
-                'Order Cancelled',
-                `Order #${oid} was auto-cancelled — not confirmed within ${windowMins} minutes. Please try again.`,
+                '😔 Order Cancelled',
+                `We're sorry! Your order #${oid} couldn't be processed this time. Please try again — we'd love to serve you! 🙏`,
                 { orderId: oid.toString(), type: 'ORDER_CANCELLED' },
                 `auto-cancel customerId=${customerId} order=#${oid}`,
                 customerId
@@ -100,8 +100,8 @@ export class OrderAutoCancelService {
           () =>
             FCMService.sendNotificationToRole(
               'admin',
-              'Order Auto-Cancelled',
-              `Order #${oid} auto-cancelled — not accepted within ${windowMins} minutes`,
+              '⚠️ Order Auto-Cancelled',
+              `⚠️ Order #${oid} auto-cancelled — was pending for ${windowMins} minutes`,
               { orderId: oid.toString(), type: 'ORDER_CANCELLED' }
             ),
           `auto-cancel notify admins #${oid}`

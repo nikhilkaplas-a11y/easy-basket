@@ -190,8 +190,8 @@ export class OrderController {
         () =>
           FCMService.sendNotificationToRole(
             'admin',
-            'New Order Received',
-            `Order #${order.id} for ₹${totalAmount}`,
+            '🛒 New Order!',
+            `🛒 New order • ₹${totalAmount} — Order #${order.id}`,
             { orderId: order.id.toString(), type: 'new_order' }
           ),
         `notify admins new order #${order.id}`
@@ -367,8 +367,8 @@ export class OrderController {
         () =>
           FCMService.sendNotificationToRole(
             'admin',
-            'Order Cancelled',
-            `Order #${order.id} has been cancelled`,
+            '😔 Order Cancelled',
+            `Order #${order.id} has been cancelled by customer`,
             { orderId: order.id.toString(), type: 'order_cancelled' }
           ),
         `notify admins customer cancelled #${order.id}`

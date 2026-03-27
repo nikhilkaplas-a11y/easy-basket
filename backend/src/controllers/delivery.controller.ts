@@ -90,14 +90,14 @@ export class DeliveryController {
         let notificationBody = `Your order #${order.id} status: ${status}`;
 
         if (status === 'preparing') {
-          notificationTitle = 'Order Preparing';
-          notificationBody = `Your order #${order.id} is being prepared`;
+          notificationTitle = '📦 Packing Your Order';
+          notificationBody = `Your order #${order.id} is being carefully packed 📦 Sit tight, almost ready!`;
         } else if (status === 'out_for_delivery') {
-          notificationTitle = 'Out for Delivery';
-          notificationBody = `Your order #${order.id} is out for delivery`;
+          notificationTitle = '🚚 On The Way!';
+          notificationBody = `Your order #${order.id} is on its way! 🚚 Our delivery partner is heading to you`;
         } else if (status === 'delivered') {
-          notificationTitle = 'Order Delivered';
-          notificationBody = `Your order #${order.id} has been delivered. Thank you!`;
+          notificationTitle = '🎉 Delivered!';
+          notificationBody = `Your order #${order.id} has been delivered! 🎉 Enjoy your fresh groceries. Thank you for choosing Easy Basket!`;
         }
 
         const token = order.user.fcmToken;
@@ -126,8 +126,8 @@ export class DeliveryController {
         () =>
           FCMService.sendNotificationToRole(
             'admin',
-            'Order Status Updated',
-            `Order #${oid} status updated to ${status} by delivery boy`,
+            '📦 Order Update',
+            `Order #${oid} → ${status} (updated by delivery partner)`,
             { orderId: oid.toString(), status, type: 'order_status_update' }
           ),
         `notify admins delivery status #${oid}`

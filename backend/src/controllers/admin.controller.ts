@@ -142,8 +142,8 @@ export class AdminController {
             () =>
               FCMService.sendNotification(
                 token,
-                'New Delivery Assignment',
-                `Order #${oid} assigned to you`,
+                '📍 New Delivery',
+                `New delivery assigned! 📍 Order #${oid} — Pick up now`,
                 { orderId: oid.toString(), type: 'order_assigned' },
                 `admin-assign-delivery order=#${oid} deliveryUserId=${deliveryUserId}`,
                 deliveryUserId
@@ -160,14 +160,20 @@ export class AdminController {
         let notificationBody = `Your order #${order.id} status: ${status}`;
 
         if (status === 'accepted') {
-          notificationTitle = 'Order Accepted';
-          notificationBody = `Your order #${order.id} has been accepted and is being prepared`;
+          notificationTitle = '✅ Order Confirmed';
+          notificationBody = `Great news! Your order #${order.id} is confirmed. We're getting it ready for you! ✅`;
+        } else if (status === 'preparing') {
+          notificationTitle = '📦 Packing Your Order';
+          notificationBody = `Your order #${order.id} is being carefully packed 📦 Sit tight, almost ready!`;
         } else if (status === 'out_for_delivery') {
-          notificationTitle = 'Out for Delivery';
-          notificationBody = `Your order #${order.id} is out for delivery`;
+          notificationTitle = '🚚 On The Way!';
+          notificationBody = `Your order #${order.id} is on its way! 🚚 Our delivery partner is heading to you`;
         } else if (status === 'delivered') {
-          notificationTitle = 'Order Delivered';
-          notificationBody = `Your order #${order.id} has been delivered. Thank you!`;
+          notificationTitle = '🎉 Delivered!';
+          notificationBody = `Your order #${order.id} has been delivered! 🎉 Enjoy your fresh groceries. Thank you for choosing Easy Basket!`;
+        } else if (status === 'cancelled') {
+          notificationTitle = '😔 Order Cancelled';
+          notificationBody = `We're sorry! Your order #${order.id} has been cancelled. Please try again — we'd love to serve you! 🙏`;
         }
 
         const token = order.user.fcmToken;
