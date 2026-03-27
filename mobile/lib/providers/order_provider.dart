@@ -19,6 +19,13 @@ class OrderProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  /// Sync addresses from AddressProvider — no extra API call
+  /// Used by home screen to keep OrderProvider in sync
+  void syncAddresses(List<AddressModel> addresses) {
+    _addresses = addresses;
+    notifyListeners();
+  }
+
   OrderProvider({required this.apiService});
 
   Future<void> fetchOrders(String token, {String? Function()? getUpdatedToken, String? status, String? fields}) async {
@@ -236,6 +243,7 @@ class OrderProvider with ChangeNotifier {
       return null;
     }
   }
+
 
   Future<void> fetchAddresses(String token) async {
     _isLoading = true;

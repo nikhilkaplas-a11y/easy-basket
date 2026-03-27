@@ -5,6 +5,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../providers/location_provider.dart';
+import '../../providers/proximity_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../widgets/address_completion_sheet.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 
@@ -17,7 +22,8 @@ class CartScreen extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
     final orderProvider = Provider.of<OrderProvider>(context);
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
-    final hasAddress = orderProvider.addresses.isNotEmpty;
+    final addressProvider = Provider.of<AddressProvider>(context);
+    final hasAddress = orderProvider.addresses.isNotEmpty || addressProvider.hasAddresses;
 
     if (cartProvider.items.isEmpty) {
       return Scaffold(
@@ -418,8 +424,35 @@ class CartScreen extends StatelessWidget {
                           duration: Duration(seconds: 3),
                         ),
                       );
-                      context.push('/address/add');
+                      // Check if GPS detected partial address available
+                      final proximityProv = Provider.of<ProximityProvider>(context, listen: false);
+                      if (proximityProv.partialAddress != null) {
+                        // Show bottom sheet — quick address completion (Blinkit style)
+                        AddressCompletionSheet.show(
+                          context: context,
+                          partialAddress: proximityProv.partialAddress!,
+                          onAddressSaved: () {
+                            // Address saved — refresh addresses and go to payment
+                            final authProv = Provider.of<AuthProvider>(context, listen: false);
+                            final addrProv = Provider.of<AddressProvider>(context, listen: false);
+                            if (authProv.token != null) {
+                              Provider.of<OrderProvider>(context, listen: false).fetchAddresses(authProv.token!);
+                              addrProv.fetchAddresses(authProv.token!).then((_) {
+                                final selectedId = addrProv.selectedAddress?.id ?? addrProv.defaultAddress?.id;
+                                if (selectedId != null && context.mounted) {
+                                  context.push('/payment', extra: {'addressId': selectedId});
+                                }
+                              });
+                            }
+                          },
+                        );
+                      } else {
+                        // No GPS data — open full add address screen
+                        context.push('/address/add');
+                      }
                     } else {
+                      // Has address — go to select address screen
+                      // User picks address → proceeds to payment from there
                       context.push('/addresses');
                     }
                   },

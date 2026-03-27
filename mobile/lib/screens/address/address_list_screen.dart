@@ -6,6 +6,9 @@ import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/service_area_provider.dart';
+import '../../providers/location_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../providers/proximity_provider.dart';
 import '../../models/address_model.dart';
 import '../../utils/theme.dart';
 
@@ -103,11 +106,23 @@ class _AddressListScreenState extends State<AddressListScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        title: const Text('Select Address', style: TextStyle(fontWeight: FontWeight.bold)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.shopping_basket_rounded, color: Colors.white, size: 18),
+          ),
         ),
+        title: const Text('Choose Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.black54),
+            onPressed: () => context.pop(),
+          ),
+        ],
       ),
       body: (orderProvider.isLoading || _isUpdating || _isCheckingService)
           ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen)))
@@ -139,14 +154,98 @@ class _AddressListScreenState extends State<AddressListScreen> {
                 )
               : Column(
                   children: [
-                    // Header
+                    // Use Current Location bar
+                    Consumer<LocationProvider>(
+                      builder: (context, locationProvider, _) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F9F5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.15)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen, size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    locationProvider.isPermissionGranted
+                                        ? 'Use Current Location'
+                                        : 'Use Current Location',
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () async {
+                                    if (locationProvider.isPermissionGranted) {
+                                      // GPS granted — detect and use current location
+                                      await locationProvider.detectLocation();
+                                      if (mounted && locationProvider.detectedAddress != null) {
+                                        final partial = locationProvider.detectedAddress!;
+                                        context.push('/address/add', extra: {
+                                          'city': partial.city ?? '',
+                                          'state': partial.state ?? '',
+                                          'pincode': partial.pincode ?? '',
+                                          'latitude': partial.latitude.toString(),
+                                          'longitude': partial.longitude.toString(),
+                                        });
+                                      }
+                                    } else if (locationProvider.isPermissionPermanentlyDenied) {
+                                      await locationProvider.openAppSettings();
+                                    } else {
+                                      final granted = await locationProvider.requestPermission();
+                                      if (granted) {
+                                        await locationProvider.detectLocation();
+                                        if (mounted && locationProvider.detectedAddress != null) {
+                                          final partial = locationProvider.detectedAddress!;
+                                          context.push('/address/add', extra: {
+                                            'city': partial.city ?? '',
+                                            'state': partial.state ?? '',
+                                            'pincode': partial.pincode ?? '',
+                                            'latitude': partial.latitude.toString(),
+                                            'longitude': partial.longitude.toString(),
+                                          });
+                                        }
+                                      }
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: locationProvider.isPermissionGranted
+                                          ? AppTheme.primaryGreen.withValues(alpha: 0.1)
+                                          : const Color(0xFFE3F2FD),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      locationProvider.isPermissionGranted ? 'Use >' : 'Enable >',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: locationProvider.isPermissionGranted
+                                            ? AppTheme.primaryGreen
+                                            : const Color(0xFF1565C0),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    // Address count header
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Row(
                         children: [
-                          Text('Your Addresses', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.grey)),
+                          Text('Your Addresses', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.grey)),
                           const Spacer(),
-                          Text('${orderProvider.addresses.length} saved', style: TextStyle(fontSize: 12, color: AppTheme.grey)),
+                          Text('${orderProvider.addresses.length} saved', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
                         ],
                       ),
                     ),
@@ -247,7 +346,10 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                   print('✅ [TAP] Service available, updating selection to address ID: ${address.id}');
                                 }
                                 setState(() => _selectedAddressId = address.id);
-                                
+
+                                // Sync with AddressProvider — so home screen reflects change
+                                Provider.of<AddressProvider>(context, listen: false).selectAddress(address);
+
                                 // If not from checkout, update default and go back
                                 if (!_isFromCheckout) {
                                   _updateDefaultAddress(address.id);
@@ -326,19 +428,69 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                         ],
                                       ),
                                     ),
-                                    // Edit button
-                                    if (!_isFromCheckout)
-                                      GestureDetector(
-                                        onTap: () => context.push('/address/edit', extra: address),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF5F5F5),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.grey),
+                                    // Distance badge + Edit button column
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        // Distance badge — shows "2.3 km" from GPS
+                                        Consumer<LocationProvider>(
+                                          builder: (context, locationProvider, _) {
+                                            if (!locationProvider.isPermissionGranted ||
+                                                locationProvider.currentPosition == null ||
+                                                address.latitude == null ||
+                                                address.longitude == null) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+                                            final dist = proximityProvider.getDistanceKm(
+                                              locationProvider.currentPosition!,
+                                              address,
+                                            );
+                                            if (dist == null) return const SizedBox.shrink();
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: dist < 5
+                                                    ? const Color(0xFFE8F5E9)
+                                                    : dist < 20
+                                                        ? const Color(0xFFFFF8E1)
+                                                        : const Color(0xFFFFEBEE),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                dist < 1
+                                                    ? '${(dist * 1000).toStringAsFixed(0)}m'
+                                                    : '${dist.toStringAsFixed(1)} km',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: dist < 5
+                                                      ? AppTheme.primaryGreen
+                                                      : dist < 20
+                                                          ? const Color(0xFFF57C00)
+                                                          : const Color(0xFFE53935),
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
-                                      ),
+                                        if (!_isFromCheckout) ...[
+                                          const SizedBox(height: 8),
+                                          // Edit button
+                                          GestureDetector(
+                                            onTap: () => context.push('/address/edit', extra: address),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF5F5F5),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.grey),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -595,6 +747,9 @@ class _AddressListScreenState extends State<AddressListScreen> {
       setState(() => _isUpdating = false);
       
       if (success && mounted) {
+        // Reset proximity so home screen re-checks with new address
+        Provider.of<ProximityProvider>(context, listen: false).reset();
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Default address updated'),
@@ -602,7 +757,6 @@ class _AddressListScreenState extends State<AddressListScreen> {
             backgroundColor: AppTheme.primaryGreen,
           ),
         );
-        // Small delay to show the update, then go back
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
           context.pop();

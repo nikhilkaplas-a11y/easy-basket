@@ -11,12 +11,17 @@ import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/service_area_provider.dart';
+import '../../providers/location_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../providers/proximity_provider.dart';
+import '../../models/proximity_result.dart';
 import '../../services/location_onboarding_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/active_order_bar.dart';
+import '../../widgets/smart_suggestion_banner.dart';
 import '../../models/category_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -75,25 +80,197 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (mounted) _startAutoScroll();
       });
       
-      // Fetch addresses and orders if user is authenticated
+      // Fetch orders and run smart address detection if authenticated
       if (authProvider.token != null) {
-        // Lightweight fetch — sirf active orders (id, status, totalAmount)
-        // Kyun: Home pe sirf active order bar dikhana hai — full data nahi chahiye
+        // 1. Fetch active orders (lightweight — for active order bar)
         orderProvider.fetchActiveOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
-        orderProvider.fetchAddresses(authProvider.token!).then((_) async {
-          // If no addresses, auto-detect location in background (seamless onboarding)
-          if (orderProvider.addresses.isEmpty && mounted) {
-            await _autoDetectLocationForNewUser(
-              orderProvider: orderProvider,
-              authProvider: authProvider,
-            );
-            return;
-          }
-          // Check service availability for default address after addresses are loaded
-          _checkDefaultAddressServiceAvailability(orderProvider);
-        });
+
+        // 2. Smart address flow — GPS detect + saved addresses + proximity check
+        _initSmartAddressFlow(authProvider.token!);
       }
     });
+  }
+
+  /// Smart Address Flow — The main address initialization method
+  ///
+  /// Flow:
+  /// 1. Start GPS detection (LocationProvider) — runs in background
+  /// 2. Fetch saved addresses (AddressProvider) — API call
+  /// 3. When BOTH ready → run proximity check (ProximityProvider)
+  /// 4. Based on decision:
+  ///    - autoSelect → select nearest address, no interruption
+  ///    - warn → select nearest + show warning banner
+  ///    - forceNew → show partial address, ask at checkout
+  ///    - noGps → use default saved address
+  /// 5. Service area check for selected address
+  Future<void> _initSmartAddressFlow(String token) async {
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Step 1 & 2: Run GPS detection and address fetch in PARALLEL
+    // Why parallel? GPS takes 2-3 sec, API takes 1 sec — don't wait sequentially
+    // Always force fresh GPS detect — user might have moved
+    // Fetch addresses ONCE via addressProvider, then sync to orderProvider
+    await Future.wait([
+      locationProvider.detectLocation(force: true),
+      addressProvider.fetchAddresses(token),
+    ]);
+    // Sync addresses to OrderProvider (backward compatibility — no extra API call)
+    if (mounted) {
+      orderProvider.syncAddresses(addressProvider.addresses);
+    }
+
+    if (!mounted) return;
+
+    // Step 3: New user check — no saved addresses
+    if (!addressProvider.hasAddresses) {
+      // New user — DON'T redirect to full form
+      // Just show partial address from GPS on home screen
+      // Full address will be asked at checkout via bottom sheet
+      final partial = locationProvider.detectedAddress;
+      if (partial != null) {
+        // Set partial address in proximity provider for home header
+        proximityProvider.checkProximity(
+          locationProvider: locationProvider,
+          addressProvider: addressProvider,
+        );
+        debugPrint('🏠 [Home] New user — showing partial: ${partial.displayName}');
+      }
+      return;
+    }
+
+    // Step 4: Run proximity check — GPS vs saved addresses (always force fresh)
+    proximityProvider.checkProximity(
+      locationProvider: locationProvider,
+      addressProvider: addressProvider,
+      force: true,
+    );
+
+    // Step 5: Act on decision
+    final result = proximityProvider.result;
+    if (result != null) {
+      switch (result.decision) {
+        case ProximityDecision.autoSelect:
+          // User is near a saved address — auto-select it
+          if (result.nearestAddress != null) {
+            addressProvider.selectAddress(result.nearestAddress!);
+          }
+          debugPrint('🏠 [Home] Auto-selected: ${result.nearestAddress?.tag}');
+          break;
+
+        case ProximityDecision.warn:
+          // User is somewhat far — select nearest but show warning
+          if (result.nearestAddress != null) {
+            addressProvider.selectAddress(result.nearestAddress!);
+          }
+          debugPrint('🏠 [Home] Warning: ${result.warningText}');
+          // Warning banner will show automatically via Consumer in build()
+          break;
+
+        case ProximityDecision.forceNew:
+          // User is in different city — show mismatch screen
+          debugPrint('🏠 [Home] Force new: user in different city');
+          if (mounted) {
+            // Delay to let home screen render first
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) context.push('/location-mismatch');
+            });
+          }
+          break;
+
+        case ProximityDecision.noGps:
+          // No GPS — use default saved address (current behavior)
+          final defaultAddr = addressProvider.defaultAddress;
+          if (defaultAddr != null) {
+            addressProvider.selectAddress(defaultAddr);
+          }
+          debugPrint('🏠 [Home] No GPS — using default address');
+          break;
+      }
+    }
+
+    // Step 6: Service area check for selected/default address
+    _checkSelectedAddressServiceAvailability(addressProvider);
+  }
+
+  /// Check if selected address is serviceable
+  /// If NOT → check current GPS location pincode
+  /// If GPS pincode serviceable → switch to partial address
+  /// If neither → show "we don't deliver here"
+  Future<void> _checkSelectedAddressServiceAvailability(AddressProvider addressProvider) async {
+    if (_hasCheckedServiceAvailability) return;
+
+    final address = addressProvider.selectedAddress ?? addressProvider.defaultAddress;
+    if (address == null) return;
+
+    _hasCheckedServiceAvailability = true;
+    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+
+    try {
+      // Step 1: Check saved/selected address
+      final isAvailable = await serviceAreaProvider.checkServiceAvailability(
+        pincode: address.pincode,
+        country: 'India',
+      );
+
+      debugPrint('🏠 [Home] Service check for saved ${address.pincode}: $isAvailable');
+
+      if (isAvailable) return; // Saved address is serviceable — all good
+
+      // Step 2: Saved address NOT serviceable — check current GPS location
+      final partial = locationProvider.detectedAddress;
+      debugPrint('🏠 [Home] GPS partial address: ${partial?.fullDisplay ?? "NULL — geocode may have failed"}');
+      debugPrint('🏠 [Home] GPS position: ${locationProvider.currentPosition?.latitude}, ${locationProvider.currentPosition?.longitude}');
+      if (partial?.pincode != null && partial!.pincode!.isNotEmpty) {
+        final gpsServiceable = await serviceAreaProvider.checkServiceAvailability(
+          pincode: partial.pincode!,
+          country: 'India',
+        );
+
+        debugPrint('🏠 [Home] Service check for GPS ${partial.pincode}: $gpsServiceable');
+
+        if (gpsServiceable && mounted) {
+          // Current GPS location IS serviceable — switch to partial address
+          // Deselect saved address, show partial in header
+          addressProvider.selectAddress(address); // keep reference but proximity shows warning
+          proximityProvider.checkProximity(
+            locationProvider: locationProvider,
+            addressProvider: addressProvider,
+            force: true,
+          );
+          // Show snackbar informing user
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Your saved address (${address.city}) is not serviceable. Using current location.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
+      }
+
+      // Step 3: Neither serviceable — show "not available" screen
+      if (mounted) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          context.go('/service-not-available', extra: {
+            'pincode': address.pincode,
+            'city': address.city,
+            'state': address.state,
+            'country': 'India',
+            'returnTo': '/home',
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [Home] Service check error: $e');
+    }
   }
 
   /// Auto-detect location for new users (seamless onboarding)
@@ -363,10 +540,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               await productProvider.fetchCategories();
               await productProvider.fetchProducts();
               if (authProvider.token != null) {
-                await orderProvider.fetchAddresses(authProvider.token!);
-                // Reset check flag and check again after refresh
+                // Reset and re-run smart address flow on pull-to-refresh
+                final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+                final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+                locationProvider.reset();
+                proximityProvider.reset();
                 _hasCheckedServiceAvailability = false;
-                _checkDefaultAddressServiceAvailability(orderProvider);
+                await _initSmartAddressFlow(authProvider.token!);
               }
             },
             child: Consumer<CartProvider>(
@@ -397,16 +577,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Column(
                   children: [
-                    // Top Row: Delivery Time, Address, Profile
-                    Consumer<OrderProvider>(
-                      builder: (context, orderProvider, _) {
-                        final defaultAddress = orderProvider.addresses.isNotEmpty
-                            ? orderProvider.addresses.firstWhere(
-                                (addr) => addr.isDefault,
-                                orElse: () => orderProvider.addresses.first,
-                              )
-                            : null;
-                        
+                    // Top Row: Brand, Address, Profile
+                    Consumer2<AddressProvider, ProximityProvider>(
+                      builder: (context, addressProvider, proximityProvider, _) {
+                        // Decide what address text to show
+                        final selectedAddr = addressProvider.selectedAddress;
+                        final partial = proximityProvider.partialAddress;
+
+                        // Two-line address display (matches UI design)
+                        // Line 1: Label (CURRENT LOCATION / HOME ✓)
+                        // Line 2: Address text (Sector 70, Mohali / 856, Doctor Goyal St)
+                        String label;
+                        String addressLine;
+                        bool hasCheckmark = false;
+
+                        if (selectedAddr != null) {
+                          label = selectedAddr.tag?.toUpperCase() ?? 'ADDRESS';
+                          hasCheckmark = true;
+                          addressLine = '${selectedAddr.addressLine1}'
+                              '${selectedAddr.addressLine2 != null ? ', ${selectedAddr.addressLine2}' : ''}'
+                              ', ${selectedAddr.city}';
+                        } else if (partial != null) {
+                          label = 'CURRENT LOCATION';
+                          addressLine = partial.displayName;
+                        } else {
+                          label = '';
+                          addressLine = 'Add delivery address';
+                        }
+
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                           child: Row(
@@ -452,38 +650,77 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ],
                                     ),
                                     const SizedBox(height: 12),
-                                    // Address Row with Dropdown
+                                    // Address Card — Two line layout (matches Blinkit UI)
+                                    // Line 1: 📍 CURRENT LOCATION / HOME ✓
+                                    // Line 2: Sector 70, Mohali / 856, Doctor Goyal St
                                     GestureDetector(
-                                      onTap: () => context.push(orderProvider.addresses.isEmpty ? '/address/add' : '/addresses'),
+                                      onTap: () => context.push(
+                                        addressProvider.hasAddresses ? '/addresses' : '/address/add',
+                                      ),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.lightGrey.withValues(alpha: 0.5),
-                                          borderRadius: BorderRadius.circular(20),
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppTheme.lightGrey.withValues(alpha: 0.5),
+                                              Colors.white.withValues(alpha: 0.8),
+                                            ],
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                          ),
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                                          ],
                                         ),
                                         child: Row(
-                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 16),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: Text(
-                                                defaultAddress != null
-                                                    ? defaultAddress.tag != null
-                                                        ? '${defaultAddress.tag!.toUpperCase()} - ${defaultAddress.addressLine1}${defaultAddress.addressLine2 != null ? ', ${defaultAddress.addressLine2}' : ''}, ${defaultAddress.city}'
-                                                        : '${defaultAddress.addressLine1}${defaultAddress.addressLine2 != null ? ', ${defaultAddress.addressLine2}' : ''}, ${defaultAddress.city}'
-                                                    : 'Add delivery address',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppTheme.black.withValues(alpha: 0.8),
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                            Icon(
+                                              Icons.location_on_rounded,
+                                              color: AppTheme.primaryGreen,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  // Label row: CURRENT LOCATION / HOME ✓
+                                                  if (label.isNotEmpty)
+                                                    Row(
+                                                      children: [
+                                                        Text(
+                                                          label,
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: AppTheme.primaryGreen,
+                                                            letterSpacing: 0.5,
+                                                          ),
+                                                        ),
+                                                        if (hasCheckmark) ...[
+                                                          const SizedBox(width: 4),
+                                                          Icon(Icons.check_circle, color: AppTheme.primaryGreen, size: 14),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                  // Address text
+                                                  Text(
+                                                    addressLine,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: AppTheme.black,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                             const SizedBox(width: 4),
-                                            Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.black.withValues(alpha: 0.6), size: 20),
+                                            Icon(Icons.chevron_right_rounded, color: AppTheme.black.withValues(alpha: 0.4), size: 22),
                                           ],
                                         ),
                                       ),
@@ -522,6 +759,181 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         );
                       },
                     ),
+
+                    // Warning Banner — shows when user is 5-20km from saved address
+                    // UI: Warning icon + text on top row
+                    //     [Use Current Location]  [Continue Anyway] on bottom row
+                    Consumer<ProximityProvider>(
+                      builder: (context, proximityProvider, _) {
+                        if (!proximityProvider.showWarning) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFF8E1), Color(0xFFFFFDE7)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFFFE082), width: 1),
+                              boxShadow: [
+                                BoxShadow(color: const Color(0xFFFFE082).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 1)),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top row — warning icon + text
+                                Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFF57C00), size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        proximityProvider.warningText,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF57C00)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                // Bottom row — two action buttons
+                                Row(
+                                  children: [
+                                    // Use Current Location button
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          // Navigate to add address with GPS pre-fill
+                                          final partial = proximityProvider.partialAddress;
+                                          final extra = <String, dynamic>{};
+                                          if (partial != null) {
+                                            extra['city'] = partial.city ?? '';
+                                            extra['state'] = partial.state ?? '';
+                                            extra['pincode'] = partial.pincode ?? '';
+                                            extra['latitude'] = partial.latitude.toString();
+                                            extra['longitude'] = partial.longitude.toString();
+                                          }
+                                          context.push('/address/add', extra: extra);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFE0E0E0)),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'Use Current Location',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black87),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Continue Anyway button
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => proximityProvider.dismissWarning(),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFE0E0E0)),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'Continue Anyway',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black87),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Enable Location Banner — shows when GPS permission denied
+                    Consumer<ProximityProvider>(
+                      builder: (context, proximityProvider, _) {
+                        if (!proximityProvider.showEnableLocationBanner) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: GestureDetector(
+                            onTap: () async {
+                              final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+                              if (locationProvider.isPermissionPermanentlyDenied) {
+                                await locationProvider.openAppSettings();
+                              } else {
+                                final granted = await locationProvider.requestPermission();
+                                if (granted && mounted) {
+                                  // Permission granted — re-run smart flow
+                                  locationProvider.reset();
+                                  proximityProvider.reset();
+                                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                                  if (authProvider.token != null) {
+                                    _hasCheckedServiceAvailability = false;
+                                    _initSmartAddressFlow(authProvider.token!);
+                                  }
+                                }
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE3F2FD), Color(0xFFEBF5FF)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFF90CAF9), width: 1),
+                                boxShadow: [
+                                  BoxShadow(color: const Color(0xFF90CAF9).withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4)),
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 1)),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.my_location_rounded, color: Color(0xFF1565C0), size: 20),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Enable location for faster delivery',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1565C0)),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1565C0),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text('Enable', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Smart Suggestion Banner (Phase 3)
+                    // Shows time-based suggestions: "Heading to office?" / "Back home?"
+                    const SmartSuggestionBanner(),
 
                     // Search Bar
                     GestureDetector(
@@ -705,7 +1117,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               // Products Section
               Consumer2<ProductProvider, OrderProvider>(
                 builder: (context, productProvider, orderProvider, _) {
-                  final hasNoAddress = orderProvider.addresses.isEmpty;
+                  // Check saved addresses + partial GPS address + AddressProvider
+                  // If ANY address exists (saved or partial), don't show "add address" box
+                  final proximityProv = Provider.of<ProximityProvider>(context);
+                  final addrProv = Provider.of<AddressProvider>(context);
+                  final hasNoAddress = orderProvider.addresses.isEmpty
+                      && !addrProv.hasAddresses
+                      && proximityProv.partialAddress == null;
                   
                   if (productProvider.isLoading && productProvider.products.isEmpty) {
                     return const Padding(

@@ -15,6 +15,9 @@ import 'providers/order_provider.dart';
 import 'providers/delivery_provider.dart';
 import 'providers/admin_provider.dart';
 import 'providers/service_area_provider.dart';
+import 'providers/location_provider.dart';
+import 'providers/address_provider.dart';
+import 'providers/proximity_provider.dart';
 import 'routes/app_router.dart';
 import 'utils/theme.dart';
 import 'services/razorpay_service.dart';
@@ -143,6 +146,18 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => ServiceAreaProvider(),
+        ),
+        // Location — GPS permission + coordinates + reverse geocode
+        ChangeNotifierProvider(
+          create: (_) => LocationProvider(),
+        ),
+        // Address — Saved addresses CRUD + selection
+        ChangeNotifierProvider(
+          create: (_) => AddressProvider(),
+        ),
+        // Proximity — GPS vs saved addresses distance + decision
+        ChangeNotifierProvider(
+          create: (_) => ProximityProvider(),
         ),
       ],
       child: MaterialApp.router(

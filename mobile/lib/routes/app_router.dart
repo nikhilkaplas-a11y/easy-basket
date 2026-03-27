@@ -36,6 +36,8 @@ import '../screens/admin/add_edit_product_screen.dart';
 import '../screens/admin/category_order_screen.dart';
 import '../models/address_model.dart';
 import '../screens/service_area/service_not_available_screen.dart';
+import '../screens/address/location_mismatch_screen.dart';
+import '../screens/address/places_search_screen.dart';
 import '../screens/onboarding/location_detection_screen.dart';
 import '../screens/onboarding/location_permission_screen.dart';
 import '../core/startup_deep_link.dart';
@@ -95,8 +97,9 @@ class AppRouter {
           }
           
           // Don't redirect if already on address or onboarding screens
-          if (currentLocation.startsWith('/address') || 
+          if (currentLocation.startsWith('/address') ||
               currentLocation == '/service-not-available' ||
+              currentLocation == '/location-mismatch' ||
               currentLocation.startsWith('/onboarding/')) {
             return null;
           }
@@ -126,6 +129,14 @@ class AppRouter {
       GoRoute(
         path: '/onboarding/location-permission',
         builder: (context, state) => const LocationPermissionScreen(),
+      ),
+      GoRoute(
+        path: '/location-mismatch',
+        builder: (context, state) => const LocationMismatchScreen(),
+      ),
+      GoRoute(
+        path: '/address/search',
+        builder: (context, state) => const PlacesSearchScreen(),
       ),
       GoRoute(
         path: '/home',

@@ -11,6 +11,57 @@ class AppTheme {
   static const Color lightGrey = Color(0xFFF5F5F5);
   static const Color darkGrey = Color(0xFF424242);
 
+  // 3D Soft Shadow — gives depth/elevation feel to cards
+  static List<BoxShadow> get softShadow => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.06),
+      blurRadius: 16,
+      spreadRadius: 0,
+      offset: const Offset(0, 4),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.02),
+      blurRadius: 4,
+      offset: const Offset(0, 1),
+    ),
+  ];
+
+  // Deeper shadow for elevated cards (banners, CTAs)
+  static List<BoxShadow> get deepShadow => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.1),
+      blurRadius: 20,
+      spreadRadius: 0,
+      offset: const Offset(0, 6),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 6,
+      offset: const Offset(0, 2),
+    ),
+  ];
+
+  // Green glow shadow for green buttons/cards
+  static List<BoxShadow> get greenGlow => [
+    BoxShadow(
+      color: primaryGreen.withValues(alpha: 0.25),
+      blurRadius: 16,
+      offset: const Offset(0, 6),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 4,
+      offset: const Offset(0, 1),
+    ),
+  ];
+
+  // Standard card decoration with 3D feel
+  static BoxDecoration softCard({Color? color, double radius = 16}) => BoxDecoration(
+    color: color ?? Colors.white,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: softShadow,
+  );
+
   // Gradient for primary buttons
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFF0A5C18), Color(0xFF1B8A2E), Color(0xFF0A5C18)],

@@ -8,6 +8,9 @@ import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/razorpay_service.dart';
 import '../../utils/theme.dart';
+import '../../providers/proximity_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../widgets/address_completion_sheet.dart';
 import 'payment_status_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -296,7 +299,24 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       return;
     }
 
-    final addressId = widget.addressId;
+    // Check if address completion is needed (new location, partial address only)
+    final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+    if (proximityProvider.needsAddressCompletion && proximityProvider.partialAddress != null) {
+      // Show address completion bottom sheet
+      AddressCompletionSheet.show(
+        context: context,
+        partialAddress: proximityProvider.partialAddress!,
+        onAddressSaved: () {
+          // Address saved — retry placing order
+          _placeOrder();
+        },
+      );
+      return;
+    }
+
+    // Use widget.addressId OR fallback to AddressProvider's selected address
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final addressId = widget.addressId ?? addressProvider.selectedAddress?.id;
     if (addressId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an address')),

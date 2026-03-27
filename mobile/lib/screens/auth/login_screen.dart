@@ -6,6 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../providers/auth_provider.dart';
 import '../../providers/admin_provider.dart';
+import '../../providers/location_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../providers/proximity_provider.dart';
+import '../../providers/service_area_provider.dart';
 import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
 
@@ -108,13 +112,118 @@ class _LoginScreenState extends State<LoginScreen>
         } else if (userRole == 'delivery') {
           context.go('/delivery/dashboard');
         } else {
-          context.go('/home');
+          // Customer login — check address/location before going to home
+          await _handleCustomerPostLogin();
         }
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.error ?? 'Invalid OTP')),
       );
+    }
+  }
+
+  /// Customer post-login flow:
+  /// 1. Check if user has saved addresses
+  ///    → YES: Go to home (existing user)
+  ///    → NO: Check GPS permission
+  ///       → Granted: Detect GPS → check service → home or "not available"
+  ///       → Not asked: Show permission screen
+  ///       → Denied: Go to manual address form
+  Future<void> _handleCustomerPostLogin() async {
+    if (!mounted) return;
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+
+    // Fresh start — reset previous user's data
+    locationProvider.reset();
+    addressProvider.reset();
+    proximityProvider.reset();
+
+    // Step 1: Fetch saved addresses
+    if (authProvider.token != null) {
+      await addressProvider.fetchAddresses(authProvider.token!);
+    }
+
+    if (!mounted) return;
+
+    // Step 2: Has saved addresses? → Existing user
+    // But STILL detect GPS — user might be in different city now
+    if (addressProvider.hasAddresses) {
+      // Detect GPS in background — home screen will do proximity check
+      await locationProvider.checkPermission();
+      if (locationProvider.isPermissionGranted) {
+        // force: true — always detect fresh, user might have moved
+        await locationProvider.detectLocation(force: true);
+      }
+      if (mounted) context.go('/home');
+      return;
+    }
+
+    // Step 3: New user — no saved addresses
+    // Check GPS permission status
+    await locationProvider.checkPermission();
+
+    if (!mounted) return;
+
+    if (locationProvider.isPermissionGranted) {
+      // GPS already granted — detect location and check service
+      await _detectAndCheckService(locationProvider, authProvider);
+    } else if (locationProvider.isPermissionPermanentlyDenied) {
+      // Permanently denied — go to manual address form
+      context.go('/address/add');
+    } else {
+      // Not asked yet or denied once — show permission screen
+      context.go('/onboarding/location-permission');
+    }
+  }
+
+  /// Detect GPS location and check if serviceable
+  /// If serviceable → go to home
+  /// If not → show "we don't deliver here" screen
+  Future<void> _detectAndCheckService(
+    LocationProvider locationProvider,
+    AuthProvider authProvider,
+  ) async {
+    // Detect GPS location
+    await locationProvider.detectLocation();
+
+    if (!mounted) return;
+
+    final partial = locationProvider.detectedAddress;
+    if (partial == null || partial.pincode == null) {
+      // GPS failed to get address — go to manual entry
+      context.go('/address/add');
+      return;
+    }
+
+    // Check service availability
+    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+    final isServiceable = await serviceAreaProvider.checkServiceAvailability(
+      pincode: partial.pincode!,
+      country: 'India',
+    );
+
+    if (!mounted) return;
+
+    if (isServiceable) {
+      // Serviceable — go to home with partial address
+      // Home screen will show "📍 CURRENT LOCATION - Sector 70, Mohali"
+      // Full address will be asked at checkout
+      context.go('/home');
+    } else {
+      // Not serviceable — show "we don't deliver here" screen
+      context.go('/service-not-available', extra: {
+        'pincode': partial.pincode,
+        'city': partial.city,
+        'state': partial.state,
+        'country': 'India',
+        'returnTo': '/home',
+        'isOnboarding': true,
+      });
     }
   }
 
