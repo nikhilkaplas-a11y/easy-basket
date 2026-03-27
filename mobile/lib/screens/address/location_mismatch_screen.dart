@@ -181,13 +181,17 @@ class LocationMismatchScreen extends StatelessWidget {
 
               // Current location row
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Current: $currentText',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  Expanded(
+                    child: Text(
+                      'Current: $currentText',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -196,13 +200,17 @@ class LocationMismatchScreen extends StatelessWidget {
 
               // Saved address row
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.location_on_rounded, color: Color(0xFFE53935), size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Saved: $savedText $distanceText',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                  Expanded(
+                    child: Text(
+                      'Saved: $savedText $distanceText',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

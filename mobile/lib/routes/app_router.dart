@@ -40,6 +40,7 @@ import '../screens/address/location_mismatch_screen.dart';
 import '../screens/address/places_search_screen.dart';
 import '../screens/onboarding/location_detection_screen.dart';
 import '../screens/onboarding/location_permission_screen.dart';
+import '../screens/address/location_permission_screen.dart' as customer_location_gate;
 import '../core/startup_deep_link.dart';
 
 class AppRouter {
@@ -100,12 +101,16 @@ class AppRouter {
           if (currentLocation.startsWith('/address') ||
               currentLocation == '/service-not-available' ||
               currentLocation == '/location-mismatch' ||
+              currentLocation == '/location-gate' ||
               currentLocation.startsWith('/onboarding/')) {
             return null;
           }
           
-          // For login/splash, redirect to home (home screen will auto-detect location if needed)
-          if (isLoginRoute || currentLocation == '/splash') {
+          // Splash lets customer choose /location-gate vs /home after permission check (no instant /home).
+          if (currentLocation == '/splash') {
+            return null;
+          }
+          if (isLoginRoute) {
             return '/home';
           }
         }
@@ -121,6 +126,10 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/location-gate',
+        builder: (context, state) => const customer_location_gate.LocationPermissionScreen(),
       ),
       GoRoute(
         path: '/onboarding/location',

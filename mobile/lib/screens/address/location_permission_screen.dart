@@ -191,6 +191,20 @@ class LocationPermissionScreen extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(height: 20),
+
+                TextButton(
+                  onPressed: () => context.go('/home'),
+                  child: Text(
+                    'Continue without sharing location',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+
                 const Spacer(flex: 1),
               ],
             ),

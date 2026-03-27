@@ -151,6 +151,12 @@ class AddressProvider extends ChangeNotifier {
     notifyListeners(); // Home screen header updates instantly
   }
 
+  /// Clear session selection so UI can show GPS partial only (e.g. >20km from saved).
+  void clearSelection() {
+    _selectedAddress = null;
+    notifyListeners();
+  }
+
   // ══════════════════════════════════════════════════
   // METHOD 3: Create new address
   // ══════════════════════════════════════════════════

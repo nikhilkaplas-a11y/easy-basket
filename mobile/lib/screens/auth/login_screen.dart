@@ -150,13 +150,16 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (!mounted) return;
 
-    // Step 2: Has saved addresses? → Existing user
-    // But STILL detect GPS — user might be in different city now
+    // Step 2: Has saved addresses? → Still gate when permission not settled (same as splash).
     if (addressProvider.hasAddresses) {
-      // Detect GPS in background — home screen will do proximity check
       await locationProvider.checkPermission();
+      if (!mounted) return;
+      if (!locationProvider.isPermissionGranted &&
+          !locationProvider.isPermissionPermanentlyDenied) {
+        if (mounted) context.go('/location-gate');
+        return;
+      }
       if (locationProvider.isPermissionGranted) {
-        // force: true — always detect fresh, user might have moved
         await locationProvider.detectLocation(force: true);
       }
       if (mounted) context.go('/home');
@@ -176,8 +179,7 @@ class _LoginScreenState extends State<LoginScreen>
       // Permanently denied — go to manual address form
       context.go('/address/add');
     } else {
-      // Not asked yet or denied once — show permission screen
-      context.go('/onboarding/location-permission');
+      context.go('/location-gate');
     }
   }
 

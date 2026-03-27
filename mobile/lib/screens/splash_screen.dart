@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/location_provider.dart';
 import '../../utils/theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -20,17 +21,41 @@ class _SplashScreenState extends State<SplashScreen> {
 
   /// Do not use a long fixed delay + go(home): it races FCM cold-start deep links and
   /// replaces the stack, so users land on home instead of order detail.
+  /// Customers: resolve location permission on `/location-gate` before `/home` so the
+  /// address bar does not flash a stale saved pin while GPS is still unsettled.
   void _navigateToNext() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 120), () {
+      Future.delayed(const Duration(milliseconds: 120), () async {
         if (!mounted) return;
+
+        final path = GoRouterState.of(context).uri.path;
+        if (path != '/splash') {
+          return;
+        }
+
         final auth = Provider.of<AuthProvider>(context, listen: false);
         if (!auth.isAuthenticated) {
           context.go('/login');
           return;
         }
-        final path = GoRouterState.of(context).uri.path;
-        if (path == '/splash') {
+
+        final role = auth.user?.role;
+        if (role == 'admin') {
+          context.go('/admin/dashboard');
+          return;
+        }
+        if (role == 'delivery') {
+          context.go('/delivery/dashboard');
+          return;
+        }
+
+        final loc = Provider.of<LocationProvider>(context, listen: false);
+        await loc.checkPermission();
+        if (!mounted) return;
+
+        if (!loc.isPermissionGranted && !loc.isPermissionPermanentlyDenied) {
+          context.go('/location-gate');
+        } else {
           context.go('/home');
         }
       });

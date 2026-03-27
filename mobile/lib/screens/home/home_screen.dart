@@ -108,7 +108,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final addressProvider = Provider.of<AddressProvider>(context, listen: false);
     final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
     final orderProvider = Provider.of<OrderProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     // Step 1 & 2: Run GPS detection and address fetch in PARALLEL
     // Why parallel? GPS takes 2-3 sec, API takes 1 sec — don't wait sequentially
@@ -125,20 +124,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (!mounted) return;
 
-    // Step 3: New user check — no saved addresses
+    // Step 3: New user — no saved addresses (partial header only, NO mismatch screen)
     if (!addressProvider.hasAddresses) {
-      // New user — DON'T redirect to full form
-      // Just show partial address from GPS on home screen
-      // Full address will be asked at checkout via bottom sheet
-      final partial = locationProvider.detectedAddress;
-      if (partial != null) {
-        // Set partial address in proximity provider for home header
-        proximityProvider.checkProximity(
-          locationProvider: locationProvider,
-          addressProvider: addressProvider,
-        );
-        debugPrint('🏠 [Home] New user — showing partial: ${partial.displayName}');
-      }
+      addressProvider.clearSelection();
+      proximityProvider.checkProximity(
+        locationProvider: locationProvider,
+        addressProvider: addressProvider,
+        force: true,
+      );
+      debugPrint(
+        '🏠 [Home] New user — partial: ${locationProvider.detectedAddress?.displayName ?? "none"}',
+      );
+      await _ensureServiceAreaForLaunch(
+        addressProvider,
+        locationProvider,
+        proximityProvider,
+      );
       return;
     }
 
@@ -171,14 +172,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           break;
 
         case ProximityDecision.forceNew:
-          // User is in different city — show mismatch screen
-          debugPrint('🏠 [Home] Force new: user in different city');
-          if (mounted) {
-            // Delay to let home screen render first
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) context.push('/location-mismatch');
-            });
-          }
+          // >20km from saved → mismatch only if current GPS pin is NOT serviceable
+          addressProvider.clearSelection();
+          await _openLocationMismatchIfNeeded(
+            result,
+            locationProvider,
+          );
           break;
 
         case ProximityDecision.noGps:
@@ -192,8 +191,134 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     }
 
-    // Step 6: Service area check for selected/default address
-    _checkSelectedAddressServiceAvailability(addressProvider);
+    // Step 6: Service area (saved pin and/or GPS partial for new users)
+    await _ensureServiceAreaForLaunch(
+      addressProvider,
+      locationProvider,
+      proximityProvider,
+    );
+  }
+
+  /// "Different city" full screen only when we cannot deliver at **current** GPS pin.
+  /// If user is 400km from saved Bareilly but GPS is in a serviceable Ropar pin, stay on home + partial.
+  Future<void> _openLocationMismatchIfNeeded(
+    ProximityResult result,
+    LocationProvider locationProvider,
+  ) async {
+    if (!result.showMismatchScreen) {
+      debugPrint('🏠 [Home] forceNew: new user / no mismatch route');
+      return;
+    }
+
+    final pin = result.partialAddress?.pincode ??
+        locationProvider.detectedAddress?.pincode;
+    if (pin != null && pin.isNotEmpty) {
+      final serviceAreaProvider =
+          Provider.of<ServiceAreaProvider>(context, listen: false);
+      final deliverHere = await serviceAreaProvider.checkServiceAvailability(
+        pincode: pin,
+        country: 'India',
+      );
+      if (!mounted) return;
+      if (deliverHere) {
+        debugPrint(
+          '🏠 [Home] Skip mismatch screen — current location pin $pin is serviceable',
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    debugPrint('🏠 [Home] Show location mismatch (current pin not serviceable or unknown)');
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) context.push('/location-mismatch');
+    });
+  }
+
+  /// Service-area gate: prefer **current GPS pin** when no saved row is selected (e.g. forceNew /
+  /// cleared selection). Do **not** fall back to default saved pin in that case — that was
+  /// showing Bareilly while user was actually in 140117.
+  Future<void> _ensureServiceAreaForLaunch(
+    AddressProvider addressProvider,
+    LocationProvider locationProvider,
+    ProximityProvider proximityProvider,
+  ) async {
+    if (_hasCheckedServiceAvailability) return;
+
+    final partial =
+        proximityProvider.partialAddress ?? locationProvider.detectedAddress;
+    final pin = partial?.pincode;
+
+    final noSavedRowSelected = addressProvider.selectedAddress == null;
+    final hasGpsPin = locationProvider.isPermissionGranted &&
+        pin != null &&
+        pin.isNotEmpty;
+
+    if (noSavedRowSelected && hasGpsPin) {
+      _hasCheckedServiceAvailability = true;
+      final serviceAreaProvider =
+          Provider.of<ServiceAreaProvider>(context, listen: false);
+      try {
+        final ok = await serviceAreaProvider.checkServiceAvailability(
+          pincode: pin,
+          country: 'India',
+        );
+        debugPrint('🏠 [Home] Service check for current-location pin $pin: $ok');
+        if (!ok && mounted) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) {
+            context.go('/service-not-available', extra: {
+              'pincode': pin,
+              'city': partial?.city,
+              'state': partial?.state,
+              'country': 'India',
+              'returnTo': '/home',
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('❌ [Home] Service check (GPS pin, no selection) error: $e');
+      }
+      return;
+    }
+
+    final saved = addressProvider.selectedAddress ?? addressProvider.defaultAddress;
+    if (saved != null) {
+      await _checkSelectedAddressServiceAvailability(addressProvider);
+      return;
+    }
+
+    if (pin == null || pin.isEmpty) {
+      debugPrint(
+        '🏠 [Home] Skip service check — no selection, no default, no GPS pincode',
+      );
+      return;
+    }
+
+    _hasCheckedServiceAvailability = true;
+    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+
+    try {
+      final ok = await serviceAreaProvider.checkServiceAvailability(
+        pincode: pin,
+        country: 'India',
+      );
+      debugPrint('🏠 [Home] Service check for GPS pin $pin: $ok');
+      if (!ok && mounted) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          context.go('/service-not-available', extra: {
+            'pincode': pin,
+            'city': partial?.city,
+            'state': partial?.state,
+            'country': 'India',
+            'returnTo': '/home',
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [Home] Service check (partial pin) error: $e');
+    }
   }
 
   /// Check if selected address is serviceable
@@ -235,9 +360,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         debugPrint('🏠 [Home] Service check for GPS ${partial.pincode}: $gpsServiceable');
 
         if (gpsServiceable && mounted) {
-          // Current GPS location IS serviceable — switch to partial address
-          // Deselect saved address, show partial in header
-          addressProvider.selectAddress(address); // keep reference but proximity shows warning
+          // Saved pin not served, but **where user is now** is served — show partial, not old saved
+          addressProvider.clearSelection();
           proximityProvider.checkProximity(
             locationProvider: locationProvider,
             addressProvider: addressProvider,
@@ -583,17 +707,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         // Decide what address text to show
                         final selectedAddr = addressProvider.selectedAddress;
                         final partial = proximityProvider.partialAddress;
+                        final proximityRes = proximityProvider.result;
 
                         // Two-line address display (matches UI design)
                         // Line 1: Label (CURRENT LOCATION / HOME ✓)
                         // Line 2: Address text (Sector 70, Mohali / 856, Doctor Goyal St)
                         String label;
                         String addressLine;
-                        bool hasCheckmark = false;
+                        // Spec: ✓ only for Case A (~200m match), not for every saved selection
+                        final hasCheckmark = selectedAddr != null &&
+                            proximityRes != null &&
+                            proximityRes.decision == ProximityDecision.autoSelect &&
+                            proximityRes.isWithinExactMatch &&
+                            proximityRes.nearestAddress?.id == selectedAddr.id;
 
                         if (selectedAddr != null) {
                           label = selectedAddr.tag?.toUpperCase() ?? 'ADDRESS';
-                          hasCheckmark = true;
                           addressLine = '${selectedAddr.addressLine1}'
                               '${selectedAddr.addressLine2 != null ? ', ${selectedAddr.addressLine2}' : ''}'
                               ', ${selectedAddr.city}';

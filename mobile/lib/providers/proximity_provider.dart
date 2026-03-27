@@ -48,6 +48,39 @@ class ProximityProvider extends ChangeNotifier {
   /// Used for matching GPS with saved address (200 meters)
   static const double _exactMatchRadiusMeters = 200.0;
 
+  /// Digits-only pincode for comparison (India: first 6 digits).
+  static String? _normalizePincode(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final d = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (d.isEmpty) return null;
+    if (d.length >= 6) return d.substring(0, 6);
+    return d;
+  }
+
+  /// When GPS pincode matches saved address pincode, prefer that full saved address (km drift OK).
+  static AddressModel _pickBestSamePincodeAddress(
+    Position gps,
+    List<AddressModel> candidates,
+  ) {
+    for (final a in candidates) {
+      if (a.isDefault) return a;
+    }
+    AddressModel? best;
+    var bestKm = double.infinity;
+    for (final a in candidates) {
+      if (a.latitude == null || a.longitude == null) continue;
+      final alat = double.tryParse(a.latitude!);
+      final alng = double.tryParse(a.longitude!);
+      if (alat == null || alng == null) continue;
+      final km = Geolocator.distanceBetween(gps.latitude, gps.longitude, alat, alng) / 1000.0;
+      if (km < bestKm) {
+        bestKm = km;
+        best = a;
+      }
+    }
+    return best ?? candidates.first;
+  }
+
   // ══════════════════════════════════════════════════
   // STATE
   // ══════════════════════════════════════════════════
@@ -130,6 +163,7 @@ class ProximityProvider extends ChangeNotifier {
       _result = ProximityResult(
         decision: ProximityDecision.noGps,
         nearestAddress: addressProvider.defaultAddress,
+        isWithinExactMatch: false,
       );
       _isChecking = false;
       _hasChecked = true;
@@ -148,12 +182,54 @@ class ProximityProvider extends ChangeNotifier {
       _result = ProximityResult(
         decision: ProximityDecision.forceNew,
         partialAddress: detectedAddress,
+        isWithinExactMatch: false,
       );
       _isChecking = false;
       _hasChecked = true;
       debugPrint('📍 [Proximity] No saved addresses → force new address');
       notifyListeners();
       return;
+    }
+
+    // ── Same pincode as GPS partial → full saved address (distance in km can be large; OK per product) ──
+    final gpsPin = _normalizePincode(detectedAddress?.pincode);
+    if (gpsPin != null) {
+      final samePin = savedAddresses
+          .where((a) => _normalizePincode(a.pincode) == gpsPin)
+          .toList();
+      if (samePin.isNotEmpty) {
+        final picked = _pickBestSamePincodeAddress(gps, samePin);
+        var distanceKm = 0.0;
+        var exact = false;
+        if (picked.latitude != null && picked.longitude != null) {
+          final alat = double.tryParse(picked.latitude!);
+          final alng = double.tryParse(picked.longitude!);
+          if (alat != null && alng != null) {
+            final m = Geolocator.distanceBetween(
+              gps.latitude,
+              gps.longitude,
+              alat,
+              alng,
+            );
+            distanceKm = m / 1000.0;
+            exact = m <= _exactMatchRadiusMeters;
+          }
+        }
+        _result = ProximityResult(
+          decision: ProximityDecision.autoSelect,
+          distanceKm: distanceKm,
+          nearestAddress: picked,
+          partialAddress: detectedAddress,
+          isWithinExactMatch: exact,
+        );
+        _isChecking = false;
+        _hasChecked = true;
+        debugPrint(
+          '📍 [Proximity] Same GPS pin $gpsPin as saved (#${picked.id}) — full address (${distanceKm.toStringAsFixed(1)}km)',
+        );
+        notifyListeners();
+        return;
+      }
     }
 
     // ── Find nearest saved address ──
@@ -191,6 +267,7 @@ class ProximityProvider extends ChangeNotifier {
         decision: ProximityDecision.forceNew,
         partialAddress: detectedAddress,
         nearestAddress: addressProvider.defaultAddress,
+        isWithinExactMatch: false,
       );
       _isChecking = false;
       _hasChecked = true;
@@ -204,12 +281,13 @@ class ProximityProvider extends ChangeNotifier {
     // ══════════════════════════════════════════════════
 
     ProximityDecision decision;
+    final distanceMeters = nearestDistanceKm * 1000;
+    final isWithinExactMatch = distanceMeters <= _exactMatchRadiusMeters;
 
     if (nearestDistanceKm <= _autoSelectRadiusKm) {
-      // 🟢 < 5km — User is near a saved address
-      // Auto-select this address, no UI interruption
+      // 🟢 < 5km — User is near a saved address (Case A <200m or Case B <5km)
       decision = ProximityDecision.autoSelect;
-      debugPrint('📍 [Proximity] Auto-select: ${nearest.tag} (${nearestDistanceKm.toStringAsFixed(1)}km)');
+      debugPrint('📍 [Proximity] Auto-select: ${nearest.tag} (${nearestDistanceKm.toStringAsFixed(1)}km, exact=$isWithinExactMatch)');
     } else if (nearestDistanceKm <= _warnRadiusKm) {
       // 🟡 5-20km — User is somewhat far
       // Select nearest but show warning banner
@@ -228,6 +306,8 @@ class ProximityProvider extends ChangeNotifier {
       distanceKm: nearestDistanceKm,
       nearestAddress: nearest,
       partialAddress: detectedAddress,
+      isWithinExactMatch:
+          decision == ProximityDecision.autoSelect && isWithinExactMatch,
     );
 
     _isChecking = false;
@@ -307,6 +387,7 @@ class ProximityProvider extends ChangeNotifier {
         distanceKm: _result!.distanceKm,
         nearestAddress: _result!.nearestAddress,
         partialAddress: _result!.partialAddress,
+        isWithinExactMatch: _result!.isWithinExactMatch,
       );
       notifyListeners();
     }

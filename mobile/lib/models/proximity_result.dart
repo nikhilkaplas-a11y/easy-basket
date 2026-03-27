@@ -57,11 +57,15 @@ class ProximityResult {
   /// Available whenever GPS is working
   final PartialAddress? partialAddress;
 
+  /// True when nearest saved address is within ~200m (spec Case A — “verified” match).
+  final bool isWithinExactMatch;
+
   ProximityResult({
     required this.decision,
     this.distanceKm,
     this.nearestAddress,
     this.partialAddress,
+    this.isWithinExactMatch = false,
   });
 
   /// Should we show address completion form at checkout?
@@ -75,9 +79,10 @@ class ProximityResult {
   /// True when: user is 5-20km from nearest saved address
   bool get showWarning => decision == ProximityDecision.warn;
 
-  /// Should we show full-screen location mismatch screen?
-  /// True when: user is >20km from all saved addresses (different city)
-  bool get showMismatchScreen => decision == ProximityDecision.forceNew;
+  /// True when user has saved address(es) and GPS is far (>20km). Home may still **skip**
+  /// the mismatch route if current GPS pincode is serviceable (deliver at current location).
+  bool get showMismatchScreen =>
+      decision == ProximityDecision.forceNew && nearestAddress != null;
 
   /// Should we show "Enable location" subtle banner?
   /// True when: GPS permission denied or GPS turned off
