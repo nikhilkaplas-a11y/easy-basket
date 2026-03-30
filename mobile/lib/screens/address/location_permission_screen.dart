@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../providers/location_provider.dart';
 import '../../utils/theme.dart';
@@ -9,7 +10,7 @@ import '../../utils/theme.dart';
 ///
 /// Flow:
 /// 1. Show permission screen (illustration + CTA)
-/// 2. User taps "Use Current Location"
+/// 2. User taps "Allow location access"
 /// 3. CrossFade to skeleton loading (simulates home screen)
 /// 4. GPS detects → navigate to real home screen
 /// 5. Error → show error + allow retry
@@ -22,6 +23,8 @@ class LocationPermissionScreen extends StatefulWidget {
 
 class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
   bool _isLoadingLocation = false;
+  /// True while waiting on system permission / [LocationProvider.requestPermission] — avoids double-tap and shows inline progress.
+  bool _isRequestingPermission = false;
   String? _errorMessage;
 
   @override
@@ -55,16 +58,37 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
 
     return Stack(
       children: [
-        // Bottom wave decoration
+        // Ambient background — soft vertical wash + bottom wave
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFF3FBF4),
+                  const Color(0xFFE8F5E9).withValues(alpha: 0.65),
+                  const Color(0xFFFAFDFA),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0.0, 0.45, 1.0],
+              ),
+            ),
+          ),
+        ),
         Positioned(
-          bottom: 0, left: 0, right: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
           child: ClipPath(
             clipper: _BottomWaveClipper(),
             child: Container(
-              height: size.height * 0.18,
-              decoration: const BoxDecoration(
+              height: size.height * 0.22,
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFD6EFDB), Color(0xFFEEF7F0)],
+                  colors: [
+                    const Color(0xFFC8E6C9).withValues(alpha: 0.35),
+                    const Color(0xFFE8F5E9).withValues(alpha: 0.2),
+                  ],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                 ),
@@ -73,143 +97,265 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
           ),
         ),
 
-        // Content — vertically centered, image + text grouped together
         SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPad + 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final shortScreen = constraints.maxHeight < 560;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ─── Branding ───
-                  _buildBranding(),
-                  const SizedBox(height: 8),
-
-                  // ─── HERO Image — edge to edge, maximum size ───
-                  Image.asset(
-                    'assets/images/delivery.png',
-                    fit: BoxFit.contain,
-                    width: size.width + 40, // overflow padding to fill edge-to-edge
-                    height: size.height * 0.42,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                    child: _buildBrandingHeader(),
                   ),
-                  const SizedBox(height: 12),
-
-                  // ─── Heading — bold, full width ───
-                  Text(
-                    'Groceries, delivered fast',
-                    style: TextStyle(
-                      fontSize: size.width * 0.076, // ~28px on 360w, scales up on bigger screens
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF1A1A1A),
-                      letterSpacing: -0.8,
-                      height: 1.15,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ─── Subtext ───
-                  Text(
-                    'Allow location to find your address faster\nand show nearby delivery options.',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.grey[500], height: 1.5),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  // ─── Error message ───
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 16),
-                          const SizedBox(width: 6),
-                          Flexible(child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w500))),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 28),
-
-                  // ─── CTA Button ───
-                  _buildPrimaryCTA(),
-                  const SizedBox(height: 14),
-
-                  // ─── Manual entry ───
-                  GestureDetector(
-                    onTap: () => context.push('/address/add'),
-                    child: const Text(
-                      'Enter address manually',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF444444), decoration: TextDecoration.underline, decorationColor: Color(0xFF888888), decorationThickness: 1),
+                  // Hero fills this region; sheet is bottom-aligned → no floating art + huge gap
+                  Expanded(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 4, right: 4, top: 2),
+                            child: _LocationHeroIllustration(
+                              viewportHeight: constraints.maxHeight,
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF0D4F14).withValues(alpha: 0.06),
+                                  blurRadius: 22,
+                                  offset: const Offset(0, -8),
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, -2),
+                                ),
+                              ],
+                            ),
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.fromLTRB(22, 18, 22, bottomPad + 18),
+                              physics: shortScreen
+                                  ? const BouncingScrollPhysics()
+                                  : const NeverScrollableScrollPhysics(),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Allow location for delivery',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.4,
+                                      color: AppTheme.primaryGreen,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Groceries, delivered fast',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: (size.width * 0.078).clamp(26.0, 34.0),
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF142118),
+                                      letterSpacing: -0.8,
+                                      height: 1.1,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Share your location once so we can find your area, show accurate prices, and deliver to the right address.',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w400,
+                                      color: const Color(0xFF546E7A),
+                                      height: 1.5,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'You can change this anytime in settings.',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF90A4AE),
+                                      height: 1.35,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  if (_errorMessage != null) ...[
+                                    const SizedBox(height: 14),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(alpha: 0.07),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.error_outline_rounded, color: Color(0xFFC62828), size: 20),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              _errorMessage!,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                color: const Color(0xFFB71C1C),
+                                                fontWeight: FontWeight.w500,
+                                                height: 1.35,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  SizedBox(height: shortScreen ? 16 : 20),
+                                  _buildPrimaryCTA(),
+                                  const SizedBox(height: 6),
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () => context.push('/address/add'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(0xFF37474F),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      ),
+                                      child: Text(
+                                        'Enter address manually instead',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          decoration: TextDecoration.underline,
+                                          decorationColor: const Color(0xFF90A4AE),
+                                          decorationThickness: 1.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBranding() {
+  Widget _buildBrandingHeader() {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Icon + Name in single row
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: AppTheme.primaryGreen.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 3))],
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.22),
+                blurRadius: 18,
+                offset: const Offset(0, 5),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset('assets/icons/app_icon.png', fit: BoxFit.cover),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text('Easy Basket', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20), letterSpacing: -0.3)),
-          ],
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset('assets/icons/app_icon.png', fit: BoxFit.cover),
+          ),
         ),
-        const SizedBox(height: 4),
-        Text('Fresh groceries in minutes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[500])),
+        const SizedBox(height: 14),
+        Text(
+          'Easy Basket',
+          style: GoogleFonts.poppins(
+            fontSize: 27,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF1B5E20),
+            letterSpacing: -0.6,
+            height: 1.05,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Fresh groceries in minutes',
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF78909C),
+            height: 1.25,
+          ),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
 
   Widget _buildPrimaryCTA() {
-    return Container(
-      width: double.infinity, height: 58,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF2E8B3C), Color(0xFF38A34A)]),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF2E8B3C).withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
-          BoxShadow(color: const Color(0xFF38A34A).withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, 10)),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: _isLoadingLocation ? null : _handleAllowLocation,
-          child: const Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.my_location_rounded, color: Colors.white, size: 22),
-                SizedBox(width: 10),
-                Text('Use Current Location', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.2)),
-              ],
+    final blocked = _isLoadingLocation || _isRequestingPermission;
+    return Opacity(
+      opacity: blocked ? 0.92 : 1,
+      child: Container(
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: AppTheme.primaryGradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppTheme.greenGlow,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: blocked ? null : _handleAllowLocation,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isRequestingPermission)
+                    const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    const Icon(Icons.my_location_rounded, color: Colors.white, size: 22),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Allow location access',
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.15,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -393,37 +539,46 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
   // ═══════════════════════════════════════
 
   Future<void> _handleAllowLocation() async {
+    if (_isRequestingPermission || _isLoadingLocation) return;
+
     final locationProvider = Provider.of<LocationProvider>(context, listen: false);
 
-    // Clear previous error
+    // Immediate feedback — work is async (no UI "freeze"), but button state shows we're handling the tap.
     setState(() {
       _errorMessage = null;
+      _isRequestingPermission = true;
     });
 
-    // Request permission first (before showing skeleton)
+    // Request permission — system dialog; awaits yield to the event loop (frames + animations keep running).
     final granted = await locationProvider.requestPermission();
     if (!mounted) return;
 
     if (!granted) {
-      if (locationProvider.isPermissionPermanentlyDenied) {
-        setState(() => _errorMessage = 'Location permanently denied. Tap to open Settings.');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Please enable location in phone Settings'),
-              backgroundColor: Colors.orange,
-              action: SnackBarAction(label: 'Open Settings', textColor: Colors.white, onPressed: () => locationProvider.openAppSettings()),
-            ),
-          );
+      setState(() {
+        _isRequestingPermission = false;
+        if (locationProvider.isPermissionPermanentlyDenied) {
+          _errorMessage = 'Location permanently denied. Tap to open Settings.';
+        } else {
+          _errorMessage = 'Location permission is needed for delivery';
         }
-      } else {
-        setState(() => _errorMessage = 'Location permission is needed for delivery');
+      });
+      if (locationProvider.isPermissionPermanentlyDenied && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please enable location in phone Settings'),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(label: 'Open Settings', textColor: Colors.white, onPressed: () => locationProvider.openAppSettings()),
+          ),
+        );
       }
       return;
     }
 
-    // Permission granted — show skeleton and detect
-    setState(() => _isLoadingLocation = true);
+    // Permission granted — skeleton + detecting copy while GPS / geocode runs (typically 2–4s).
+    setState(() {
+      _isRequestingPermission = false;
+      _isLoadingLocation = true;
+    });
 
     await locationProvider.detectLocation(force: true);
 
@@ -436,9 +591,74 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
       // Detection failed — show error, allow retry
       setState(() {
         _isLoadingLocation = false;
+        _isRequestingPermission = false;
         _errorMessage = 'Could not detect location. Please try again.';
       });
     }
+  }
+}
+
+/// Hero illustration: bottom-aligned + scaled so art meets the action sheet with little dead air.
+class _LocationHeroIllustration extends StatelessWidget {
+  const _LocationHeroIllustration({this.viewportHeight});
+
+  /// Total screen body height — used to size the bloom vs small [Expanded] slots.
+  final double? viewportHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+        final vh = viewportHeight ?? h;
+        final bloomDiameter = (w * 1.35).clamp(280.0, vh * 0.72);
+
+        return Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              bottom: -h * 0.06,
+              child: OverflowBox(
+                maxWidth: bloomDiameter,
+                maxHeight: bloomDiameter,
+                alignment: Alignment.center,
+                child: Container(
+                  width: bloomDiameter,
+                  height: bloomDiameter,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF66BB6A).withValues(alpha: 0.26),
+                        const Color(0xFF81C784).withValues(alpha: 0.12),
+                        const Color(0xFFA5D6A7).withValues(alpha: 0.0),
+                      ],
+                      stops: const [0.0, 0.4, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Transform.scale(
+              scale: 1.22,
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: EdgeInsets.only(left: w * 0.01, right: w * 0.01, bottom: 4),
+                child: Image.asset(
+                  'assets/images/delivery.png',
+                  fit: BoxFit.contain,
+                  width: w * 1.2,
+                  height: h * 0.94,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
