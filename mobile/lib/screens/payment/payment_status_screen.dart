@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
+import '../../services/notification_service.dart';
 
 enum PaymentStatus {
   success,
@@ -29,6 +31,14 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Ask notification permission after first order (Blinkit style)
+    // User just placed order — wants updates — high accept rate
+    if (!kIsWeb &&
+        (widget.status == PaymentStatus.success || widget.status == PaymentStatus.orderPlaced)) {
+      NotificationService().requestNotificationPermission();
+    }
+
     // Auto-redirect after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {

@@ -428,11 +428,18 @@ class CartScreen extends StatelessWidget {
                       final proximityProv = Provider.of<ProximityProvider>(context, listen: false);
                       if (proximityProv.partialAddress != null) {
                         // Show bottom sheet — quick address completion (Blinkit style)
+                        final partial = proximityProv.partialAddress!;
                         AddressCompletionSheet.show(
                           context: context,
-                          partialAddress: proximityProv.partialAddress!,
-                          onAddressSaved: () {
-                            // Address saved — refresh addresses and go to payment
+                          preFilledData: {
+                            'city': partial.city ?? '',
+                            'state': partial.state ?? '',
+                            'pincode': partial.pincode ?? '',
+                            'latitude': partial.latitude.toString(),
+                            'longitude': partial.longitude.toString(),
+                            'area': partial.area ?? '',
+                          },
+                          onSaved: () {
                             final authProv = Provider.of<AuthProvider>(context, listen: false);
                             final addrProv = Provider.of<AddressProvider>(context, listen: false);
                             if (authProv.token != null) {
@@ -447,8 +454,8 @@ class CartScreen extends StatelessWidget {
                           },
                         );
                       } else {
-                        // No GPS data — open full add address screen
-                        context.push('/address/add');
+                        // No GPS data — open address list (has search, map, manual)
+                        context.push('/addresses');
                       }
                     } else {
                       // Has address — go to select address screen

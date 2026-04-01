@@ -303,11 +303,18 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
     if (proximityProvider.needsAddressCompletion && proximityProvider.partialAddress != null) {
       // Show address completion bottom sheet
+      final partial = proximityProvider.partialAddress!;
       AddressCompletionSheet.show(
         context: context,
-        partialAddress: proximityProvider.partialAddress!,
-        onAddressSaved: () {
-          // Address saved — retry placing order
+        preFilledData: {
+          'city': partial.city ?? '',
+          'state': partial.state ?? '',
+          'pincode': partial.pincode ?? '',
+          'latitude': partial.latitude.toString(),
+          'longitude': partial.longitude.toString(),
+          'area': partial.area ?? '',
+        },
+        onSaved: () {
           _placeOrder();
         },
       );

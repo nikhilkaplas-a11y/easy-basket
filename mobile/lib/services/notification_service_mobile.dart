@@ -66,8 +66,9 @@ class NotificationService {
     _adminProvider = adminProvider;
     _authProvider = authProvider;
 
-    // 1. Notification permission maango (Android 13+ ke liye zaroori)
-    await _requestPermission();
+    // 1. Notification permission — DON'T ask on login
+    // Ask after first order (higher accept rate — Blinkit style)
+    // _requestPermission() will be called from payment success screen
 
     // 2. Local notifications setup karo (foreground mein dikhane ke liye)
     await _setupLocalNotifications();
@@ -97,7 +98,8 @@ class NotificationService {
 
   // ── 1. Permission maango ──
   // Kyun: Android 13+ mein bina permission ke notification nahi dikhegi
-  Future<void> _requestPermission() async {
+  /// Request notification permission — call after first order
+  Future<void> requestNotificationPermission() async {
     final settings = await _messaging.requestPermission(
       alert: true,    // notification dikhao
       badge: true,    // app icon pe badge dikhao

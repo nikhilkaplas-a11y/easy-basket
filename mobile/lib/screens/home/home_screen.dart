@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -21,6 +22,8 @@ import '../../utils/responsive.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/active_order_bar.dart';
+import '../../widgets/address_completion_sheet.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/smart_suggestion_banner.dart';
 import '../../models/category_model.dart';
 
@@ -31,8 +34,27 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  bool _hasCheckedServiceAvailability = false; // Prevent multiple checks
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
+  bool _hasCheckedServiceAvailability = false;
+  String? _serviceNotAvailableMessage;
+  bool _isHomeLoading = true;
+  Timer? _orderPollingTimer; // Backup polling when FCM denied
+
+  // Fun facts — randomly selected, rotate every 1.5 sec
+  Timer? _factsTimer;
+  int _currentFactIndex = 0;
+  static final List<Map<String, String>> _funFacts = [
+    {'emoji': '🥛', 'fact': 'India is the world\'s largest milk producer!'},
+    {'emoji': '🍚', 'fact': 'Indians consume 100 million tonnes of rice yearly'},
+    {'emoji': '🛒', 'fact': 'Online grocery grew 80% in India since 2020'},
+    {'emoji': '🥭', 'fact': 'India grows over 1000 varieties of mangoes'},
+    {'emoji': '🧈', 'fact': 'Ghee has been used in India for over 5000 years'},
+    {'emoji': '🌶️', 'fact': 'Bhut Jolokia was once the world\'s hottest chilli'},
+    {'emoji': '🍌', 'fact': 'India is the largest producer of bananas'},
+    {'emoji': '🫖', 'fact': 'India is the 2nd largest tea producer globally'},
+    {'emoji': '🧅', 'fact': 'India is the 2nd largest onion producer'},
+    {'emoji': '🍋', 'fact': 'India produces 16% of the world\'s fruits'},
+  ];
 
   // Product cards auto-scroll
   final ScrollController _productScrollController = ScrollController();
@@ -57,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // App lifecycle listener
 
     // Search hint 3D flip animation
     _searchFlipController = AnimationController(
@@ -68,25 +91,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     _startSearchHintRotation();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Random starting fact
+    _currentFactIndex = DateTime.now().millisecond % _funFacts.length;
+    _startFactsRotation();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       final orderProvider = Provider.of<OrderProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      productProvider.fetchCategories();
-      // limit: 15 → sirf 15 products fetch karo (snack it away section ke liye)
-      // Kyun: 568 products fetch karna sirf 15 dikhane ke liye = 95% data waste
-      productProvider.fetchProducts(limit: 15).then((_) {
-        if (mounted) _startAutoScroll();
-      });
-      
-      // Fetch orders and run smart address detection if authenticated
-      if (authProvider.token != null) {
-        // 1. Fetch active orders (lightweight — for active order bar)
-        orderProvider.fetchActiveOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
 
-        // 2. Smart address flow — GPS detect + saved addresses + proximity check
-        _initSmartAddressFlow(authProvider.token!);
+      // Sequential: GPS first → then products (products depend on location)
+      if (authProvider.token != null) {
+        orderProvider.fetchActiveOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
+        await _initSmartAddressFlow(authProvider.token!);
+      }
+
+      // GPS done → now fetch products for this location
+      await Future.wait([
+        productProvider.fetchCategories(),
+        productProvider.fetchProducts(limit: 15),
+      ]);
+
+      if (mounted) _startAutoScroll();
+
+      // DONO done — hide skeleton, show real content
+      if (mounted) {
+        setState(() => _isHomeLoading = false);
+        _factsTimer?.cancel();
+
+        // Start order polling ONLY if FCM not available (backup mechanism)
+        final notificationService = NotificationService();
+        if (notificationService.fcmToken == null || notificationService.fcmToken!.isEmpty) {
+          _startOrderPolling();
+        }
       }
     });
   }
@@ -124,277 +161,181 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (!mounted) return;
 
-    // Step 3: New user — no saved addresses (partial header only, NO mismatch screen)
-    if (!addressProvider.hasAddresses) {
-      addressProvider.clearSelection();
-      proximityProvider.checkProximity(
-        locationProvider: locationProvider,
-        addressProvider: addressProvider,
-        force: true,
-      );
-      debugPrint(
-        '🏠 [Home] New user — partial: ${locationProvider.detectedAddress?.displayName ?? "none"}',
-      );
-      await _ensureServiceAreaForLaunch(
-        addressProvider,
-        locationProvider,
-        proximityProvider,
-      );
-      return;
-    }
-
-    // Step 4: Run proximity check — GPS vs saved addresses (always force fresh)
+    // Step 3: Proximity check
     proximityProvider.checkProximity(
       locationProvider: locationProvider,
       addressProvider: addressProvider,
       force: true,
     );
 
-    // Step 5: Act on decision
     final result = proximityProvider.result;
+
+    // Step 4: Silently decide — no warnings, no mismatch screens (Blinkit style)
     if (result != null) {
-      switch (result.decision) {
-        case ProximityDecision.autoSelect:
-          // User is near a saved address — auto-select it
-          if (result.nearestAddress != null) {
-            addressProvider.selectAddress(result.nearestAddress!);
-          }
-          debugPrint('🏠 [Home] Auto-selected: ${result.nearestAddress?.tag}');
-          break;
-
-        case ProximityDecision.warn:
-          // User is somewhat far — select nearest but show warning
-          if (result.nearestAddress != null) {
-            addressProvider.selectAddress(result.nearestAddress!);
-          }
-          debugPrint('🏠 [Home] Warning: ${result.warningText}');
-          // Warning banner will show automatically via Consumer in build()
-          break;
-
-        case ProximityDecision.forceNew:
-          // >20km from saved → mismatch only if current GPS pin is NOT serviceable
-          addressProvider.clearSelection();
-          await _openLocationMismatchIfNeeded(
-            result,
-            locationProvider,
-          );
-          break;
-
-        case ProximityDecision.noGps:
-          // No GPS — use default saved address (current behavior)
-          final defaultAddr = addressProvider.defaultAddress;
-          if (defaultAddr != null) {
-            addressProvider.selectAddress(defaultAddr);
-          }
-          debugPrint('🏠 [Home] No GPS — using default address');
-          break;
+      if (result.decision == ProximityDecision.noGps) {
+        // No GPS — silently use default saved address
+        final defaultAddr = addressProvider.defaultAddress;
+        if (defaultAddr != null) addressProvider.selectAddress(defaultAddr);
+        debugPrint('🏠 [Home] No GPS → default address');
+      } else if (result.nearestAddress != null &&
+          result.decision != ProximityDecision.forceNew) {
+        // Near a saved address → silently select it
+        addressProvider.selectAddress(result.nearestAddress!);
+        debugPrint('🏠 [Home] Silently selected: ${result.nearestAddress?.tag}');
+      } else {
+        // Far from saved (or no saved) → use GPS partial
+        addressProvider.clearSelection();
+        debugPrint('🏠 [Home] Using GPS partial: ${locationProvider.detectedAddress?.displayName}');
       }
     }
 
-    // Step 6: Service area (saved pin and/or GPS partial for new users)
-    await _ensureServiceAreaForLaunch(
-      addressProvider,
-      locationProvider,
-      proximityProvider,
-    );
+    // Step 5: Service area check (soft — no hard redirect)
+    await _softServiceAreaCheck(addressProvider, locationProvider);
   }
 
-  /// "Different city" full screen only when we cannot deliver at **current** GPS pin.
-  /// If user is 400km from saved Bareilly but GPS is in a serviceable Ropar pin, stay on home + partial.
-  Future<void> _openLocationMismatchIfNeeded(
-    ProximityResult result,
-    LocationProvider locationProvider,
-  ) async {
-    if (!result.showMismatchScreen) {
-      debugPrint('🏠 [Home] forceNew: new user / no mismatch route');
-      return;
-    }
-
-    final pin = result.partialAddress?.pincode ??
-        locationProvider.detectedAddress?.pincode;
-    if (pin != null && pin.isNotEmpty) {
-      final serviceAreaProvider =
-          Provider.of<ServiceAreaProvider>(context, listen: false);
-      final deliverHere = await serviceAreaProvider.checkServiceAvailability(
-        pincode: pin,
-        country: 'India',
-      );
-      if (!mounted) return;
-      if (deliverHere) {
-        debugPrint(
-          '🏠 [Home] Skip mismatch screen — current location pin $pin is serviceable',
-        );
-        return;
-      }
-    }
-
-    if (!mounted) return;
-    debugPrint('🏠 [Home] Show location mismatch (current pin not serviceable or unknown)');
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) context.push('/location-mismatch');
-    });
-  }
-
-  /// Service-area gate: prefer **current GPS pin** when no saved row is selected (e.g. forceNew /
-  /// cleared selection). Do **not** fall back to default saved pin in that case — that was
-  /// showing Bareilly while user was actually in 140117.
-  Future<void> _ensureServiceAreaForLaunch(
+  /// Soft service area check — Blinkit style
+  /// No hard redirect. Check GPS pincode first, then saved address.
+  /// If not serviceable → show soft banner on home, don't block.
+  Future<void> _softServiceAreaCheck(
     AddressProvider addressProvider,
     LocationProvider locationProvider,
-    ProximityProvider proximityProvider,
   ) async {
     if (_hasCheckedServiceAvailability) return;
-
-    final partial =
-        proximityProvider.partialAddress ?? locationProvider.detectedAddress;
-    final pin = partial?.pincode;
-
-    final noSavedRowSelected = addressProvider.selectedAddress == null;
-    final hasGpsPin = locationProvider.isPermissionGranted &&
-        pin != null &&
-        pin.isNotEmpty;
-
-    if (noSavedRowSelected && hasGpsPin) {
-      _hasCheckedServiceAvailability = true;
-      final serviceAreaProvider =
-          Provider.of<ServiceAreaProvider>(context, listen: false);
-      try {
-        final ok = await serviceAreaProvider.checkServiceAvailability(
-          pincode: pin,
-          country: 'India',
-        );
-        debugPrint('🏠 [Home] Service check for current-location pin $pin: $ok');
-        if (!ok && mounted) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (mounted) {
-            context.go('/service-not-available', extra: {
-              'pincode': pin,
-              'city': partial?.city,
-              'state': partial?.state,
-              'country': 'India',
-              'returnTo': '/home',
-            });
-          }
-        }
-      } catch (e) {
-        debugPrint('❌ [Home] Service check (GPS pin, no selection) error: $e');
-      }
-      return;
-    }
-
-    final saved = addressProvider.selectedAddress ?? addressProvider.defaultAddress;
-    if (saved != null) {
-      await _checkSelectedAddressServiceAvailability(addressProvider);
-      return;
-    }
-
-    if (pin == null || pin.isEmpty) {
-      debugPrint(
-        '🏠 [Home] Skip service check — no selection, no default, no GPS pincode',
-      );
-      return;
-    }
-
     _hasCheckedServiceAvailability = true;
+
     final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+    final partial = locationProvider.detectedAddress;
+    final selected = addressProvider.selectedAddress;
+
+    // Determine which pincode to check
+    String? pinToCheck;
+    String? cityForDisplay;
+
+    if (selected != null) {
+      pinToCheck = selected.pincode;
+      cityForDisplay = selected.city;
+    } else if (partial?.pincode != null && partial!.pincode!.isNotEmpty) {
+      pinToCheck = partial.pincode;
+      cityForDisplay = partial.city;
+    }
+
+    if (pinToCheck == null || pinToCheck.isEmpty) {
+      debugPrint('🏠 [Home] No pincode to check — skipping service area');
+      return;
+    }
 
     try {
-      final ok = await serviceAreaProvider.checkServiceAvailability(
-        pincode: pin,
+      final isServiceable = await serviceAreaProvider.checkServiceAvailability(
+        pincode: pinToCheck,
         country: 'India',
       );
-      debugPrint('🏠 [Home] Service check for GPS pin $pin: $ok');
-      if (!ok && mounted) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          context.go('/service-not-available', extra: {
-            'pincode': pin,
-            'city': partial?.city,
-            'state': partial?.state,
-            'country': 'India',
-            'returnTo': '/home',
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ [Home] Service check (partial pin) error: $e');
-    }
-  }
+      debugPrint('🏠 [Home] Service check $pinToCheck: ${isServiceable ? "✅" : "❌"}');
 
-  /// Check if selected address is serviceable
-  /// If NOT → check current GPS location pincode
-  /// If GPS pincode serviceable → switch to partial address
-  /// If neither → show "we don't deliver here"
-  Future<void> _checkSelectedAddressServiceAvailability(AddressProvider addressProvider) async {
-    if (_hasCheckedServiceAvailability) return;
-
-    final address = addressProvider.selectedAddress ?? addressProvider.defaultAddress;
-    if (address == null) return;
-
-    _hasCheckedServiceAvailability = true;
-    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
-
-    try {
-      // Step 1: Check saved/selected address
-      final isAvailable = await serviceAreaProvider.checkServiceAvailability(
-        pincode: address.pincode,
-        country: 'India',
-      );
-
-      debugPrint('🏠 [Home] Service check for saved ${address.pincode}: $isAvailable');
-
-      if (isAvailable) return; // Saved address is serviceable — all good
-
-      // Step 2: Saved address NOT serviceable — check current GPS location
-      final partial = locationProvider.detectedAddress;
-      debugPrint('🏠 [Home] GPS partial address: ${partial?.fullDisplay ?? "NULL — geocode may have failed"}');
-      debugPrint('🏠 [Home] GPS position: ${locationProvider.currentPosition?.latitude}, ${locationProvider.currentPosition?.longitude}');
-      if (partial?.pincode != null && partial!.pincode!.isNotEmpty) {
-        final gpsServiceable = await serviceAreaProvider.checkServiceAvailability(
-          pincode: partial.pincode!,
-          country: 'India',
-        );
-
-        debugPrint('🏠 [Home] Service check for GPS ${partial.pincode}: $gpsServiceable');
-
-        if (gpsServiceable && mounted) {
-          // Saved pin not served, but **where user is now** is served — show partial, not old saved
-          addressProvider.clearSelection();
-          proximityProvider.checkProximity(
-            locationProvider: locationProvider,
-            addressProvider: addressProvider,
-            force: true,
-          );
-          // Show snackbar informing user
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Your saved address (${address.city}) is not serviceable. Using current location.'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          return;
-        }
-      }
-
-      // Step 3: Neither serviceable — show "not available" screen
-      if (mounted) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          context.go('/service-not-available', extra: {
-            'pincode': address.pincode,
-            'city': address.city,
-            'state': address.state,
-            'country': 'India',
-            'returnTo': '/home',
-          });
-        }
+      if (!isServiceable && mounted) {
+        // Soft banner — don't block, let user browse
+        setState(() {
+          _serviceNotAvailableMessage = "We don't deliver to ${cityForDisplay ?? pinToCheck} yet";
+        });
       }
     } catch (e) {
       debugPrint('❌ [Home] Service check error: $e');
     }
+  }
+
+  /// "Not in your area" card — replaces products when not serviceable
+  Widget _buildNotServiceableCard(AddressProvider addrProv) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Emoji + icon
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.location_off_rounded, size: 40, color: Color(0xFFF57C00)),
+          ),
+          const SizedBox(height: 18),
+
+          // Title
+          const Text(
+            "We're not in your area yet",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+
+          // Subtitle
+          Text(
+            _serviceNotAvailableMessage ?? "We don't deliver to this location yet.",
+            style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.4),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+
+          // Option 1: Try saved address (if user has saved addresses)
+          if (addrProv.hasAddresses) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => context.push('/addresses'),
+                    child: const Center(
+                      child: Text(
+                        'Try Saved Address',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // Option 2: Add different address
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () => context.push('/addresses'),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey[300]!),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text(
+                'Add Different Address',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Auto-detect location for new users (seamless onboarding)
@@ -418,9 +359,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Location detected - show edit screen for user to review/refine (Blinkit-style)
       if (result['addressData'] != null && mounted) {
         // Navigate to add address screen with pre-filled data
-        context.push(
-          '/address/add',
-          extra: result['addressData'] as Map<String, dynamic>,
+        // Open address form bottom sheet with pre-filled data
+        AddressCompletionSheet.show(
+          context: context,
+          preFilledData: result['addressData'] as Map<String, dynamic>,
+          onSaved: () {
+            final authProv = Provider.of<AuthProvider>(context, listen: false);
+            if (authProv.token != null) {
+              Provider.of<OrderProvider>(context, listen: false).fetchAddresses(authProv.token!);
+              Provider.of<AddressProvider>(context, listen: false).fetchAddresses(authProv.token!);
+            }
+          },
         );
       } else {
         // Fallback: if no address data, refresh and show success
@@ -526,6 +475,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  /// Order polling — backup when FCM denied
+  /// Har 30 sec active orders refresh karo
+  void _startOrderPolling() {
+    _orderPollingTimer?.cancel();
+    _orderPollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+      if (authProvider.token != null) {
+        orderProvider.fetchActiveOrders(authProvider.token!);
+      }
+    });
+    debugPrint('🔄 [Home] Order polling started (FCM not available)');
+  }
+
+  /// App resume — ALWAYS refresh orders (regardless of FCM)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+      if (authProvider.token != null) {
+        orderProvider.fetchActiveOrders(authProvider.token!);
+        debugPrint('🔄 [Home] Orders refreshed on app resume');
+      }
+    }
+  }
+
+  void _startFactsRotation() {
+    _factsTimer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
+      if (!mounted || !_isHomeLoading) {
+        _factsTimer?.cancel();
+        return;
+      }
+      setState(() {
+        _currentFactIndex = (_currentFactIndex + 1) % _funFacts.length;
+      });
+    });
+  }
+
   void _startSearchHintRotation() {
     _searchHintTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
@@ -592,8 +581,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchHintTimer?.cancel();
     _autoScrollTimer?.cancel();
+    _factsTimer?.cancel();
+    _orderPollingTimer?.cancel();
     _searchFlipController.dispose();
     _productScrollController.dispose();
     super.dispose();
@@ -630,6 +622,154 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
+  /// Skeleton loading screen with rotating fun facts
+  Widget _buildHomeSkeletonWithFacts() {
+    final fact = _funFacts[_currentFactIndex];
+
+    return Container(
+      color: const Color(0xFFF4F8F3),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header skeleton — SHIMMER
+              Shimmer.fromColors(
+                baseColor: const Color(0xFFE8E8E8),
+                highlightColor: const Color(0xFFF8F8F8),
+                period: const Duration(milliseconds: 1000),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+                          const SizedBox(width: 10),
+                          Container(width: 120, height: 20, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6))),
+                          const Spacer(),
+                          Container(width: 36, height: 36, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Container(height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Search bar skeleton — SHIMMER
+              Shimmer.fromColors(
+                baseColor: const Color(0xFFE8E8E8),
+                highlightColor: const Color(0xFFF8F8F8),
+                period: const Duration(milliseconds: 1100),
+                child: Container(height: 48, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14))),
+              ),
+              const SizedBox(height: 18),
+
+              // Fun fact — plain text, no card (on shimmer bg)
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: Padding(
+                  key: ValueKey(_currentFactIndex),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(fact['emoji']!, style: const TextStyle(fontSize: 22)),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          fact['fact']!,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[600], height: 1.3),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Category + Products skeleton — SHIMMER
+              Shimmer.fromColors(
+                baseColor: const Color(0xFFE8E8E8),
+                highlightColor: const Color(0xFFF8F8F8),
+                period: const Duration(milliseconds: 1200),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Category chips
+                    SizedBox(
+                      height: 90,
+                      child: Row(
+                        children: List.generate(4, (i) => Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: i < 3 ? 10 : 0),
+                            child: Column(
+                              children: [
+                                Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14))),
+                                const SizedBox(height: 8),
+                                Container(width: 48, height: 10, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                              ],
+                            ),
+                          ),
+                        )),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section title
+                    Container(width: 130, height: 16, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                    const SizedBox(height: 12),
+
+                    // Product cards
+                    Row(
+                      children: [
+                        Expanded(child: _skeletonProductCard()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _skeletonProductCard()),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeletonProductCard() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(height: 90, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+          const SizedBox(height: 8),
+          Container(width: double.infinity, height: 12, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+          const SizedBox(height: 6),
+          Container(width: 70, height: 10, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(width: 45, height: 14, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+              Container(width: 50, height: 26, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
@@ -637,7 +777,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: AppTheme.white,
-      body: Stack(
+      body: _isHomeLoading
+          ? _buildHomeSkeletonWithFacts()
+          : Stack(
         children: [
           // Green gradient behind status bar + header area
           Container(
@@ -783,9 +925,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     // Line 1: 📍 CURRENT LOCATION / HOME ✓
                                     // Line 2: Sector 70, Mohali / 856, Doctor Goyal St
                                     GestureDetector(
-                                      onTap: () => context.push(
-                                        addressProvider.hasAddresses ? '/addresses' : '/address/add',
-                                      ),
+                                      onTap: () {
+                                        if (addressProvider.hasAddresses) {
+                                          context.push('/addresses');
+                                        } else {
+                                          // No saved address — open bottom sheet instead of old add address page
+                                          final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+                                          final partial = locationProvider.detectedAddress;
+                                          AddressCompletionSheet.show(
+                                            context: context,
+                                            preFilledData: partial != null ? {
+                                              'city': partial.city ?? '',
+                                              'state': partial.state ?? '',
+                                              'pincode': partial.pincode ?? '',
+                                              'latitude': partial.latitude.toString(),
+                                              'longitude': partial.longitude.toString(),
+                                              'area': partial.area ?? '',
+                                            } : {},
+                                            onSaved: () {
+                                              // Refresh after save
+                                              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                                              if (authProvider.token != null) {
+                                                Provider.of<OrderProvider>(context, listen: false).fetchAddresses(authProvider.token!);
+                                                Provider.of<AddressProvider>(context, listen: false).fetchAddresses(authProvider.token!);
+                                              }
+                                            },
+                                          );
+                                        }
+                                      },
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         decoration: BoxDecoration(
@@ -889,110 +1056,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       },
                     ),
 
-                    // Warning Banner — shows when user is 5-20km from saved address
-                    // UI: Warning icon + text on top row
-                    //     [Use Current Location]  [Continue Anyway] on bottom row
-                    Consumer<ProximityProvider>(
-                      builder: (context, proximityProvider, _) {
-                        if (!proximityProvider.showWarning) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFFFF8E1), Color(0xFFFFFDE7)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFFFE082), width: 1),
-                              boxShadow: [
-                                BoxShadow(color: const Color(0xFFFFE082).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4)),
-                                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 1)),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Top row — warning icon + text
-                                Row(
-                                  children: [
-                                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFF57C00), size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        proximityProvider.warningText,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF57C00)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                // Bottom row — two action buttons
-                                Row(
-                                  children: [
-                                    // Use Current Location button
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          // Navigate to add address with GPS pre-fill
-                                          final partial = proximityProvider.partialAddress;
-                                          final extra = <String, dynamic>{};
-                                          if (partial != null) {
-                                            extra['city'] = partial.city ?? '';
-                                            extra['state'] = partial.state ?? '';
-                                            extra['pincode'] = partial.pincode ?? '';
-                                            extra['latitude'] = partial.latitude.toString();
-                                            extra['longitude'] = partial.longitude.toString();
-                                          }
-                                          context.push('/address/add', extra: extra);
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              'Use Current Location',
-                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black87),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Continue Anyway button
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => proximityProvider.dismissWarning(),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              'Continue Anyway',
-                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black87),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                    // Soft "not serviceable" banner — doesn't block, just informs
+                    if (_serviceNotAvailableMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3E0),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFFE0B2)),
                           ),
-                        );
-                      },
-                    ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Color(0xFFF57C00), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _serviceNotAvailableMessage!,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF57C00)),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => setState(() => _serviceNotAvailableMessage = null),
+                                child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
                     // Enable Location Banner — shows when GPS permission denied
                     Consumer<ProximityProvider>(
@@ -1253,7 +1345,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   final hasNoAddress = orderProvider.addresses.isEmpty
                       && !addrProv.hasAddresses
                       && proximityProv.partialAddress == null;
-                  
+
+                  // Not serviceable — show "not in your area" card instead of products
+                  if (_serviceNotAvailableMessage != null) {
+                    return _buildNotServiceableCard(addrProv);
+                  }
+
                   if (productProvider.isLoading && productProvider.products.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.all(24.0),

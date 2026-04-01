@@ -9,8 +9,12 @@ import '../../providers/service_area_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/proximity_provider.dart';
+import 'dart:async';
+import 'package:geocoding/geocoding.dart';
 import '../../models/address_model.dart';
 import '../../utils/theme.dart';
+import '../../widgets/address_completion_sheet.dart';
+import 'map_address_picker_screen.dart';
 
 class AddressListScreen extends StatefulWidget {
   const AddressListScreen({super.key});
@@ -21,8 +25,15 @@ class AddressListScreen extends StatefulWidget {
 
 class _AddressListScreenState extends State<AddressListScreen> {
   int? _selectedAddressId;
-  bool _isFromCheckout = false; // Track if user came from checkout flow
-  bool _isUpdating = false; // Track if updating default address
+  bool _isFromCheckout = false;
+  bool _isUpdating = false;
+
+  // Search state
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  List<_SearchResult> _searchResults = [];
+  bool _isSearching = false;
+  bool _showSearchResults = false;
   bool _isCheckingService = false; // Track if checking service availability
   int? _lastCheckedAddressId; // Track which address was last checked to prevent showing wrong result
   GoRouter? _router; // Store router reference to avoid context issues
@@ -57,6 +68,114 @@ class _AddressListScreenState extends State<AddressListScreen> {
           }
         });
       }
+    });
+  }
+
+  /// Open universal address form bottom sheet
+  void _showAddressSheet(Map<String, dynamic> preFilledData) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    AddressCompletionSheet.show(
+      context: context,
+      preFilledData: preFilledData,
+      onSaved: () {
+        // Refresh addresses after save
+        if (authProvider.token != null) {
+          Provider.of<OrderProvider>(context, listen: false).fetchAddresses(authProvider.token!);
+          Provider.of<AddressProvider>(context, listen: false).fetchAddresses(authProvider.token!);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  // ── Search methods ──
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+
+    if (query.trim().length < 3) {
+      setState(() {
+        _searchResults = [];
+        _showSearchResults = false;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      _performSearch(query.trim());
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    try {
+      final locations = await locationFromAddress(query);
+      if (!mounted) return;
+
+      final results = <_SearchResult>[];
+      for (final location in locations.take(5)) {
+        try {
+          final placemarks = await placemarkFromCoordinates(location.latitude, location.longitude);
+          if (placemarks.isNotEmpty) {
+            final place = placemarks.first;
+            final title = [place.subLocality, place.locality].where((s) => s != null && s.isNotEmpty).join(', ');
+            final subtitle = [place.administrativeArea, place.postalCode].where((s) => s != null && s.isNotEmpty).join(' - ');
+            results.add(_SearchResult(
+              title: title.isNotEmpty ? title : place.name ?? query,
+              subtitle: subtitle,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              city: place.locality ?? place.subAdministrativeArea ?? '',
+              state: place.administrativeArea ?? '',
+              pincode: place.postalCode?.replaceAll(RegExp(r'[^0-9]'), '') ?? '',
+              area: place.subLocality ?? '',
+            ));
+          }
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _showSearchResults = true;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _showSearchResults = false;
+          _isSearching = false;
+        });
+      }
+    }
+  }
+
+  void _onSearchResultTap(_SearchResult result) {
+    // Clear search
+    _searchController.clear();
+    setState(() {
+      _searchResults = [];
+      _showSearchResults = false;
+    });
+
+    // Open address form bottom sheet with pre-filled data
+    _showAddressSheet({
+      'area': result.area.isNotEmpty ? result.area : result.title,
+      'city': result.city,
+      'state': result.state,
+      'pincode': result.pincode,
+      'latitude': result.latitude.toString(),
+      'longitude': result.longitude.toString(),
     });
   }
 
@@ -145,7 +264,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                       Text('Add a delivery address to get started', style: TextStyle(fontSize: 13, color: AppTheme.grey)),
                       const SizedBox(height: 20),
                       AppTheme.gradientButton(
-                        onPressed: () => context.push('/address/add'),
+                        onPressed: () => _showAddressSheet({}),
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: const Text('Add Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
@@ -154,54 +273,145 @@ class _AddressListScreenState extends State<AddressListScreen> {
                 )
               : Column(
                   children: [
-                    // Use Current Location bar
-                    Consumer<LocationProvider>(
-                      builder: (context, locationProvider, _) {
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F9F5),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.15)),
+                    // ─── Search bar — directly on UI, white bg, soft shadow ───
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(50),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 3)),
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 1)),
+                        ],
+                      ),
+                      child: TextField(
+                              controller: _searchController,
+                              onChanged: _onSearchChanged,
+                              decoration: InputDecoration(
+                                hintText: 'Search area, street, landmark...',
+                                hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                                prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 20),
+                                suffixIcon: _searchController.text.isNotEmpty
+                                    ? GestureDetector(
+                                        onTap: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchResults = [];
+                                            _showSearchResults = false;
+                                            _isSearching = false;
+                                          });
+                                        },
+                                        child: Icon(Icons.close_rounded, color: Colors.grey[400], size: 20),
+                                      )
+                                    : null,
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen, size: 20),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    locationProvider.isPermissionGranted
-                                        ? 'Use Current Location'
-                                        : 'Use Current Location',
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () async {
-                                    if (locationProvider.isPermissionGranted) {
-                                      // GPS granted — detect and use current location
-                                      await locationProvider.detectLocation();
-                                      if (mounted && locationProvider.detectedAddress != null) {
-                                        final partial = locationProvider.detectedAddress!;
-                                        context.push('/address/add', extra: {
+                          ),
+
+                          // Search results — show below search bar when active
+                          if (_isSearching)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(AppTheme.primaryGreen)))),
+                            ),
+
+                          if (_showSearchResults && _searchResults.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFF0F0F0)),
+                              ),
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                padding: EdgeInsets.zero,
+                                itemCount: _searchResults.length,
+                                separatorBuilder: (_, __) => Container(height: 0.5, color: const Color(0xFFF0F0F0)),
+                                itemBuilder: (context, index) {
+                                  final result = _searchResults[index];
+                                  return InkWell(
+                                    onTap: () => _onSearchResultTap(result),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF5F9F5),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 16),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(result.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                if (result.subtitle.isNotEmpty)
+                                                  Text(result.subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[500]), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 18),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                    // ─── Location options card (separate) ───
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Use Current Location
+                          Consumer<LocationProvider>(
+                            builder: (context, locationProvider, _) {
+                              return InkWell(
+                                onTap: () async {
+                                  if (locationProvider.isPermissionGranted) {
+                                    await locationProvider.detectLocation(force: true);
+                                    if (mounted && locationProvider.detectedAddress != null) {
+                                      final partial = locationProvider.detectedAddress!;
+                                      if (mounted) {
+                                        _showAddressSheet({
                                           'city': partial.city ?? '',
                                           'state': partial.state ?? '',
                                           'pincode': partial.pincode ?? '',
                                           'latitude': partial.latitude.toString(),
                                           'longitude': partial.longitude.toString(),
+                                          'area': partial.area ?? '',
                                         });
                                       }
-                                    } else if (locationProvider.isPermissionPermanentlyDenied) {
-                                      await locationProvider.openAppSettings();
-                                    } else {
-                                      final granted = await locationProvider.requestPermission();
-                                      if (granted) {
-                                        await locationProvider.detectLocation();
-                                        if (mounted && locationProvider.detectedAddress != null) {
-                                          final partial = locationProvider.detectedAddress!;
-                                          context.push('/address/add', extra: {
+                                    }
+                                  } else if (locationProvider.isPermissionPermanentlyDenied) {
+                                    await locationProvider.openAppSettings();
+                                  } else {
+                                    final granted = await locationProvider.requestPermission();
+                                    if (granted) {
+                                      await locationProvider.detectLocation(force: true);
+                                      if (mounted && locationProvider.detectedAddress != null) {
+                                        final partial = locationProvider.detectedAddress!;
+                                        if (mounted) {
+                                          _showAddressSheet({
                                             'city': partial.city ?? '',
                                             'state': partial.state ?? '',
                                             'pincode': partial.pincode ?? '',
@@ -211,39 +421,103 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                         }
                                       }
                                     }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: locationProvider.isPermissionGranted
-                                          ? AppTheme.primaryGreen.withValues(alpha: 0.1)
-                                          : const Color(0xFFE3F2FD),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      locationProvider.isPermissionGranted ? 'Use >' : 'Enable >',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: locationProvider.isPermissionGranted
-                                            ? AppTheme.primaryGreen
-                                            : const Color(0xFF1565C0),
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(7),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(9),
+                                        ),
+                                        child: const Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen, size: 16),
                                       ),
-                                    ),
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Use Current Location', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
+                                            SizedBox(height: 1),
+                                            Text('Detect via GPS', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 22),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              );
+                            },
+                          ),
+
+                          Container(height: 0.5, margin: const EdgeInsets.symmetric(horizontal: 16), color: const Color(0xFFF0F0F0)),
+
+                          // Pick on Map
+                          InkWell(
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MapAddressPickerScreen(
+                                    onLocationSelected: (lat, lng, address) {},
+                                  ),
+                                ),
+                              ).then((result) {
+                                if (result != null && result is Map<String, dynamic> && mounted) {
+                                  _showAddressSheet({
+                                    'addressLine1': result['addressLine1'] ?? '',
+                                    'city': result['city'] ?? '',
+                                    'state': result['state'] ?? '',
+                                    'pincode': result['pincode'] ?? '',
+                                    'latitude': result['latitude']?.toString() ?? '',
+                                    'longitude': result['longitude']?.toString() ?? '',
+                                  });
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE3F2FD),
+                                      borderRadius: BorderRadius.circular(9),
+                                    ),
+                                    child: const Icon(Icons.map_rounded, color: Color(0xFF1565C0), size: 16),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Pick on Map', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
+                                        SizedBox(height: 1),
+                                        Text('Choose from map', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 22),
+                                ],
+                              ),
                             ),
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
-                    // Address count header
+
+                    // ─── "Your Saved Addresses" header ───
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Row(
                         children: [
-                          Text('Your Addresses', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.grey)),
+                          Text('Your Saved Addresses', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.grey)),
                           const Spacer(),
                           Text('${orderProvider.addresses.length} saved', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
                         ],
@@ -282,77 +556,38 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                   print('📍 Is default: ${address.isDefault}, Is from checkout: $_isFromCheckout');
                                 }
                                 
-                                // If clicking on default address (whether selected or not), check service and navigate
-                                if (address.isDefault && !_isFromCheckout) {
-                                  if (kDebugMode) {
-                                    print('🏠 [TAP] Clicked on default address, checking service availability');
-                                  }
-                                  
-                                  // Check service availability for the default address
-                                  final isServiceable = await _checkServiceAvailability(address);
-                                  
-                                  // CRITICAL: Check if widget is still mounted before using context
-                                  if (!mounted) {
-                                    if (kDebugMode) {
-                                      print('⚠️ [TAP] Widget no longer mounted, skipping navigation');
-                                    }
-                                    return;
-                                  }
-                                  
-                                  if (isServiceable) {
-                                    // Default address is serviceable, navigate to home
-                                    if (kDebugMode) {
-                                      print('✅ [TAP] Default address is serviceable, navigating to home');
-                                    }
-                                    
-                                    // Update selection to default address
-                                    if (mounted) {
-                                      setState(() => _selectedAddressId = address.id);
-                                    }
-                                    
-                                    // Navigate to home using router reference to avoid context issues
-                                    if (mounted && _router != null) {
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        if (mounted && _router != null) {
-                                          _router!.go('/home');
-                                        }
-                                      });
-                                    }
-                                    return;
-                                  } else {
-                                    // Default address is not serviceable, service not available screen is already shown
-                                    if (kDebugMode) {
-                                      print('🚫 [TAP] Default address is not serviceable');
-                                    }
-                                    return;
-                                  }
-                                }
-                                
-                                // IMPORTANT: Check service availability for the CLICKED address, not the selected one
-                                // Pass the address object directly to ensure we check the correct one
+                                // Check service availability for clicked address
                                 final isServiceable = await _checkServiceAvailability(address);
-                                
+
+                                if (!mounted) return;
+
                                 if (!isServiceable) {
-                                  // Service not available - screen is already shown
-                                  // Don't update selection, keep current selection
                                   if (kDebugMode) {
-                                    print('🚫 [TAP] Service not available for clicked address ID: ${address.id}');
+                                    print('🚫 [TAP] Service not available for address ID: ${address.id}');
                                   }
                                   return;
                                 }
                                 
-                                // Update selection only if serviceable
-                                if (kDebugMode) {
-                                  print('✅ [TAP] Service available, updating selection to address ID: ${address.id}');
-                                }
-                                setState(() => _selectedAddressId = address.id);
-
-                                // Sync with AddressProvider — so home screen reflects change
+                                // Serviceable — select and go home
                                 Provider.of<AddressProvider>(context, listen: false).selectAddress(address);
+                                Provider.of<ProximityProvider>(context, listen: false).reset();
 
-                                // If not from checkout, update default and go back
-                                if (!_isFromCheckout) {
-                                  _updateDefaultAddress(address.id);
+                                if (_isFromCheckout) {
+                                  // From checkout — select and stay on list
+                                  setState(() => _selectedAddressId = address.id);
+                                } else {
+                                  // From home — set default in background, go home immediately
+                                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                                  final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+                                  if (authProvider.token != null && !address.isDefault) {
+                                    // Fire and forget — don't wait for API
+                                    orderProvider.updateAddress(
+                                      token: authProvider.token!,
+                                      addressId: address.id,
+                                      isDefault: true,
+                                    );
+                                  }
+                                  context.go('/home');
                                 }
                               },
                               child: Padding(
@@ -521,7 +756,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                               width: double.infinity,
                               height: 44,
                               child: OutlinedButton.icon(
-                                onPressed: () => context.push('/address/add'),
+                                onPressed: () => _showAddressSheet({}),
                                 icon: const Icon(Icons.add_location_alt_outlined, size: 18),
                                 label: const Text('Add New Address', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                                 style: OutlinedButton.styleFrom(
@@ -568,120 +803,32 @@ class _AddressListScreenState extends State<AddressListScreen> {
   }
 
   /// Check service availability for an address
+  /// Quick service check — no delays, no redirects, just true/false
   Future<bool> _checkServiceAvailability(AddressModel address) async {
-    // CRITICAL: Get fresh provider instance to avoid any cached state
-    final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
-    
-    // CRITICAL: Reset provider state before checking to ensure fresh check
-    // This is critical to avoid showing cached results from previous checks
-    serviceAreaProvider.reset();
-    
-    // Wait a moment to ensure reset completes and any pending operations finish
-    await Future.delayed(const Duration(milliseconds: 150));
-    
-    setState(() => _isCheckingService = true);
-    
-    // Store the address ID and pincode we're checking to verify we got the right result
-    final checkingAddressId = address.id;
-    final checkingPincode = address.pincode.trim().replaceAll(' ', '');
-    
-    if (kDebugMode) {
-      print('🔍 [CHECK START] Starting fresh check for Address ID: $checkingAddressId, Pincode: $checkingPincode');
-    }
-    
+    final pincode = address.pincode.trim().replaceAll(' ', '');
+    if (pincode.isEmpty) return true; // No pincode = allow
+
     try {
-      if (kDebugMode) {
-        print('🔍 [CHECK START] Address ID: $checkingAddressId, Pincode: $checkingPincode');
-        print('📍 Address: ${address.addressLine1}, ${address.city}, ${address.state}');
-      }
-      
-      // Make the API call with the exact pincode from the address
+      final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
       final isAvailable = await serviceAreaProvider.checkServiceAvailability(
-        pincode: checkingPincode,
+        pincode: pincode,
         country: 'India',
       );
-      
-      setState(() => _isCheckingService = false);
-      
-      if (kDebugMode) {
-        print('🔍 [CHECK RESULT] Address ID: $checkingAddressId, Pincode: $checkingPincode, Available: $isAvailable');
-      }
-      
-      // Verify we got the result for the correct address
-      // Double-check the provider state matches what we checked
-      if (kDebugMode) {
-        final serviceAreaInfo = serviceAreaProvider.serviceAreaInfo;
-        if (serviceAreaInfo != null) {
-          final checkedPincode = serviceAreaInfo['pincode'] as String?;
-          if (checkedPincode != null && checkedPincode != checkingPincode) {
-            print('⚠️ [WARNING] Pincode mismatch! Checked: $checkingPincode, Result: $checkedPincode');
-          }
-        }
-      }
-      
+
       if (!isAvailable && mounted) {
-        // Store the address ID we just checked (before navigation)
-        _lastCheckedAddressId = checkingAddressId;
-        
-        // Show service not available screen with the CORRECT address details
-        if (kDebugMode) {
-          print('🚫 [NAVIGATING] Service not available for Address ID: $checkingAddressId');
-          print('📍 Showing service not available for: ${address.city}, ${address.state}, $checkingPincode');
-        }
-        
-        // Navigate immediately - don't wait for post-frame callback
-        try {
-          context.push(
-            '/service-not-available',
-            extra: {
-              'pincode': checkingPincode,
-              'city': address.city,
-              'state': address.state,
-              'country': 'India',
-              'returnTo': _isFromCheckout ? '/addresses' : '/home',
-            },
-          );
-          if (kDebugMode) {
-            print('✅ [NAVIGATED] Service not available screen for Address ID: $checkingAddressId, Pincode: $checkingPincode');
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('❌ [NAV ERROR] Navigation error: $e');
-          }
-          // Fallback: show error message
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Service not available in this area. Please select a different address.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 4),
-              ),
-            );
-          }
-        }
-        return false;
-      }
-      
-      if (kDebugMode && isAvailable) {
-        print('✅ [SUCCESS] Service is available for Address ID: $checkingAddressId, Pincode: $checkingPincode');
-      }
-      
-      return isAvailable;
-    } catch (e) {
-      setState(() => _isCheckingService = false);
-      if (kDebugMode) {
-        print('❌ [ERROR] Error checking service availability for Address ID: $checkingAddressId, Pincode: $checkingPincode');
-        print('❌ [ERROR] Exception: $e');
-      }
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error checking service availability: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            content: Text("We don't deliver to ${address.city} yet"),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
-      return false;
+
+      return isAvailable;
+    } catch (e) {
+      debugPrint('❌ Service check error: $e');
+      return true; // On error, allow — don't block user
     }
   }
 
@@ -750,17 +897,8 @@ class _AddressListScreenState extends State<AddressListScreen> {
         // Reset proximity so home screen re-checks with new address
         Provider.of<ProximityProvider>(context, listen: false).reset();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Default address updated'),
-            duration: Duration(seconds: 2),
-            backgroundColor: AppTheme.primaryGreen,
-          ),
-        );
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          context.pop();
-        }
+        // Go to home directly — no delay
+        context.go('/home');
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -776,4 +914,27 @@ class _AddressListScreenState extends State<AddressListScreen> {
       }
     }
   }
+}
+
+/// Search result model — holds geocoded address data
+class _SearchResult {
+  final String title;
+  final String subtitle;
+  final double latitude;
+  final double longitude;
+  final String city;
+  final String state;
+  final String pincode;
+  final String area;
+
+  _SearchResult({
+    required this.title,
+    required this.subtitle,
+    required this.latitude,
+    required this.longitude,
+    required this.city,
+    required this.state,
+    required this.pincode,
+    required this.area,
+  });
 }

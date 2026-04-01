@@ -170,7 +170,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                 child: AppTheme.gradientButton(
                   onPressed: () {
                     if (isOnboardingFlow) {
-                      context.push('/address/add');
+                      context.push('/addresses');
                     } else {
                       context.push('/addresses');
                     }

@@ -176,8 +176,8 @@ class _LoginScreenState extends State<LoginScreen>
       // GPS already granted — detect location and check service
       await _detectAndCheckService(locationProvider, authProvider);
     } else if (locationProvider.isPermissionPermanentlyDenied) {
-      // Permanently denied — go to manual address form
-      context.go('/address/add');
+      // Permanently denied — go to address list (has search, map, manual options)
+      context.go('/addresses');
     } else {
       context.go('/location-gate');
     }
@@ -197,8 +197,8 @@ class _LoginScreenState extends State<LoginScreen>
 
     final partial = locationProvider.detectedAddress;
     if (partial == null || partial.pincode == null) {
-      // GPS failed to get address — go to manual entry
-      context.go('/address/add');
+      // GPS failed to get address — go to address list
+      context.go('/addresses');
       return;
     }
 

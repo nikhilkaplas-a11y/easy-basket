@@ -229,7 +229,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
                                   const SizedBox(height: 6),
                                   Center(
                                     child: TextButton(
-                                      onPressed: () => context.push('/address/add'),
+                                      onPressed: () => context.push('/addresses'),
                                       style: TextButton.styleFrom(
                                         foregroundColor: const Color(0xFF37474F),
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
