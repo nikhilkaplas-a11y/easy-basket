@@ -421,6 +421,60 @@ class NotificationService {
     if (adminProvider != null) _adminProvider = adminProvider;
     if (authProvider != null) _authProvider = authProvider;
   }
+
+  // ── FCM Topic Subscribe (Pincode-based promo notifications) ──
+  // Rule: User is subscribed to ONLY 1 pincode topic at a time
+  // This ensures user only receives promos for their current delivery area
+
+  /// Currently subscribed pincode — track to avoid unnecessary calls
+  String? _currentSubscribedPincode;
+
+  /// Get current subscribed pincode
+  String? get currentSubscribedPincode => _currentSubscribedPincode;
+
+  /// Switch pincode topic — unsubscribe old + subscribe new (1 call)
+  /// This is the ONLY method to call from outside — handles everything
+  Future<void> switchPincodeTopic(String newPincode) async {
+    if (kIsWeb || newPincode.isEmpty) return;
+    if (newPincode == _currentSubscribedPincode) return; // Same — no change
+
+    // Unsubscribe old
+    if (_currentSubscribedPincode != null && _currentSubscribedPincode!.isNotEmpty) {
+      final oldTopic = 'pincode_$_currentSubscribedPincode';
+      await _messaging.unsubscribeFromTopic(oldTopic);
+      debugPrint('📌 [FCM] Unsubscribed from: $oldTopic');
+    }
+
+    // Subscribe new
+    final newTopic = 'pincode_$newPincode';
+    await _messaging.subscribeToTopic(newTopic);
+    _currentSubscribedPincode = newPincode;
+    debugPrint('📌 [FCM] Subscribed to: $newTopic');
+  }
+
+  /// Subscribe to a specific pincode (used on first address save)
+  Future<void> subscribeToPincode(String pincode) async {
+    await switchPincodeTopic(pincode);
+  }
+
+  /// Subscribe to all pincodes — DEPRECATED, kept for backward compat
+  /// Now only subscribes to FIRST (default) pincode
+  Future<void> subscribeToAllPincodes(List<String> pincodes) async {
+    if (kIsWeb || pincodes.isEmpty) return;
+    // Only subscribe to first/default pincode — not all
+    await switchPincodeTopic(pincodes.first);
+  }
+
+  /// Unsubscribe from current topic — call on logout
+  Future<void> unsubscribeCurrentTopic() async {
+    if (kIsWeb) return;
+    if (_currentSubscribedPincode != null && _currentSubscribedPincode!.isNotEmpty) {
+      final topic = 'pincode_$_currentSubscribedPincode';
+      await _messaging.unsubscribeFromTopic(topic);
+      debugPrint('📌 [FCM] Unsubscribed (logout): $topic');
+      _currentSubscribedPincode = null;
+    }
+  }
 }
 
 // ── Admin Action Banner Widget ──

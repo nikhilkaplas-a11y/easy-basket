@@ -24,7 +24,10 @@ import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/active_order_bar.dart';
 import '../../widgets/address_completion_sheet.dart';
 import '../../services/notification_service.dart';
-import '../../widgets/smart_suggestion_banner.dart';
+import '../../services/api_service.dart';
+import '../../widgets/hero_banner_carousel.dart';
+import '../../widgets/promo_banner_widget.dart';
+import '../../models/campaign_model.dart';
 import '../../models/category_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -38,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   bool _hasCheckedServiceAvailability = false;
   String? _serviceNotAvailableMessage;
   bool _isHomeLoading = true;
-  Timer? _orderPollingTimer; // Backup polling when FCM denied
+  Timer? _orderPollingTimer;
+  List<CampaignModel> _heroBanners = []; // Homepage promo banners
 
   // Fun facts — randomly selected, rotate every 1.5 sec
   Timer? _factsTimer;
@@ -59,6 +63,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   // Product cards auto-scroll
   final ScrollController _productScrollController = ScrollController();
   Timer? _autoScrollTimer;
+
+  // "Shop Now" shake animation
+  late AnimationController _shopNowShakeController;
+  late Animation<double> _shopNowShakeAnim;
+  Timer? _shopNowShakeTimer;
 
   // Search hint flip animation
   late AnimationController _searchFlipController;
@@ -91,6 +100,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     );
     _startSearchHintRotation();
 
+    // "Shop Now" shake animation — shakes every 5 seconds
+    _shopNowShakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _shopNowShakeAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0, end: -6), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -6, end: 6), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 6, end: -4), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -4, end: 4), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 4, end: 0), weight: 1),
+    ]).animate(CurvedAnimation(
+      parent: _shopNowShakeController,
+      curve: Curves.easeInOut,
+    ));
+    _shopNowShakeTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _shopNowShakeController.forward(from: 0);
+    });
+
     // Random starting fact
     _currentFactIndex = DateTime.now().millisecond % _funFacts.length;
     _startFactsRotation();
@@ -119,9 +147,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
         setState(() => _isHomeLoading = false);
         _factsTimer?.cancel();
 
-        // Start order polling ONLY if FCM not available (backup mechanism)
+        // Subscribe to SELECTED address pincode + fetch campaigns
         final notificationService = NotificationService();
-        if (notificationService.fcmToken == null || notificationService.fcmToken!.isEmpty) {
+        final addrProv = Provider.of<AddressProvider>(context, listen: false);
+        final locationProv = Provider.of<LocationProvider>(context, listen: false);
+        final selectedPin = addrProv.selectedAddress?.pincode
+            ?? addrProv.defaultAddress?.pincode
+            ?? locationProv.detectedAddress?.pincode;
+        if (selectedPin != null && selectedPin.isNotEmpty) {
+          notificationService.switchPincodeTopic(selectedPin);
+          // Fetch campaigns for this pincode
+          _fetchCampaigns(selectedPin);
+        }
+
+        // Start order polling ONLY if: FCM not available + active orders exist
+        final orderProv = Provider.of<OrderProvider>(context, listen: false);
+        if ((notificationService.fcmToken == null || notificationService.fcmToken!.isEmpty)
+            && orderProv.activeOrders.isNotEmpty) {
           _startOrderPolling();
         }
       }
@@ -185,6 +227,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       } else {
         // Far from saved (or no saved) → use GPS partial
         addressProvider.clearSelection();
+        // Switch topic to GPS pincode (user is in new area)
+        final gpsPincode = locationProvider.detectedAddress?.pincode;
+        if (gpsPincode != null && gpsPincode.isNotEmpty) {
+          NotificationService().switchPincodeTopic(gpsPincode);
+        }
         debugPrint('🏠 [Home] Using GPS partial: ${locationProvider.detectedAddress?.displayName}');
       }
     }
@@ -479,10 +526,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   /// Har 30 sec active orders refresh karo
   void _startOrderPolling() {
     _orderPollingTimer?.cancel();
-    _orderPollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _orderPollingTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+
+      // Stop polling if no active orders (saves API calls)
+      if (orderProvider.activeOrders.isEmpty) {
+        _orderPollingTimer?.cancel();
+        debugPrint('⏹️ [Home] Polling stopped — no active orders');
+        return;
+      }
+
       if (authProvider.token != null) {
         orderProvider.fetchActiveOrders(authProvider.token!);
       }
@@ -500,6 +555,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
         orderProvider.fetchActiveOrders(authProvider.token!);
         debugPrint('🔄 [Home] Orders refreshed on app resume');
       }
+    }
+  }
+
+  /// Fetch campaigns for active pincode
+  Future<void> _fetchCampaigns(String pincode) async {
+    try {
+      final apiService = ApiService();
+      final response = await apiService.get('/campaigns?pincode=$pincode');
+      if (response is Map<String, dynamic> && mounted) {
+        final heroBanners = (response['hero_banners'] as List?)
+            ?.map((e) => CampaignModel.fromJson(e as Map<String, dynamic>))
+            .toList() ?? [];
+        setState(() => _heroBanners = heroBanners);
+      }
+    } catch (e) {
+      debugPrint('❌ [Home] Campaign fetch error: $e');
     }
   }
 
@@ -586,6 +657,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     _autoScrollTimer?.cancel();
     _factsTimer?.cancel();
     _orderPollingTimer?.cancel();
+    _shopNowShakeTimer?.cancel();
+    _shopNowShakeController.dispose();
     _searchFlipController.dispose();
     _productScrollController.dispose();
     super.dispose();
@@ -824,13 +897,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Section — white card on top of green gradient bg
+              // Header Section — gradient card with sparkle dots (matches category card)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
                 child: Container(
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
-                    color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFB9E5B8).withValues(alpha: 0.6),
+                        const Color(0xFFD4EDC9).withValues(alpha: 0.4),
+                        const Color(0xFFECF6E5).withValues(alpha: 0.15),
+                        Colors.white,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0.0, 0.2, 0.5, 0.8],
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.10),
@@ -841,7 +925,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                     ],
                   ),
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
+                  child: Stack(
+                    children: [
+                      // Sparkle dots — same as category card
+                      ..._buildSparkles(),
+                      Column(
                   children: [
                     // Top Row: Brand, Address, Profile
                     Consumer2<AddressProvider, ProximityProvider>(
@@ -1152,10 +1240,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                       },
                     ),
 
-                    // Smart Suggestion Banner (Phase 3)
-                    // Shows time-based suggestions: "Heading to office?" / "Back home?"
-                    const SmartSuggestionBanner(),
-
                     // Search Bar
                     GestureDetector(
                       onTap: () => context.push('/products'),
@@ -1228,7 +1312,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                     ),
                   ],
                 ),
+              ],
+                ),
               ),
+              ),
+              // Promo Banner with text overlay bottom-right
+              Stack(
+                children: [
+                  const PromoBannerWidget(imagePath: 'assets/images/delievry_boy.png'),
+                  Positioned(
+                    bottom: 8,
+                    right: 16,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Lowest Prices, ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
+                        AnimatedBuilder(
+                          animation: _shopNowShakeAnim,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(_shopNowShakeAnim.value, 0),
+                              child: child,
+                            );
+                          },
+                          child: GestureDetector(
+                            onTap: () => context.push('/categories'),
+                            child: Text('Shop Now!!', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               // Categories Section (Horizontal Scrollable Slider - Blinkit Style)
               Consumer<ProductProvider>(
@@ -1335,6 +1450,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   );
                 },
               ),
+              // Hero Banner Carousel — promo campaigns
+              if (_heroBanners.isNotEmpty)
+                HeroBannerCarousel(banners: _heroBanners),
+
               // Products Section
               Consumer2<ProductProvider, OrderProvider>(
                 builder: (context, productProvider, orderProvider, _) {

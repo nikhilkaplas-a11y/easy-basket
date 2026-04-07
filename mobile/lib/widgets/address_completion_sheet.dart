@@ -5,6 +5,7 @@ import '../providers/address_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/service_area_provider.dart';
+import '../services/notification_service.dart';
 import '../utils/theme.dart';
 
 /// Universal Address Form Bottom Sheet — Premium, Blinkit style
@@ -504,6 +505,9 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
 
       setState(() => _isSaving = false);
       if (success && mounted) {
+        // Subscribe to pincode topic for promo notifications
+        NotificationService().subscribeToPincode(pincode);
+
         Navigator.pop(context);
         widget.onSaved();
       }

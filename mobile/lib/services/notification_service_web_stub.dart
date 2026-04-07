@@ -32,6 +32,12 @@ class NotificationService {
   /// Request notification permission — no-op on web
   Future<void> requestNotificationPermission() async {}
 
+  String? get currentSubscribedPincode => null;
+  Future<void> switchPincodeTopic(String newPincode) async {}
+  Future<void> subscribeToPincode(String pincode) async {}
+  Future<void> subscribeToAllPincodes(List<String> pincodes) async {}
+  Future<void> unsubscribeCurrentTopic() async {}
+
   /// Manually trigger FCM token generation and send to backend
   /// No-op for web since FCM is not supported
   Future<void> ensureTokenSent() async {

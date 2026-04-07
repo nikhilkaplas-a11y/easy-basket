@@ -19,6 +19,7 @@ import productRoutes from './routes/product.routes';
 import serviceAreaRoutes from './routes/serviceArea.routes';
 import uploadRoutes from './routes/upload.routes';
 import variantRoutes from './routes/variant.routes';
+import campaignRoutes from './routes/campaign.routes';
 
 // Load environment variables FIRST before importing any modules that use them
 dotenv.config();
@@ -54,6 +55,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/service-area', serviceAreaRoutes);
 app.use('/api/admin', uploadRoutes);
 app.use('/api', variantRoutes);
+app.use('/api/campaigns', campaignRoutes);
 
 app.get('/', (req, res) => {
   res.send('Easy Basket Backend is running');

@@ -18,5 +18,6 @@ router.get('/products', AdminController.getAllProducts);
 router.post('/products', AdminController.createProduct);
 router.put('/products/:id', AdminController.updateProduct);
 router.delete('/products/:id', AdminController.deleteProduct);
+router.post('/notifications/send', AdminController.sendPromoNotification);
 
 export default router;

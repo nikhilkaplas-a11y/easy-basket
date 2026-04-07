@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:geocoding/geocoding.dart';
 import '../../models/address_model.dart';
 import '../../utils/theme.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/address_completion_sheet.dart';
 import 'map_address_picker_screen.dart';
 
@@ -568,9 +569,11 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                   return;
                                 }
                                 
-                                // Serviceable — select and go home
+                                // Serviceable — select, switch topic, go home
                                 Provider.of<AddressProvider>(context, listen: false).selectAddress(address);
                                 Provider.of<ProximityProvider>(context, listen: false).reset();
+                                // Switch promo notification topic to selected address pincode
+                                NotificationService().switchPincodeTopic(address.pincode);
 
                                 if (_isFromCheckout) {
                                   // From checkout — select and stay on list
@@ -709,21 +712,19 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                             );
                                           },
                                         ),
-                                        if (!_isFromCheckout) ...[
-                                          const SizedBox(height: 8),
-                                          // Edit button
-                                          GestureDetector(
-                                            onTap: () => context.push('/address/edit', extra: address),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(6),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF5F5F5),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.grey),
+                                        const SizedBox(height: 8),
+                                        // Edit button
+                                        GestureDetector(
+                                          onTap: () => context.push('/address/edit', extra: address),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF5F5F5),
+                                              borderRadius: BorderRadius.circular(8),
                                             ),
+                                            child: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.grey),
                                           ),
-                                        ],
+                                        ),
                                       ],
                                     ),
                                   ],

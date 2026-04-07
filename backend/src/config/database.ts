@@ -1,4 +1,5 @@
 import { Address } from '../entities/Address';
+import { Campaign } from '../entities/Campaign';
 import { Category } from '../entities/Category';
 import { DataSource } from 'typeorm';
 import { Order } from '../entities/Order';
@@ -31,6 +32,7 @@ export const AppDataSource = new DataSource({
     RefreshToken,
     ServiceArea,
     ProductVariant,
+    Campaign,
   ],
   subscribers: [],
   migrations: [],

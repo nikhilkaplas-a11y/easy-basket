@@ -34,7 +34,11 @@ import '../screens/admin/admin_categories_screen.dart';
 import '../screens/admin/add_edit_category_screen.dart';
 import '../screens/admin/add_edit_product_screen.dart';
 import '../screens/admin/category_order_screen.dart';
+import '../screens/admin/send_notification_screen.dart';
+import '../screens/admin/campaign_list_screen.dart';
+import '../screens/admin/campaign_form_screen.dart';
 import '../models/address_model.dart';
+import '../models/campaign_model.dart';
 import '../screens/service_area/service_not_available_screen.dart';
 import '../screens/address/location_mismatch_screen.dart';
 import '../screens/address/places_search_screen.dart';
@@ -376,6 +380,25 @@ class AppRouter {
       GoRoute(
         path: '/admin/categories/order',
         builder: (context, state) => const CategoryOrderScreen(),
+      ),
+      GoRoute(
+        path: '/admin/notifications',
+        builder: (context, state) => const SendNotificationScreen(),
+      ),
+      GoRoute(
+        path: '/admin/campaigns',
+        builder: (context, state) => const CampaignListScreen(),
+      ),
+      GoRoute(
+        path: '/admin/campaigns/create',
+        builder: (context, state) => const CampaignFormScreen(),
+      ),
+      GoRoute(
+        path: '/admin/campaigns/edit',
+        builder: (context, state) {
+          final campaign = state.extra as CampaignModel?;
+          return CampaignFormScreen(campaign: campaign);
+        },
       ),
       GoRoute(
         path: '/admin/products/add',

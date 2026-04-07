@@ -374,6 +374,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
                           color: Colors.teal,
                           onTap: () => context.push('/admin/categories/order'),
                         ),
+                        _ActionCard(
+                          title: 'Campaigns',
+                          icon: Icons.campaign,
+                          color: Colors.deepOrange,
+                          onTap: () => context.push('/admin/campaigns'),
+                        ),
+                        _ActionCard(
+                          title: 'Push Notify',
+                          icon: Icons.notifications_active,
+                          color: Colors.red,
+                          onTap: () => context.push('/admin/notifications'),
+                        ),
                       ],
                     ),
                   ],

@@ -1,3 +1,4 @@
+import * as admin from 'firebase-admin';
 import { AppDataSource } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Category } from '../entities/Category';
@@ -540,6 +541,58 @@ export class AdminController {
       console.error('❌ Error fetching delivery agents:', error);
       res.status(500).json({
         message: 'Error fetching delivery agents',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /// Send promo notification to users by pincode (FCM topic-based)
+  /// POST /api/admin/notifications/send
+  /// Body: { pincodes: ["243003", "243005"], title: "...", body: "..." }
+  static async sendPromoNotification(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { pincodes, title, body } = req.body;
+
+      if (!pincodes || !Array.isArray(pincodes) || pincodes.length === 0) {
+        res.status(400).json({ message: 'pincodes array required' });
+        return;
+      }
+      if (!title || !body) {
+        res.status(400).json({ message: 'title and body required' });
+        return;
+      }
+
+      let sent = 0;
+      const errors: string[] = [];
+
+      for (const pincode of pincodes) {
+        const topic = `pincode_${pincode}`;
+        try {
+          await admin.messaging().send({
+            topic,
+            notification: { title, body },
+            data: { type: 'PROMO_OFFER', pincode: String(pincode) },
+          });
+          sent++;
+          console.log(`✅ [PROMO] Notification sent to topic: ${topic}`);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          errors.push(`${topic}: ${msg}`);
+          console.error(`❌ [PROMO] Failed to send to topic ${topic}: ${msg}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        totalPincodes: pincodes.length,
+        sent,
+        failed: pincodes.length - sent,
+        errors: errors.length > 0 ? errors : undefined,
+      });
+    } catch (error) {
+      console.error('❌ Error sending promo notification:', error);
+      res.status(500).json({
+        message: 'Error sending notification',
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
