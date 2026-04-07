@@ -2,7 +2,7 @@ class AppConfig {
   // Backend API Configuration
   
   // Production API URL
-  //static const String apiBaseUrl = 'https://api.easybasket.in/api';
+  // static const String apiBaseUrl = 'https://api.easybasket.in/api';
 
   // Alternative URLs (uncomment if needed):
   // For local development (web only):

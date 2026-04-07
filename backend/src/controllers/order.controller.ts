@@ -219,6 +219,21 @@ export class OrderController {
       const { status, fields } = req.query;
       const orderRepository = AppDataSource.getRepository(Order);
 
+      // Optional pagination: ?limit=15&offset=0 — My Orders app screen (full relations).
+      // Omit limit → same as before: return full array JSON (backward compatible).
+      const limitRaw = req.query.limit;
+      const offsetRaw = req.query.offset;
+      const usePagination =
+        limitRaw !== undefined && limitRaw !== null && String(limitRaw).trim() !== '';
+      let limit: number | undefined;
+      let offset = 0;
+      if (usePagination) {
+        const parsed = parseInt(String(limitRaw), 10);
+        limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 100) : 15;
+        const off = parseInt(String(offsetRaw ?? '0'), 10);
+        offset = Number.isFinite(off) && off >= 0 ? off : 0;
+      }
+
       // Build where condition
       // status=active → sirf pending/accepted/preparing/out_for_delivery (home screen ke liye)
       // status=delivered/cancelled → sirf wo status
@@ -240,6 +255,17 @@ export class OrderController {
       // Kyun: Home screen pe sirf id, status, totalAmount chahiye
       // 6 JOINs lagana unnecessary hai — ~90% faster response
       if (fields === 'light') {
+        if (usePagination && limit !== undefined) {
+          const [orders, total] = await orderRepository.findAndCount({
+            where: whereCondition,
+            select: ['id', 'status', 'totalAmount', 'createdAt', 'updatedAt'],
+            order: { createdAt: 'DESC' },
+            skip: offset,
+            take: limit,
+          });
+          res.json({ orders, total, limit, offset });
+          return;
+        }
         const orders = await orderRepository.find({
           where: whereCondition,
           select: ['id', 'status', 'totalAmount', 'createdAt', 'updatedAt'],
@@ -250,6 +276,25 @@ export class OrderController {
       }
 
       // Full data — orders page, order detail ke liye (6 JOINs)
+      if (usePagination && limit !== undefined) {
+        const [orders, total] = await orderRepository.findAndCount({
+          where: whereCondition,
+          relations: [
+            'user',
+            'items',
+            'items.product',
+            'items.variant',
+            'deliveryAddress',
+            'deliveryBoy',
+          ],
+          order: { createdAt: 'DESC' },
+          skip: offset,
+          take: limit,
+        });
+        res.json({ orders, total, limit, offset });
+        return;
+      }
+
       const orders = await orderRepository.find({
         where: whereCondition,
         relations: [

@@ -11,12 +11,21 @@ class OrderProvider with ChangeNotifier {
   List<ActiveOrderModel> _activeOrders = [];  // Lightweight — sirf home screen ke liye
   List<AddressModel> _addresses = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMoreOrders = true;
+  int _ordersTotal = 0;
   String? _error;
+
+  /// Page size for My Orders (must match backend default expectations).
+  static const int ordersPageSize = 15;
 
   List<OrderModel> get orders => _orders;
   List<ActiveOrderModel> get activeOrders => _activeOrders;
   List<AddressModel> get addresses => _addresses;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
+  bool get hasMoreOrders => _hasMoreOrders;
+  int get ordersTotal => _ordersTotal;
   String? get error => _error;
 
   /// Sync addresses from AddressProvider — no extra API call
@@ -28,23 +37,46 @@ class OrderProvider with ChangeNotifier {
 
   OrderProvider({required this.apiService});
 
-  Future<void> fetchOrders(String token, {String? Function()? getUpdatedToken, String? status, String? fields}) async {
-    _isLoading = true;
+  /// Fetches orders. Use [paginated] for My Orders list (15 per page + infinite scroll).
+  /// Without [paginated], behavior is unchanged: full list, replaces [_orders].
+  Future<void> fetchOrders(
+    String token, {
+    String? Function()? getUpdatedToken,
+    String? status,
+    String? fields,
+    bool paginated = false,
+    bool append = false,
+  }) async {
+    if (paginated) {
+      if (append) {
+        if (_isLoadingMore || !_hasMoreOrders || _isLoading) return;
+        _isLoadingMore = true;
+      } else {
+        _isLoading = true;
+        _hasMoreOrders = true;
+      }
+    } else {
+      _isLoading = true;
+    }
     _error = null;
     notifyListeners();
 
     try {
-      // Build endpoint with query params
-      // status=active → sirf active orders (home screen ke liye)
-      // fields=light → sirf id, status, totalAmount (0 JOINs, ~90% faster)
       final params = <String>[];
       if (status != null) params.add('status=$status');
       if (fields != null) params.add('fields=$fields');
+      if (paginated) {
+        final offset = append ? _orders.length : 0;
+        params.add('limit=$ordersPageSize');
+        params.add('offset=$offset');
+      }
       final query = params.isNotEmpty ? '?${params.join('&')}' : '';
       final endpoint = '/orders$query';
 
       if (kDebugMode) {
-        print('🔄 Fetching orders from API... (status: ${status ?? 'all'})');
+        print(
+          '🔄 Fetching orders... (status: ${status ?? 'all'}, paginated: $paginated, append: $append)',
+        );
       }
 
       final response = await apiService.get(
@@ -52,22 +84,45 @@ class OrderProvider with ChangeNotifier {
         token: token,
         getUpdatedToken: getUpdatedToken,
       );
-      
-      // Backend returns array directly: res.json(orders)
-      final List<dynamic> data = response is List ? response : [];
-      _orders = data.map((json) {
-        try {
+
+      if (paginated && response is Map<String, dynamic>) {
+        final rawList = response['orders'];
+        final total = (response['total'] as num?)?.toInt() ?? 0;
+        final List<dynamic> data = rawList is List ? rawList : [];
+        final page = data.map((json) {
           return OrderModel.fromJson(json as Map<String, dynamic>);
-        } catch (e) {
-          if (kDebugMode) {
-            print('❌ Error parsing order: $e');
-            print('Order data: $json');
-          }
-          rethrow;
+        }).toList();
+
+        if (append) {
+          _orders = [..._orders, ...page];
+        } else {
+          _orders = page;
         }
-      }).toList();
-      if (kDebugMode) {
-        print('✅ Fetched ${_orders.length} orders successfully');
+        _ordersTotal = total;
+        _hasMoreOrders = _orders.length < total;
+        if (kDebugMode) {
+          print('✅ Orders page: ${page.length} items, total=$total, hasMore=$_hasMoreOrders');
+        }
+      } else {
+        final List<dynamic> data = response is List ? response : [];
+        _orders = data.map((json) {
+          try {
+            return OrderModel.fromJson(json as Map<String, dynamic>);
+          } catch (e) {
+            if (kDebugMode) {
+              print('❌ Error parsing order: $e');
+              print('Order data: $json');
+            }
+            rethrow;
+          }
+        }).toList();
+        if (!paginated) {
+          _hasMoreOrders = false;
+          _ordersTotal = _orders.length;
+        }
+        if (kDebugMode) {
+          print('✅ Fetched ${_orders.length} orders successfully');
+        }
       }
     } catch (e) {
       final errorMessage = e.toString().replaceAll('Exception: ', '');
@@ -78,6 +133,7 @@ class OrderProvider with ChangeNotifier {
       }
     } finally {
       _isLoading = false;
+      _isLoadingMore = false;
       notifyListeners();
     }
   }

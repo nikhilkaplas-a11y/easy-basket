@@ -19,28 +19,63 @@ class OrderListScreen extends StatefulWidget {
 
 class _OrderListScreenState extends State<OrderListScreen> {
   bool _hasLoaded = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScrollNearBottom);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadOrders();
     });
   }
 
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScrollNearBottom);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScrollNearBottom() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.maxScrollExtent <= 0) return;
+    if (pos.pixels < pos.maxScrollExtent - 400) return;
+
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.token == null) return;
+    if (!orderProvider.hasMoreOrders ||
+        orderProvider.isLoadingMore ||
+        orderProvider.isLoading) {
+      return;
+    }
+    orderProvider.fetchOrders(
+      authProvider.token!,
+      paginated: true,
+      append: true,
+      getUpdatedToken: () {
+        final updatedAuth = Provider.of<AuthProvider>(context, listen: false);
+        return updatedAuth.token;
+      },
+    );
+  }
+
   void _loadOrders() async {
     if (_hasLoaded) return;
-    
+
     final orderProvider = Provider.of<OrderProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (authProvider.token != null) {
       _hasLoaded = true;
       if (kDebugMode) {
-        print('🔄 Loading orders...');
+        print('🔄 Loading orders (paginated)...');
       }
-      // Pass callback to get updated token if refresh happens
       await orderProvider.fetchOrders(
         authProvider.token!,
+        paginated: true,
+        append: false,
         getUpdatedToken: () {
           final updatedAuth = Provider.of<AuthProvider>(context, listen: false);
           return updatedAuth.token;
@@ -66,18 +101,47 @@ class _OrderListScreenState extends State<OrderListScreen> {
       return _buildEmptyState();
     }
     
+    final showLoadMoreFooter =
+        orderProvider.hasMoreOrders || orderProvider.isLoadingMore;
+
     return RefreshIndicator(
       onRefresh: () async {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         if (authProvider.token != null) {
-          await orderProvider.fetchOrders(authProvider.token!);
+          await orderProvider.fetchOrders(
+            authProvider.token!,
+            paginated: true,
+            append: false,
+            getUpdatedToken: () {
+              final updatedAuth = Provider.of<AuthProvider>(context, listen: false);
+              return updatedAuth.token;
+            },
+          );
         }
       },
       color: AppTheme.primaryGreen,
       child: ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        itemCount: orders.length,
+        itemCount: orders.length + (showLoadMoreFooter ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index >= orders.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: orderProvider.isLoadingMore
+                    ? SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            );
+          }
           final order = orders[index];
           return Padding(
             padding: EdgeInsets.only(bottom: index < orders.length - 1 ? 16 : 0),
@@ -192,12 +256,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final orderProvider = Provider.of<OrderProvider>(context, listen: false);
         if (authProvider.token != null) {
-          await orderProvider.fetchOrders(authProvider.token!);
+          await orderProvider.fetchOrders(
+            authProvider.token!,
+            paginated: true,
+            append: false,
+            getUpdatedToken: () {
+              final updatedAuth = Provider.of<AuthProvider>(context, listen: false);
+              return updatedAuth.token;
+            },
+          );
         }
       },
       color: AppTheme.primaryGreen,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
+        primary: false,
         child: Container(
           height: MediaQuery.of(context).size.height * 0.7,
           padding: const EdgeInsets.all(32.0),
