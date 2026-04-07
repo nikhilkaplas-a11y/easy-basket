@@ -39,7 +39,8 @@ module.exports = {
     // Auto-restart settings
     autorestart: true,
     watch: false,
-    max_memory_restart: '1G', // Restart if memory exceeds 1GB
+    // t3.small has 2 GiB RAM total; cluster uses one process per vCPU (2). Keep each worker bounded.
+    max_memory_restart: '900M', // ~1.8 GiB cap for 2 workers; raise only if you run instances: 1
     
     // Logging
     error_file: './logs/err.log',
