@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/order_model.dart';
 import '../../utils/theme.dart';
 import '../../utils/date_utils.dart';
+import '../../utils/navigation_utils.dart';
 import 'package:intl/intl.dart';
 
 class OrderListScreen extends StatefulWidget {
@@ -166,7 +167,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         title: const Text('My Orders', style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => popOrRoleHub(context),
         ),
       ),
       body: orderProvider.isLoading && orderProvider.orders.isEmpty

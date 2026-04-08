@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/order_model.dart';
+import '../../config/app_config.dart';
 import '../../utils/navigation_utils.dart';
 import 'package:intl/intl.dart';
 
@@ -237,6 +241,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 child: Column(
                   children: [
+                    // Live Map on top when out for delivery
+                    if (isOutForDelivery) _buildMapSection(order),
+                    if (isOutForDelivery) const SizedBox(height: 16),
+
                     // Status + ETA
                     _buildStatusSection(order),
                     const SizedBox(height: 16),
@@ -252,10 +260,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                     // Order Details
                     _buildOrderDetails(order, fmt),
                     const SizedBox(height: 16),
-
-                    // Live Map (only when out for delivery)
-                    if (isOutForDelivery) _buildMapSection(),
-                    if (isOutForDelivery) const SizedBox(height: 16),
 
                     // Delivery Address
                     _buildAddressCard(order),
@@ -671,80 +675,167 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
   // LIVE MAP SECTION
   // ═══════════════════════════════════════
 
-  Widget _buildMapSection() {
+  Widget _buildMapSection(OrderModel order) {
+    final custLat = double.tryParse(order.deliveryAddress.latitude ?? '');
+    final custLng = double.tryParse(order.deliveryAddress.longitude ?? '');
+
+    // If customer has no coordinates, show fallback
+    if (custLat == null || custLng == null) {
+      return _accentCard(
+        title: 'Live Order Tracking',
+        child: Container(
+          height: 180,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.map_rounded, size: 40, color: Colors.grey[300]),
+              const SizedBox(height: 8),
+              Text('Map not available',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[400])),
+            ],
+          ),
+        ),
+      );
+    }
+
+    const storeLat = AppConfig.storeLat;
+    const storeLng = AppConfig.storeLng;
+
+    // Calculate distance
+    final distanceMeters = Geolocator.distanceBetween(
+        storeLat, storeLng, custLat, custLng);
+    final distanceKm = (distanceMeters / 1000).toStringAsFixed(1);
+
+    // Map bounds to fit both markers
+    final southWestLat = storeLat < custLat ? storeLat : custLat;
+    final southWestLng = storeLng < custLng ? storeLng : custLng;
+    final northEastLat = storeLat > custLat ? storeLat : custLat;
+    final northEastLng = storeLng > custLng ? storeLng : custLng;
+
+    final markers = <Marker>{
+      Marker(
+        markerId: const MarkerId('store'),
+        position: LatLng(storeLat, storeLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: 'Easy Basket Store'),
+      ),
+      Marker(
+        markerId: const MarkerId('customer'),
+        position: LatLng(custLat, custLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: const InfoWindow(title: 'Your Location'),
+      ),
+    };
+
+    final polylines = <Polyline>{
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: [
+          LatLng(storeLat, storeLng),
+          LatLng(custLat, custLng),
+        ],
+        color: const Color(0xFF2E7D32),
+        width: 4,
+        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+      ),
+    };
+
     return _accentCard(
       title: 'Live Order Tracking',
       child: Column(
         children: [
-          // Map
           Container(
-            height: 180,
-            width: double.infinity,
+            height: 200,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                children: [
-                  // Map background
-                  CustomPaint(
-                    size: const Size(double.infinity, 180),
-                    painter: _LiveMapPainter(
-                      riderProgress: _pulseController.value * 0.6 + 0.2,
-                    ),
-                  ),
-                  // Live badge
-                  Positioned(
-                    right: 10,
-                    top: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 6,
-                          ),
-                        ],
+              child: kIsWeb
+                  ? Container(
+                      color: const Color(0xFFF5F5F5),
+                      alignment: Alignment.center,
+                      child: Text('Map not available on web',
+                          style: TextStyle(
+                              fontSize: 13, color: Colors.grey[400])),
+                    )
+                  : GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(
+                          (storeLat + custLat) / 2,
+                          (storeLng + custLng) / 2,
+                        ),
+                        zoom: 12,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2E7D32),
-                              shape: BoxShape.circle,
+                      markers: markers,
+                      polylines: polylines,
+                      zoomControlsEnabled: false,
+                      myLocationButtonEnabled: false,
+                      mapToolbarEnabled: false,
+                      compassEnabled: false,
+                      liteModeEnabled: true,
+                      onMapCreated: (controller) {
+                        // Fit both markers in view
+                        controller.animateCamera(
+                          CameraUpdate.newLatLngBounds(
+                            LatLngBounds(
+                              southwest:
+                                  LatLng(southWestLat, southWestLng),
+                              northeast:
+                                  LatLng(northEastLat, northEastLng),
                             ),
+                            50, // padding
                           ),
-                          const SizedBox(width: 4),
-                          const Text('LIVE',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF2E7D32),
-                                  letterSpacing: 0.5)),
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 12),
-          // Subtext
-          Text(
-            'Rider is heading to your location!',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+          // Distance + ETA info
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.store_rounded,
+                    size: 16, color: Color(0xFF2E7D32)),
+                const SizedBox(width: 6),
+                Text(
+                  '$distanceKm km away',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text('\u2022',
+                      style:
+                          TextStyle(fontSize: 8, color: Colors.grey[300])),
+                ),
+                const Icon(Icons.access_time_rounded,
+                    size: 14, color: Color(0xFF2E7D32)),
+                const SizedBox(width: 4),
+                const Text(
+                  'ETA ~15 mins',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -950,123 +1041,3 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
   }
 }
 
-// ═══════════════════════════════════════
-// CUSTOM MAP PAINTER
-// ═══════════════════════════════════════
-
-class _LiveMapPainter extends CustomPainter {
-  final double riderProgress;
-
-  _LiveMapPainter({required this.riderProgress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Soft map background
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFFE8F5E9),
-    );
-
-    // Subtle grid roads
-    final roadPaint = Paint()
-      ..color = const Color(0xFFD5E8D5)
-      ..strokeWidth = 1;
-    for (var i = 1; i <= 5; i++) {
-      final y = size.height * (i / 6);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), roadPaint);
-    }
-    for (var i = 1; i <= 6; i++) {
-      final x = size.width * (i / 7);
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), roadPaint);
-    }
-
-    // Main road
-    final mainRoad = Path();
-    mainRoad.moveTo(size.width * 0.12, size.height * 0.78);
-    mainRoad.quadraticBezierTo(
-        size.width * 0.35, size.height * 0.5,
-        size.width * 0.55, size.height * 0.42);
-    mainRoad.quadraticBezierTo(
-        size.width * 0.75, size.height * 0.34,
-        size.width * 0.88, size.height * 0.22);
-
-    // Road background
-    canvas.drawPath(
-      mainRoad,
-      Paint()
-        ..color = const Color(0xFFCCDFCC)
-        ..strokeWidth = 10
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round,
-    );
-
-    // Green route
-    canvas.drawPath(
-      mainRoad,
-      Paint()
-        ..color = const Color(0xFF2E7D32)
-        ..strokeWidth = 4
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round,
-    );
-
-    // Store marker
-    final storePos = Offset(size.width * 0.12, size.height * 0.78);
-    canvas.drawCircle(
-        storePos, 12, Paint()..color = const Color(0xFF2E7D32).withValues(alpha: 0.2));
-    canvas.drawCircle(storePos, 8, Paint()..color = Colors.white);
-    canvas.drawCircle(storePos, 5, Paint()..color = const Color(0xFF2E7D32));
-
-    // Destination pin
-    final destPos = Offset(size.width * 0.88, size.height * 0.22);
-    // Pin shadow
-    canvas.drawCircle(
-        destPos.translate(0, 3), 7, Paint()..color = Colors.black.withValues(alpha: 0.1));
-    // Pin body
-    canvas.drawCircle(destPos, 10, Paint()..color = const Color(0xFFE53935));
-    canvas.drawCircle(destPos, 4, Paint()..color = Colors.white);
-
-    // "Your Address" label
-    final labelBg = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-          center: destPos.translate(0, -22), width: 90, height: 22),
-      const Radius.circular(4),
-    );
-    canvas.drawRRect(labelBg, Paint()..color = Colors.white);
-    canvas.drawRRect(
-      labelBg,
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.08)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.5,
-    );
-
-    // Rider on route
-    final metrics = mainRoad.computeMetrics().first;
-    final riderTangent =
-        metrics.getTangentForOffset(metrics.length * riderProgress);
-    if (riderTangent != null) {
-      final pos = riderTangent.position;
-      // Glow
-      canvas.drawCircle(
-          pos, 16, Paint()..color = const Color(0xFF2E7D32).withValues(alpha: 0.12));
-      // White bg
-      canvas.drawCircle(pos, 11, Paint()..color = Colors.white);
-      // Green fill
-      canvas.drawCircle(pos, 8, Paint()..color = const Color(0xFF2E7D32));
-      // Simple bike shape
-      final bp = Paint()
-        ..color = Colors.white
-        ..strokeWidth = 1.5
-        ..style = PaintingStyle.stroke;
-      canvas.drawCircle(pos.translate(-2.5, 1), 2, bp);
-      canvas.drawCircle(pos.translate(2.5, 1), 2, bp);
-      canvas.drawLine(pos.translate(-2.5, 1), pos.translate(0, -2.5), bp);
-      canvas.drawLine(pos.translate(0, -2.5), pos.translate(2.5, 1), bp);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LiveMapPainter old) =>
-      old.riderProgress != riderProgress;
-}

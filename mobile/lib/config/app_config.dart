@@ -21,4 +21,8 @@ class AppConfig {
   
   // Development OTP (for testing)
   static const String devOTP = '1234';
+
+  // Store location (hardcoded for now — Nurpur Bedi, Mohali, Punjab)
+  static const double storeLat = 31.1250;
+  static const double storeLng = 76.4351;
 }
