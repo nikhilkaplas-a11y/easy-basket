@@ -36,6 +36,7 @@ export const AppDataSource = new DataSource({
   ],
   subscribers: [],
   migrations: [],
+  timezone: 'Z', // RDS MySQL uses UTC — tell mysql2 to interpret times as UTC, not local
   extra: {
     connectionLimit: 10,
     connectTimeout: 10000, // 10 seconds connection timeout
