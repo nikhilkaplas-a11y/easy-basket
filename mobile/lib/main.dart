@@ -21,7 +21,6 @@ import 'providers/proximity_provider.dart';
 import 'routes/app_router.dart';
 import 'utils/theme.dart';
 import 'services/razorpay_service.dart';
-import 'widgets/app_lifecycle_refresh.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -167,12 +166,8 @@ class MyApp extends StatelessWidget {
         routerConfig: AppRouter.router,
         builder: (context, child) {
           final content = child ?? const SizedBox.shrink();
-          // Refetch active orders when app returns from background (FCM alone is not enough).
-          final wrapped = kIsWeb
-              ? content
-              : AppLifecycleRefresh(
-                  child: content,
-                );
+          // Active order refresh is handled by home screen only (not globally).
+          final wrapped = content;
           if (!kIsWeb) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               try {

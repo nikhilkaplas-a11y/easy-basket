@@ -37,7 +37,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _hasCheckedServiceAvailability = false;
   String? _serviceNotAvailableMessage;
   bool _isHomeLoading = true;
@@ -88,8 +88,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // App lifecycle listener
-
     // Search hint 3D flip animation
     _searchFlipController = AnimationController(
       vsync: this,
@@ -191,10 +189,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     // Step 1 & 2: Run GPS detection and address fetch in PARALLEL
     // Why parallel? GPS takes 2-3 sec, API takes 1 sec — don't wait sequentially
     // Always force fresh GPS detect — user might have moved
-    // Fetch addresses ONCE via addressProvider, then sync to orderProvider
+    // Skip address fetch if already loaded (e.g. login just fetched them)
+    final needsFetch = addressProvider.addresses.isEmpty;
     await Future.wait([
       locationProvider.detectLocation(force: true),
-      addressProvider.fetchAddresses(token),
+      if (needsFetch) addressProvider.fetchAddresses(token),
     ]);
     // Sync addresses to OrderProvider (backward compatibility — no extra API call)
     if (mounted) {
@@ -545,18 +544,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     debugPrint('🔄 [Home] Order polling started (FCM not available)');
   }
 
-  /// App resume — ALWAYS refresh orders (regardless of FCM)
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final orderProvider = Provider.of<OrderProvider>(context, listen: false);
-      if (authProvider.token != null) {
-        orderProvider.fetchActiveOrders(authProvider.token!);
-        debugPrint('🔄 [Home] Orders refreshed on app resume');
-      }
-    }
-  }
+  // App resume active-order refresh is handled globally by AppLifecycleRefresh
+  // (wraps the entire app in main.dart) — no duplicate observer needed here.
 
   /// Fetch campaigns for active pincode
   Future<void> _fetchCampaigns(String pincode) async {
@@ -652,7 +641,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _searchHintTimer?.cancel();
     _autoScrollTimer?.cancel();
     _factsTimer?.cancel();
