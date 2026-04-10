@@ -9,8 +9,8 @@ plugins {
 android {
     namespace = "com.easybasket.grocery"
     compileSdk = flutter.compileSdkVersion
-    // Use NDK 27 required by Flutter plugins (e.g. razorpay_flutter, geolocator_android, etc.)
-    ndkVersion = "27.0.12077973"
+    // Use highest NDK required by plugins (backward compatible)
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

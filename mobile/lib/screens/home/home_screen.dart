@@ -1293,7 +1293,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             const Spacer(),
                             Container(width: 1, height: 20, color: Colors.grey.shade300),
                             const SizedBox(width: 12),
-                            const Icon(Icons.mic_none_rounded, color: AppTheme.black, size: 24),
+                            GestureDetector(
+                              onTap: () => context.push('/products?voice=true'),
+                              behavior: HitTestBehavior.opaque,
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.mic_none_rounded, color: AppTheme.primaryGreen, size: 24),
+                              ),
+                            ),
                           ],
                         ),
                       ),

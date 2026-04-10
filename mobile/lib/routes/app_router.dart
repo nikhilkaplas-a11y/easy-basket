@@ -199,8 +199,10 @@ class AppRouter {
         path: '/products',
         builder: (context, state) {
           final categoryId = state.uri.queryParameters['categoryId'];
+          final voice = state.uri.queryParameters['voice'] == 'true';
           return ProductListScreen(
             categoryId: categoryId != null ? int.parse(categoryId) : null,
+            startVoiceSearch: voice,
           );
         },
       ),

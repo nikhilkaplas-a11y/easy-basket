@@ -10,6 +10,7 @@ import '../../models/order_model.dart';
 import '../../config/app_config.dart';
 import '../../utils/navigation_utils.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -557,7 +558,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
         width: double.infinity,
         height: 44,
         child: ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            final phone = order.deliveryBoy?.phoneNumber;
+            if (phone != null && phone.isNotEmpty) {
+              launchUrl(Uri.parse('tel:$phone'));
+            }
+          },
           icon: const Icon(Icons.phone_rounded, size: 18),
           label: const Text('Contact Driver',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
