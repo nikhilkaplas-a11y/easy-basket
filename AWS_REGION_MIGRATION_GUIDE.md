@@ -1,5 +1,9 @@
 # AWS Region Migration Guide: EU to India (ap-south-1)
 
+> **India-only, full stack (EC2 + RDS + ALB + S3 + Redis):** use the step-by-step guide  
+> **[AWS_AP_SOUTH_1_FULL_STACK_MIGRATION.md](./AWS_AP_SOUTH_1_FULL_STACK_MIGRATION.md)** — migrate **everything** to Mumbai (`ap-south-1`), DNS cutover, then decommission EU.  
+> This file below focuses on **code/env + S3** and mixed-region options.
+
 ## Why Change Region?
 
 Since you're located in India, using AWS resources in the **Mumbai region (ap-south-1)** provides:

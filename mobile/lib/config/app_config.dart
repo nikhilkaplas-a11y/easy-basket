@@ -2,7 +2,10 @@ class AppConfig {
   // Backend API Configuration
   
   // Production API URL
-  static const String apiBaseUrl = 'https://api.easybasket.in/api';
+  // static const String apiBaseUrl = 'https://api.easybasket.in/api';
+
+  // Mumbai migration / staging — test without touching production hostname (see AWS_API_V2_MUMBAI_CUT_OVER.md):
+  static const String apiBaseUrl = 'https://api-v2.easybasket.in/api';
 
   // Alternative URLs (uncomment if needed):
   // For local development (web only):
