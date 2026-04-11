@@ -1,8 +1,34 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Category } from '../entities/Category';
+import { RedisService } from '../services/redis.service';
+
+/** Home / listing API — cache static-ish category trees in Redis */
+const CATEGORY_LIST_CACHE_PREFIX = 'cache:categories:list:';
+const CATEGORY_LIST_TTL_SEC = 600; // 10 minutes
+
+function categoryListCacheKey(
+  parentId: string | undefined,
+  page: number,
+  limit: number,
+  includeInactive: boolean
+): string {
+  const p = parentId ?? 'root';
+  return `${CATEGORY_LIST_CACHE_PREFIX}${p}:${page}:${limit}:${includeInactive}`;
+}
 
 export class CategoryController {
+  private static async invalidateCategoryListCache(): Promise<void> {
+    try {
+      const n = await RedisService.deleteKeysMatching(`${CATEGORY_LIST_CACHE_PREFIX}*`);
+      if (n > 0) {
+        console.log(`🗑️ Category list cache invalidated (${n} key(s))`);
+      }
+    } catch (e) {
+      console.warn('Category list cache invalidation failed:', e);
+    }
+  }
+
   static async getAllCategories(req: Request, res: Response): Promise<void> {
     try {
       const parentId = req.query.parentId as string | undefined;
@@ -10,6 +36,26 @@ export class CategoryController {
       const limit = parseInt(req.query.limit as string) || 20;
       const skip = (page - 1) * limit;
       const includeInactive = req.query.includeInactive === 'true';
+
+      const cacheKey = categoryListCacheKey(parentId, page, limit, includeInactive);
+      try {
+        const cached = await RedisService.getJson<{
+          categories: unknown[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasMore: boolean;
+          };
+        }>(cacheKey);
+        if (cached) {
+          res.json(cached);
+          return;
+        }
+      } catch {
+        // Redis hiccup — fall through to DB
+      }
 
       const categoryRepository = AppDataSource.getRepository(Category);
 
@@ -42,7 +88,7 @@ export class CategoryController {
 
       const [categories, total] = await queryBuilder.getManyAndCount();
 
-      res.json({
+      const payload = {
         categories,
         pagination: {
           page,
@@ -51,7 +97,15 @@ export class CategoryController {
           totalPages: Math.ceil(total / limit),
           hasMore: page * limit < total,
         },
-      });
+      };
+
+      try {
+        await RedisService.setJson(cacheKey, payload, CATEGORY_LIST_TTL_SEC);
+      } catch (e) {
+        console.warn('Category list cache set failed:', e);
+      }
+
+      res.json(payload);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching categories' });
@@ -168,6 +222,7 @@ export class CategoryController {
         relations: ['parentCategory', 'subcategories'],
       });
 
+      await CategoryController.invalidateCategoryListCache();
       res.status(201).json(savedCategory);
     } catch (error: any) {
       console.error('Error creating category:', error);
@@ -251,6 +306,7 @@ export class CategoryController {
       if (displayOrder !== undefined) category.displayOrder = displayOrder;
 
       await categoryRepository.save(category);
+      await CategoryController.invalidateCategoryListCache();
       res.json(category);
     } catch (error: any) {
       console.error('Error updating category:', error);
@@ -280,6 +336,7 @@ export class CategoryController {
       }
 
       await categoryRepository.remove(category);
+      await CategoryController.invalidateCategoryListCache();
       res.json({ message: 'Category deleted successfully' });
     } catch (error) {
       console.error(error);

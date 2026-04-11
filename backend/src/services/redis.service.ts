@@ -129,6 +129,17 @@ export class RedisService {
     return c.del(keys);
   }
 
+  /**
+   * Delete all keys matching a glob pattern (e.g. `cache:categories:list:*`).
+   * Uses KEYS — suitable for small key counts (admin cache invalidation).
+   */
+  static async deleteKeysMatching(pattern: string): Promise<number> {
+    const c = await this.getClient();
+    const keys = await c.keys(pattern);
+    if (keys.length === 0) return 0;
+    return c.del(keys);
+  }
+
   static async exists(key: string): Promise<boolean> {
     const c = await this.getClient();
     return (await c.exists(key)) === 1;
