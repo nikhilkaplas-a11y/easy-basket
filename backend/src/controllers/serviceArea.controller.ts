@@ -1,14 +1,53 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { ServiceArea } from '../entities/ServiceArea';
+import { RedisService } from '../services/redis.service';
 
 const serviceAreaRepository = AppDataSource.getRepository(ServiceArea);
+
+const SERVICE_AREA_CHECK_CACHE_PREFIX = 'cache:service-area:check:v1:';
+const SERVICE_AREA_CHECK_CACHE_PATTERN = 'cache:service-area:check:*';
+/** Pincode coverage changes rarely; invalidate on admin writes */
+const SERVICE_AREA_CHECK_TTL_SEC = 3600;
+
+type ServiceAreaCheckPayload =
+  | {
+      success: true;
+      available: true;
+      serviceArea: {
+        id: number;
+        pincode: string;
+        city: string;
+        state: string;
+        country: string;
+      };
+    }
+  | {
+      success: true;
+      available: false;
+      message: string;
+    };
+
+function serviceAreaCheckCacheKey(cleanPincode: string, country: string): string {
+  return `${SERVICE_AREA_CHECK_CACHE_PREFIX}${cleanPincode}:${country}`;
+}
 
 /**
  * Check if a pincode is serviceable
  * GET /api/service-area/check?pincode=123456&country=India
  */
 export class ServiceAreaController {
+  private static async invalidateServiceAreaCheckCache(): Promise<void> {
+    try {
+      const n = await RedisService.deleteKeysMatching(SERVICE_AREA_CHECK_CACHE_PATTERN);
+      if (n > 0) {
+        console.log(`🗑️ Service area check cache invalidated (${n} key(s))`);
+      }
+    } catch (e) {
+      console.warn('Service area check cache invalidation failed:', e);
+    }
+  }
+
   static async checkAvailability(req: Request, res: Response): Promise<void> {
     try {
       const { pincode, country = 'India' } = req.query;
@@ -23,18 +62,32 @@ export class ServiceAreaController {
 
       // Clean pincode (remove spaces, ensure 6 digits for India)
       const cleanPincode = pincode.trim().replace(/\s+/g, '');
+      const countryStr = country as string;
+
+      const cacheKey = serviceAreaCheckCacheKey(cleanPincode, countryStr);
+      try {
+        const cached = await RedisService.getJson<ServiceAreaCheckPayload>(cacheKey);
+        if (cached && cached.success === true) {
+          res.json(cached);
+          return;
+        }
+      } catch {
+        // Redis hiccup — fall through to DB
+      }
 
       // Find service area
       const serviceArea = await serviceAreaRepository.findOne({
         where: {
           pincode: cleanPincode,
-          country: country as string,
+          country: countryStr,
           isActive: true,
         },
       });
 
+      let payload: ServiceAreaCheckPayload;
+
       if (serviceArea) {
-        res.json({
+        payload = {
           success: true,
           available: true,
           serviceArea: {
@@ -44,14 +97,22 @@ export class ServiceAreaController {
             state: serviceArea.state,
             country: serviceArea.country,
           },
-        });
+        };
       } else {
-        res.json({
+        payload = {
           success: true,
           available: false,
           message: 'Service not available in this location',
-        });
+        };
       }
+
+      try {
+        await RedisService.setJson(cacheKey, payload, SERVICE_AREA_CHECK_TTL_SEC);
+      } catch (e) {
+        console.warn('Service area check cache set failed:', e);
+      }
+
+      res.json(payload);
     } catch (error) {
       console.error('Error checking service availability:', error);
       res.status(500).json({
@@ -157,6 +218,8 @@ export class ServiceAreaController {
 
       await serviceAreaRepository.save(serviceArea);
 
+      await ServiceAreaController.invalidateServiceAreaCheckCache();
+
       res.status(201).json({
         success: true,
         message: 'Service area created successfully',
@@ -204,6 +267,8 @@ export class ServiceAreaController {
 
       await serviceAreaRepository.save(serviceArea);
 
+      await ServiceAreaController.invalidateServiceAreaCheckCache();
+
       res.json({
         success: true,
         message: 'Service area updated successfully',
@@ -239,6 +304,8 @@ export class ServiceAreaController {
       }
 
       await serviceAreaRepository.remove(serviceArea);
+
+      await ServiceAreaController.invalidateServiceAreaCheckCache();
 
       res.json({
         success: true,
