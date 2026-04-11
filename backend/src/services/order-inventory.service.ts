@@ -2,6 +2,7 @@ import { AppDataSource } from '../config/database';
 import { OrderItem } from '../entities/OrderItem';
 import { Product } from '../entities/Product';
 import { ProductVariant } from '../entities/ProductVariant';
+import { ProductController } from '../controllers/product.controller';
 
 /**
  * Mirrors create-order stock deduction: restore variant stock when a line has a variant,
@@ -27,5 +28,7 @@ export class OrderInventoryService {
         }
       }
     }
+
+    await ProductController.invalidateProductListCache();
   }
 }

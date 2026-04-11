@@ -1,12 +1,48 @@
+import { createHash } from 'crypto';
 import { Request, Response } from 'express';
 
 import { AppDataSource } from '../config/database';
 import { Category } from '../entities/Category';
 import { Product } from '../entities/Product';
+import { RedisService } from '../services/redis.service';
 
 import { Brackets } from 'typeorm';
 
+/** Public product list GET /api/products — cache in Redis; invalidate on product/variant/stock changes */
+const PRODUCT_LIST_CACHE_PREFIX = 'cache:products:list:v1:';
+const PRODUCT_LIST_CACHE_PATTERN = 'cache:products:list:*';
+const PRODUCT_LIST_TTL_SEC = 300; // 5 minutes (shorter than categories; safety net if invalidation misses)
+
+function productListCacheKey(query: Request['query']): string {
+  const { categoryId, search, limit, page } = query;
+  const cat = categoryId ? String(Number(categoryId)) : '_';
+  const q =
+    search && String(search).trim()
+      ? createHash('sha256')
+          .update(String(search).trim().toLowerCase())
+          .digest('hex')
+          .slice(0, 16)
+      : '_';
+  const takeLimit = limit ? Number(limit) : search ? 50 : undefined;
+  const lim = takeLimit ? String(takeLimit) : 'all';
+  const pageKey =
+    takeLimit && page ? String(Math.max(1, Number(page))) : takeLimit ? '1' : '1';
+  return `${PRODUCT_LIST_CACHE_PREFIX}${cat}:${q}:${lim}:${pageKey}`;
+}
+
 export class ProductController {
+  /** Wipe all product list cache entries (any query variant). */
+  static async invalidateProductListCache(): Promise<void> {
+    try {
+      const n = await RedisService.deleteKeysMatching(PRODUCT_LIST_CACHE_PATTERN);
+      if (n > 0) {
+        console.log(`🗑️ Product list cache invalidated (${n} key(s))`);
+      }
+    } catch (e) {
+      console.warn('Product list cache invalidation failed:', e);
+    }
+  }
+
   static async getSuggestions(req: Request, res: Response): Promise<void> {
     try {
       const { search } = req.query;
@@ -57,6 +93,17 @@ export class ProductController {
   static async getAllProducts(req: Request, res: Response): Promise<void> {
     try {
       const { categoryId, search, limit, page } = req.query;
+      const cacheKey = productListCacheKey(req.query);
+      try {
+        const cached = await RedisService.getJson<unknown[]>(cacheKey);
+        if (cached) {
+          res.json(cached);
+          return;
+        }
+      } catch {
+        // Redis hiccup — fall through to DB
+      }
+
       const productRepository = AppDataSource.getRepository(Product);
       const queryBuilder = productRepository
         .createQueryBuilder('product')
@@ -134,6 +181,12 @@ export class ProductController {
         }
       });
 
+      try {
+        await RedisService.setJson(cacheKey, products, PRODUCT_LIST_TTL_SEC);
+      } catch (e) {
+        console.warn('Product list cache set failed:', e);
+      }
+
       res.json(products);
     } catch (error) {
       console.error(error);
@@ -202,6 +255,7 @@ export class ProductController {
       });
 
       await productRepository.save(product);
+      await ProductController.invalidateProductListCache();
       res.status(201).json(product);
     } catch (error) {
       console.error(error);
@@ -241,6 +295,7 @@ export class ProductController {
       }
 
       await productRepository.save(product);
+      await ProductController.invalidateProductListCache();
       res.json(product);
     } catch (error) {
       console.error(error);
@@ -260,6 +315,7 @@ export class ProductController {
       }
 
       await productRepository.remove(product);
+      await ProductController.invalidateProductListCache();
       res.json({ message: 'Product deleted successfully' });
     } catch (error) {
       console.error(error);

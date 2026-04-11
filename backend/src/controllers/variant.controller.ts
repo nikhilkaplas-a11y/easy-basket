@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { ProductVariant } from '../entities/ProductVariant';
 import { Product } from '../entities/Product';
+import { ProductController } from './product.controller';
 
 export class VariantController {
   /**
@@ -89,6 +90,7 @@ export class VariantController {
         await productRepository.save(product);
       }
 
+      await ProductController.invalidateProductListCache();
       res.status(201).json(variant);
     } catch (error: any) {
       console.error('Error creating variant:', error);
@@ -169,6 +171,7 @@ export class VariantController {
       if (isDefault !== undefined) variant.isDefault = isDefault;
 
       await variantRepository.save(variant);
+      await ProductController.invalidateProductListCache();
       res.json(variant);
     } catch (error) {
       console.error('Error updating variant:', error);
@@ -207,6 +210,7 @@ export class VariantController {
         await productRepository.save(variant.product);
       }
 
+      await ProductController.invalidateProductListCache();
       res.json({ message: 'Variant deleted successfully' });
     } catch (error) {
       console.error('Error deleting variant:', error);

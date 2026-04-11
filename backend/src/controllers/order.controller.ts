@@ -10,6 +10,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { PaymentService } from '../services/payment.service';
 import { FCMService } from '../services/fcm.service';
 import { OrderInventoryService } from '../services/order-inventory.service';
+import { ProductController } from './product.controller';
 
 export class OrderController {
   static async createOrder(req: AuthRequest, res: Response): Promise<void> {
@@ -174,6 +175,8 @@ export class OrderController {
           }
         }
       }
+
+      await ProductController.invalidateProductListCache();
 
       // Create payment order if UPI
       let paymentOrder = null;

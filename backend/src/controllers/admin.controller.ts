@@ -8,6 +8,7 @@ import { Product } from '../entities/Product';
 import { Response } from 'express';
 import { User } from '../entities/User';
 import { Brackets } from 'typeorm';
+import { ProductController } from './product.controller';
 
 export class AdminController {
   static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -421,6 +422,7 @@ export class AdminController {
       });
 
       await productRepository.save(product);
+      await ProductController.invalidateProductListCache();
       res.status(201).json(product);
     } catch (error) {
       console.error(error);
@@ -463,6 +465,7 @@ export class AdminController {
       }
 
       await productRepository.save(product);
+      await ProductController.invalidateProductListCache();
       res.json(product);
     } catch (error) {
       console.error(error);
@@ -485,6 +488,7 @@ export class AdminController {
       product.isAvailable = false;
       await productRepository.save(product);
 
+      await ProductController.invalidateProductListCache();
       res.json({ message: 'Product deleted successfully' });
     } catch (error) {
       console.error(error);
