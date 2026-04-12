@@ -14,6 +14,10 @@ AWS_ACCESS_KEY_ID=your_access_key_id_here
 AWS_SECRET_ACCESS_KEY=your_secret_access_key_here
 AWS_S3_BUCKET_NAME=your-bucket-name
 AWS_REGION=ap-south-1
+
+# Public base URL for images returned to apps (DB stores path only after normalize)
+# Use the same host as direct S3, or a CloudFront CDN URL when you migrate.
+PUBLIC_MEDIA_BASE_URL=https://your-bucket-name.s3.ap-south-1.amazonaws.com
 ```
 
 ### 2. Create S3 Bucket

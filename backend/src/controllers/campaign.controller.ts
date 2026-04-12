@@ -3,7 +3,8 @@ import { AppDataSource } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Campaign } from '../entities/Campaign';
 import { Response } from 'express';
-import { LessThanOrEqual, MoreThanOrEqual, Brackets } from 'typeorm';
+import { LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { mapCampaignPublic, normalizeMediaForStorage } from '../utils/media-url.util';
 
 /**
  * CampaignController — Admin creates campaigns, users fetch matching ones
@@ -82,7 +83,13 @@ export class CampaignController {
         }
       }
 
-      res.json(grouped);
+      const out: Record<string, ReturnType<typeof mapCampaignPublic>[]> = {
+        hero_banners: grouped.hero_banners.map(mapCampaignPublic),
+        category_strips: grouped.category_strips.map(mapCampaignPublic),
+        product_spotlights: grouped.product_spotlights.map(mapCampaignPublic),
+        bottom_banners: grouped.bottom_banners.map(mapCampaignPublic),
+      };
+      res.json(out);
     } catch (error) {
       console.error('❌ Error fetching campaigns:', error);
       res.status(500).json({ message: 'Error fetching campaigns' });
@@ -99,7 +106,7 @@ export class CampaignController {
         order: { createdAt: 'DESC' },
         relations: ['createdBy'],
       });
-      res.json(campaigns);
+      res.json(campaigns.map(mapCampaignPublic));
     } catch (error) {
       console.error('❌ Error fetching all campaigns:', error);
       res.status(500).json({ message: 'Error fetching campaigns' });
@@ -128,7 +135,7 @@ export class CampaignController {
       const campaign = campaignRepo.create({
         title,
         subtitle: subtitle || null,
-        imageUrl: imageUrl || null,
+        imageUrl: normalizeMediaForStorage(imageUrl),
         ctaText: ctaText || 'Shop Now',
         ctaLink: ctaLink || null,
         targetPincodes: targetPincodes || [],
@@ -150,7 +157,7 @@ export class CampaignController {
       }
 
       console.log(`✅ [Campaign] Created: "${title}" (id=${campaign.id})`);
-      res.status(201).json(campaign);
+      res.status(201).json(mapCampaignPublic(campaign));
     } catch (error) {
       console.error('❌ Error creating campaign:', error);
       res.status(500).json({ message: 'Error creating campaign' });
@@ -181,15 +188,19 @@ export class CampaignController {
 
       for (const field of fields) {
         if (req.body[field] !== undefined) {
-          (campaign as any)[field] = field === 'startsAt' || field === 'expiresAt'
-            ? new Date(req.body[field])
-            : req.body[field];
+          if (field === 'startsAt' || field === 'expiresAt') {
+            (campaign as any)[field] = new Date(req.body[field]);
+          } else if (field === 'imageUrl') {
+            (campaign as any)[field] = normalizeMediaForStorage(req.body[field]) ?? null;
+          } else {
+            (campaign as any)[field] = req.body[field];
+          }
         }
       }
 
       await campaignRepo.save(campaign);
       console.log(`✅ [Campaign] Updated: "${campaign.title}" (id=${campaign.id})`);
-      res.json(campaign);
+      res.json(mapCampaignPublic(campaign));
     } catch (error) {
       console.error('❌ Error updating campaign:', error);
       res.status(500).json({ message: 'Error updating campaign' });

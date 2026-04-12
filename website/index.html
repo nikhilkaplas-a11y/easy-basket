@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="Easy Basket - Instant Grocery Delivery. Get fresh groceries delivered to your doorstep in 10-20 minutes. Available on Google Play and iOS.">
     <title>Easy Basket - Instant Grocery Delivery</title>
+    <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="images/favicon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,8 +17,8 @@
     <nav class="navbar">
         <div class="container">
             <div class="nav-content">
-                <div class="logo">
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <a href="/" class="logo" aria-label="Easy Basket home">
+                    <svg class="logo-mark" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <rect width="40" height="40" rx="10" fill="#2ECC71"/>
                         <path d="M12 16L20 10L28 16V28C28 29.1046 27.1046 30 26 30H14C12.8954 30 12 29.1046 12 28V16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <path d="M12 16H28" stroke="white" stroke-width="2" stroke-linecap="round"/>
@@ -24,10 +26,11 @@
                         <path d="M24 20V26" stroke="white" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                     <span class="logo-text">Easy Basket</span>
-                </div>
+                </a>
                 <div class="nav-links">
                     <a href="#features">Features</a>
                     <a href="#how-it-works">How It Works</a>
+                    <a href="#team">Team</a>
                     <a href="#download" class="btn-download">Download</a>
                 </div>
             </div>
@@ -75,20 +78,16 @@
                     </div>
                 </div>
                 <div class="hero-image">
-                    <div class="phone-mockup">
-                        <div class="phone-screen">
-                            <div class="app-preview">
-                                <div class="app-header">
-                                    <div class="app-logo-small"></div>
-                                    <span>Easy Basket</span>
-                                </div>
-                                <div class="app-content">
-                                    <div class="category-card"></div>
-                                    <div class="category-card"></div>
-                                    <div class="category-card"></div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="hero-device">
+                        <img
+                            class="app-screenshot"
+                            src="images/app-home.png"
+                            alt="Easy Basket app — home screen with categories and search"
+                            width="320"
+                            height="693"
+                            loading="eager"
+                            decoding="async"
+                        />
                     </div>
                 </div>
             </div>
@@ -210,6 +209,58 @@
         </div>
     </section>
 
+    <!-- Team Section -->
+    <section id="team" class="team">
+        <div class="container">
+            <div class="section-header">
+                <h2>Team</h2>
+                <p>People building faster, fresher grocery delivery for your neighbourhood</p>
+            </div>
+            <div class="team-grid">
+                <article class="team-card" id="founder">
+                    <div class="team-photo-wrap">
+                        <img
+                            class="team-photo team-photo--nikhil"
+                            src="images/nikhil.png"
+                            alt="Nikhil Kaplas, founder of Easy Basket"
+                            width="200"
+                            height="200"
+                            loading="lazy"
+                        />
+                    </div>
+                    <div class="team-text">
+                        <h3>Nikhil Kaplas</h3>
+                        <p class="team-role">Founder, Easy Basket</p>
+                        <p class="team-bio">
+                            Easy Basket started with a simple idea: groceries at your door in minutes, not hours.
+                            We’re focused on speed, quality, and a smooth experience from browse to delivery.
+                        </p>
+                    </div>
+                </article>
+                <article class="team-card">
+                    <div class="team-photo-wrap">
+                        <img
+                            class="team-photo team-photo--riya"
+                            src="images/riya.png"
+                            alt="Riya Agarwal, Junior Software Engineer at Easy Basket"
+                            width="200"
+                            height="200"
+                            loading="lazy"
+                        />
+                    </div>
+                    <div class="team-text">
+                        <h3>Riya Agarwal</h3>
+                        <p class="team-role">Junior Software Engineer</p>
+                        <p class="team-bio">
+                            Building and improving the product experience—mobile, backend, and everything in between
+                            so ordering stays simple and reliable.
+                        </p>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
     <!-- Download Section -->
     <section id="download" class="download">
         <div class="container">
@@ -270,6 +321,7 @@
                     </div>
                     <div class="footer-column">
                         <h4>Company</h4>
+                        <a href="#team">Team</a>
                         <a href="#about">About</a>
                         <a href="#contact">Contact</a>
                     </div>
@@ -281,7 +333,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2024 Easy Basket. All rights reserved.</p>
+                <p>&copy; 2026 Easy Basket. All rights reserved.</p>
             </div>
         </div>
     </footer>

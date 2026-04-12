@@ -5,6 +5,7 @@ import { AppDataSource } from '../config/database';
 import { Category } from '../entities/Category';
 import { Product } from '../entities/Product';
 import { RedisService } from '../services/redis.service';
+import { mapProductPublic, normalizeMediaForStorage, publicMediaUrl } from '../utils/media-url.util';
 
 import { Brackets } from 'typeorm';
 
@@ -83,7 +84,13 @@ export class ProductController {
         .limit(8)
         .getRawMany();
 
-      res.json(suggestions.map((s, index) => ({ id: index, name: s.name, imageUrl: s.imageUrl })));
+      res.json(
+        suggestions.map((s, index) => ({
+          id: index,
+          name: s.name,
+          imageUrl: publicMediaUrl(s.imageUrl),
+        }))
+      );
     } catch (error) {
       console.error('Error fetching suggestions:', error);
       res.status(500).json({ message: 'Error fetching suggestions' });
@@ -181,13 +188,15 @@ export class ProductController {
         }
       });
 
+      const publicProducts = products.map(mapProductPublic);
+
       try {
-        await RedisService.setJson(cacheKey, products, PRODUCT_LIST_TTL_SEC);
+        await RedisService.setJson(cacheKey, publicProducts, PRODUCT_LIST_TTL_SEC);
       } catch (e) {
         console.warn('Product list cache set failed:', e);
       }
 
-      res.json(products);
+      res.json(publicProducts);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching products' });
@@ -218,7 +227,7 @@ export class ProductController {
         });
       }
 
-      res.json(product);
+      res.json(mapProductPublic(product));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching product' });
@@ -247,7 +256,7 @@ export class ProductController {
         name,
         description,
         price,
-        imageUrl,
+        imageUrl: normalizeMediaForStorage(imageUrl),
         category,
         stock: stock || 0,
         unit: unit || 'piece',
@@ -256,7 +265,7 @@ export class ProductController {
 
       await productRepository.save(product);
       await ProductController.invalidateProductListCache();
-      res.status(201).json(product);
+      res.status(201).json(mapProductPublic(product));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error creating product' });
@@ -280,7 +289,8 @@ export class ProductController {
       if (name) product.name = name;
       if (description !== undefined) product.description = description;
       if (price) product.price = price;
-      if (imageUrl !== undefined) product.imageUrl = imageUrl;
+      if (imageUrl !== undefined)
+        product.imageUrl = normalizeMediaForStorage(imageUrl) ?? '';
       if (stock !== undefined) product.stock = stock;
       if (unit) product.unit = unit;
       if (isAvailable !== undefined) product.isAvailable = isAvailable;
@@ -296,7 +306,7 @@ export class ProductController {
 
       await productRepository.save(product);
       await ProductController.invalidateProductListCache();
-      res.json(product);
+      res.json(mapProductPublic(product));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error updating product' });

@@ -60,15 +60,15 @@ document.querySelectorAll('.download-btn').forEach(btn => {
     });
 });
 
-// Add hover effect to phone mockup
-const phoneMockup = document.querySelector('.phone-mockup');
-if (phoneMockup) {
-    phoneMockup.addEventListener('mouseenter', () => {
-        phoneMockup.style.transform = 'scale(1.05)';
-        phoneMockup.style.transition = 'transform 0.3s ease';
+// Subtle hover on hero device frame
+const heroDevice = document.querySelector('.hero-device');
+if (heroDevice) {
+    heroDevice.addEventListener('mouseenter', () => {
+        heroDevice.style.transform = 'scale(1.03)';
+        heroDevice.style.transition = 'transform 0.3s ease';
     });
-    
-    phoneMockup.addEventListener('mouseleave', () => {
-        phoneMockup.style.transform = 'scale(1)';
+
+    heroDevice.addEventListener('mouseleave', () => {
+        heroDevice.style.transform = 'scale(1)';
     });
 }

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Category } from '../entities/Category';
 import { RedisService } from '../services/redis.service';
+import { mapCategoryPublic, normalizeMediaForStorage } from '../utils/media-url.util';
 
 /** Home / listing API — cache static-ish category trees in Redis */
 const CATEGORY_LIST_CACHE_PREFIX = 'cache:categories:list:';
@@ -89,7 +90,7 @@ export class CategoryController {
       const [categories, total] = await queryBuilder.getManyAndCount();
 
       const payload = {
-        categories,
+        categories: categories.map(mapCategoryPublic),
         pagination: {
           page,
           limit,
@@ -126,7 +127,7 @@ export class CategoryController {
         return;
       }
 
-      res.json(category);
+      res.json(mapCategoryPublic(category));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching category' });
@@ -158,7 +159,7 @@ export class CategoryController {
         order: { displayOrder: 'ASC', name: 'ASC' },
       });
 
-      res.json({ subcategories });
+      res.json({ subcategories: subcategories.map(mapCategoryPublic) });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching subcategories' });
@@ -209,7 +210,7 @@ export class CategoryController {
       const category = categoryRepository.create({
         name: name.trim(),
         description,
-        imageUrl,
+        imageUrl: normalizeMediaForStorage(imageUrl),
         parentCategory: parentCategory,
         displayOrder: displayOrder ?? 0,
       });
@@ -223,7 +224,7 @@ export class CategoryController {
       });
 
       await CategoryController.invalidateCategoryListCache();
-      res.status(201).json(savedCategory);
+      res.status(201).json(savedCategory ? mapCategoryPublic(savedCategory) : savedCategory);
     } catch (error: any) {
       console.error('Error creating category:', error);
 
@@ -301,13 +302,14 @@ export class CategoryController {
 
       if (name) category.name = name.trim();
       if (description !== undefined) category.description = description;
-      if (imageUrl !== undefined) category.imageUrl = imageUrl;
+      if (imageUrl !== undefined)
+        category.imageUrl = normalizeMediaForStorage(imageUrl) ?? '';
       if (isActive !== undefined) category.isActive = isActive;
       if (displayOrder !== undefined) category.displayOrder = displayOrder;
 
       await categoryRepository.save(category);
       await CategoryController.invalidateCategoryListCache();
-      res.json(category);
+      res.json(mapCategoryPublic(category));
     } catch (error: any) {
       console.error('Error updating category:', error);
 

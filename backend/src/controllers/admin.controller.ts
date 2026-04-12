@@ -9,6 +9,7 @@ import { Response } from 'express';
 import { User } from '../entities/User';
 import { Brackets } from 'typeorm';
 import { ProductController } from './product.controller';
+import { mapOrderPublic, mapProductPublic, normalizeMediaForStorage } from '../utils/media-url.util';
 
 export class AdminController {
   static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -36,7 +37,7 @@ export class AdminController {
       const [orders, total] = await queryBuilder.skip(skip).take(limit).getManyAndCount();
 
       res.json({
-        orders,
+        orders: orders.map(mapOrderPublic),
         pagination: {
           page,
           limit,
@@ -73,7 +74,7 @@ export class AdminController {
         return;
       }
 
-      res.json(order);
+      res.json(mapOrderPublic(order));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching order' });
@@ -376,7 +377,7 @@ export class AdminController {
       const [products, total] = await queryBuilder.getManyAndCount();
 
       res.json({
-        products,
+        products: products.map(mapProductPublic),
         pagination: {
           page,
           limit,
@@ -413,7 +414,7 @@ export class AdminController {
         name,
         description,
         price,
-        imageUrl,
+        imageUrl: normalizeMediaForStorage(imageUrl),
         category,
         stock: stock || 0,
         unit: unit || 'piece',
@@ -423,7 +424,7 @@ export class AdminController {
 
       await productRepository.save(product);
       await ProductController.invalidateProductListCache();
-      res.status(201).json(product);
+      res.status(201).json(mapProductPublic(product));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error creating product' });
@@ -450,7 +451,8 @@ export class AdminController {
       if (name) product.name = name;
       if (description !== undefined) product.description = description;
       if (price) product.price = price;
-      if (imageUrl !== undefined) product.imageUrl = imageUrl;
+      if (imageUrl !== undefined)
+        product.imageUrl = normalizeMediaForStorage(imageUrl) ?? '';
       if (stock !== undefined) product.stock = stock;
       if (unit) product.unit = unit;
       if (isAvailable !== undefined) product.isAvailable = isAvailable;
@@ -466,7 +468,7 @@ export class AdminController {
 
       await productRepository.save(product);
       await ProductController.invalidateProductListCache();
-      res.json(product);
+      res.json(mapProductPublic(product));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error updating product' });
