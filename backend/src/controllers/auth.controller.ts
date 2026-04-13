@@ -28,6 +28,14 @@ function normalizeFcmToken(input: unknown): string | null {
 }
 
 export class AuthController {
+  private static readonly LOGIN_TEST_OTP_VALUE = '1234';
+
+  /** When `LOGIN_USE_TEST_OTP` is true, login skips Twilio and verify accepts only `1234`. Otherwise Twilio SMS + verification apply (if configured). */
+  private static isLoginTestOtpEnabled(): boolean {
+    const v = process.env.LOGIN_USE_TEST_OTP?.trim().toLowerCase();
+    return v === 'true' || v === '1' || v === 'yes';
+  }
+
   static async login(req: Request, res: Response): Promise<void> {
     const { phoneNumber } = req.body;
 
@@ -37,14 +45,25 @@ export class AuthController {
     }
 
     try {
-      if (TwilioService.isConfigured()) {
+      const useTestOtp = AuthController.isLoginTestOtpEnabled();
+      if (TwilioService.isConfigured() && !useTestOtp) {
         await TwilioService.sendVerification(phoneNumber, 'sms');
         console.log(`OTP sent via Twilio for ${phoneNumber}`);
         res.json({ message: 'OTP sent successfully to your phone number.' });
+      } else if (TwilioService.isConfigured() && useTestOtp) {
+        console.log(
+          `OTP test mode (LOGIN_USE_TEST_OTP) for ${phoneNumber}; SMS not sent. Use ${AuthController.LOGIN_TEST_OTP_VALUE}.`
+        );
+        res.json({
+          message: `OTP not sent (test mode). Use ${AuthController.LOGIN_TEST_OTP_VALUE} to verify.`,
+        });
       } else {
-        // Dev fallback when Twilio is not configured
-        console.log(`OTP request for ${phoneNumber}. Use OTP: 1234`);
-        res.json({ message: 'OTP sent successfully. Use 1234 for testing.' });
+        console.log(
+          `OTP request for ${phoneNumber}. Use OTP: ${AuthController.LOGIN_TEST_OTP_VALUE}`
+        );
+        res.json({
+          message: `OTP sent successfully. Use ${AuthController.LOGIN_TEST_OTP_VALUE} for testing.`,
+        });
       }
     } catch (error) {
       console.error('Error sending OTP:', error);
@@ -68,19 +87,28 @@ export class AuthController {
 
     try {
       let otpValid = false;
+      const useTestOtp = AuthController.isLoginTestOtpEnabled();
+      const expectedTest = AuthController.LOGIN_TEST_OTP_VALUE;
+
       if (TwilioService.isConfigured()) {
-        otpValid = await TwilioService.checkVerification(phoneNumber, otp);
-        if (!otpValid) {
-          res.status(400).json({ message: 'Invalid or expired OTP. Please request a new one.' });
-          return;
+        if (useTestOtp) {
+          if (otp !== expectedTest) {
+            res.status(400).json({ message: `Invalid OTP. Use ${expectedTest} in test mode.` });
+            return;
+          }
+          otpValid = true;
+        } else {
+          otpValid = await TwilioService.checkVerification(phoneNumber, otp);
+          if (!otpValid) {
+            res.status(400).json({ message: 'Invalid or expired OTP. Please request a new one.' });
+            return;
+          }
         }
-      } else {
-        // Dev fallback: accept 1234 when Twilio is not configured
-        if (otp !== '1234') {
-          res.status(400).json({ message: 'Invalid OTP. Please use 1234' });
-          return;
-        }
+      } else if (otp === expectedTest) {
         otpValid = true;
+      } else {
+        res.status(400).json({ message: `Invalid OTP. Please use ${expectedTest}` });
+        return;
       }
 
       // Check database connection
