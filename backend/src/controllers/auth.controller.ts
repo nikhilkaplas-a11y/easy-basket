@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import crypto from 'crypto';
 
 import { AppDataSource } from '../config/database';
+import { AuthRequest } from '../middleware/auth.middleware';
+import { RefreshToken } from '../entities/RefreshToken';
 import { TwilioService } from '../services/twilio.service';
 import { User } from '../entities/User';
-import { RefreshToken } from '../entities/RefreshToken';
-import { AuthRequest } from '../middleware/auth.middleware';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
 function formatBirthday(birthday: Date | string | null | undefined): string | null {
@@ -28,7 +28,7 @@ function normalizeFcmToken(input: unknown): string | null {
 }
 
 export class AuthController {
-  private static readonly LOGIN_TEST_OTP_VALUE = '1234';
+  private static readonly LOGIN_TEST_OTP_VALUE = '123456';
 
   /** When `LOGIN_USE_TEST_OTP` is true, login skips Twilio and verify accepts only `1234`. Otherwise Twilio SMS + verification apply (if configured). */
   private static isLoginTestOtpEnabled(): boolean {
