@@ -636,7 +636,12 @@ class _SubcategoriesDialogState extends State<_SubcategoriesDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             AppBar(
-              title: Text('Subcategories: ${widget.parentCategory.name}'),
+              title: Text(
+                'Subcategories: ${widget.parentCategory.name}',
+                style: const TextStyle(fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               leading: IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),

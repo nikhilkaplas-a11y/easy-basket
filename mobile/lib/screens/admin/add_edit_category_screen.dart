@@ -70,11 +70,38 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await adminProvider.fetchCategories(token: authProvider.token);
-    _category = adminProvider.categories.firstWhere(
-      (cat) => cat.id == widget.categoryId,
-      orElse: () => adminProvider.categories.first,
-    );
-    _loadCategoryData();
+
+    CategoryModel? found;
+    // First: check top-level categories
+    for (final cat in adminProvider.categories) {
+      if (cat.id == widget.categoryId) {
+        found = cat;
+        break;
+      }
+      // Then: check subcategories nested inside each parent
+      if (cat.subcategories != null) {
+        for (final sub in cat.subcategories!) {
+          if (sub.id == widget.categoryId) {
+            found = sub.copyWith(parentCategoryId: cat.id);
+            break;
+          }
+        }
+        if (found != null) break;
+      }
+    }
+
+    if (found != null) {
+      _category = found;
+      _loadCategoryData();
+    } else {
+      // Category not found — show error, don't load random fallback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Category not found')),
+        );
+        Navigator.of(context).pop();
+      }
+    }
     setState(() => _isLoadingCategory = false);
   }
 

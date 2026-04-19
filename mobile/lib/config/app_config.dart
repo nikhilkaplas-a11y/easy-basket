@@ -1,27 +1,24 @@
 class AppConfig {
   // Backend API Configuration
-  
-  // Production API URL
-  // static const String apiBaseUrl = 'https://api.easybasket.in/api';
 
-  // Mumbai migration / staging — test without touching production hostname (see AWS_API_V2_MUMBAI_CUT_OVER.md):
+  // Production API URL
   static const String apiBaseUrl = 'https://api-v2.easybasket.in/api';
 
   // Alternative URLs (uncomment if needed):
   // For local development (web only):
 
   //static const String apiBaseUrl = 'http://localhost:3000/api';
-  
+
   // For Android emulator:
   // static const String apiBaseUrl = 'http://10.0.2.2:3000/api';
-  
+
   // For physical device on same WiFi (replace with your Mac's IP):
   // static const String apiBaseUrl = 'http://192.168.1.29:3000/api';
-  
+
   // App Configuration (version is for Play Store / release, not tied to backend API)
   static const String appName = 'Easy Basket';
   static const String appVersion = '10.0.0';
-  
+
   // Development OTP (for testing)
   static const String devOTP = '1234';
 

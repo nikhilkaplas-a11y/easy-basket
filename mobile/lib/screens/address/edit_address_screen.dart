@@ -36,7 +36,6 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
   String? _longitude;
   bool _isDefault = false;
   bool _isSaving = false;
-  bool _isDeleting = false;
   String? _errorMessage;
 
   @override
@@ -228,17 +227,6 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                     const SizedBox(height: 24),
 
                     // Delete address
-                    Center(
-                      child: GestureDetector(
-                        onTap: _isDeleting ? null : _confirmDelete,
-                        child: _isDeleting
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.red)))
-                            : Text(
-                                'Delete this address',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.red[400]),
-                              ),
-                      ),
-                    ),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -449,72 +437,4 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
     }
   }
 
-  // ─── Delete logic ───
-  void _confirmDelete() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        content: const Text('Are you sure you want to delete this address?', style: TextStyle(fontSize: 14)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _deleteAddress();
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deleteAddress() async {
-    setState(() => _isDeleting = true);
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
-    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-
-    String? token = authProvider.accessToken ?? authProvider.token;
-    if (token == null) {
-      setState(() => _isDeleting = false);
-      return;
-    }
-
-    try {
-      final success = await addressProvider.deleteAddress(
-        token: token,
-        addressId: widget.address.id,
-      );
-
-      if (success) {
-        // Also refresh order provider's address list
-        await orderProvider.fetchAddresses(token);
-      }
-
-      setState(() => _isDeleting = false);
-      if (success && mounted) {
-        context.pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Address deleted'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isDeleting = false;
-        _errorMessage = 'Could not delete address';
-      });
-    }
-  }
 }

@@ -4,6 +4,7 @@ import { AppDataSource } from './config/database';
 import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
 import { OrderAutoCancelService } from './services/order-auto-cancel.service';
+import { PaymentsReconcilerService } from './services/payments-reconciler.service';
 import { RedisService } from './services/redis.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
@@ -15,6 +16,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import orderRoutes from './routes/order.routes';
 import paymentRoutes from './routes/payment.routes';
+import { PaymentController } from './controllers/payment.controller';
 import productRoutes from './routes/product.routes';
 import serviceAreaRoutes from './routes/serviceArea.routes';
 import uploadRoutes from './routes/upload.routes';
@@ -37,9 +39,18 @@ app.use(
     origin: true, // Allow all origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   })
 );
+
+// Razorpay webhook MUST use raw body for HMAC verification — mount BEFORE express.json()
+// so the body stays an untouched Buffer. Any other route still gets JSON parsing below.
+app.post(
+  '/api/payment/webhook/razorpay',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  PaymentController.razorpayWebhook
+);
+
 app.use(express.json());
 app.use(RequestTimingMiddleware.handle);
 
@@ -129,6 +140,9 @@ AppDataSource.initialize()
 
     // Auto-cancel: pending orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
     OrderAutoCancelService.start();
+
+    // Payments reconciler: reconcile stale payments / pending refunds with Razorpay.
+    PaymentsReconcilerService.start();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);

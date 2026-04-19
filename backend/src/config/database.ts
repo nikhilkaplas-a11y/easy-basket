@@ -4,11 +4,14 @@ import { Category } from '../entities/Category';
 import { DataSource } from 'typeorm';
 import { Order } from '../entities/Order';
 import { OrderItem } from '../entities/OrderItem';
+import { Payment } from '../entities/Payment';
 import { Product } from '../entities/Product';
 import { ProductVariant } from '../entities/ProductVariant';
+import { Refund } from '../entities/Refund';
 import { RefreshToken } from '../entities/RefreshToken';
 import { ServiceArea } from '../entities/ServiceArea';
 import { User } from '../entities/User';
+import { WebhookEvent } from '../entities/WebhookEvent';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -33,6 +36,9 @@ export const AppDataSource = new DataSource({
     ServiceArea,
     ProductVariant,
     Campaign,
+    Payment,
+    Refund,
+    WebhookEvent,
   ],
   subscribers: [],
   migrations: [],

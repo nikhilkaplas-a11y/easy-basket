@@ -38,6 +38,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   bool _isUploadingImage = false;
   double _uploadProgress = 0.0;
   int? _selectedCategoryId;
+  int? _selectedParentCategoryId;
   String _selectedUnit = 'piece';
   bool _isAvailable = true;
   bool _isLoading = false;
@@ -106,6 +107,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       _stockController.text = _product!.stock.toString();
       _imageUrlController.text = _product!.imageUrl ?? '';
       _selectedCategoryId = _product!.category?.id;
+      _selectedParentCategoryId = _product!.category?.parentCategoryId ?? _product!.category?.id;
       _selectedUnit = _product!.unit ?? 'piece';
       _isAvailable = _product!.isAvailable;
       
@@ -337,31 +339,27 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         allCategories.add(category);
         addedIds.add(category.id);
       }
-      
-      // Add subcategories if they exist
+      // Add subcategories — patch parentCategoryId since API doesn't include it
       if (category.hasSubcategories && category.subcategories != null) {
         for (var subcategory in category.subcategories!) {
           if (!addedIds.contains(subcategory.id)) {
-            allCategories.add(subcategory);
+            allCategories.add(subcategory.copyWith(parentCategoryId: category.id));
             addedIds.add(subcategory.id);
           }
         }
       }
     }
-    
+
     // Also check admin provider categories for any missing ones
     for (var category in adminProvider.categories) {
-      // Check if already added
       if (!addedIds.contains(category.id)) {
         allCategories.add(category);
         addedIds.add(category.id);
       }
-      
-      // Add subcategories
       if (category.hasSubcategories && category.subcategories != null) {
         for (var subcategory in category.subcategories!) {
           if (!addedIds.contains(subcategory.id)) {
-            allCategories.add(subcategory);
+            allCategories.add(subcategory.copyWith(parentCategoryId: category.id));
             addedIds.add(subcategory.id);
           }
         }
@@ -384,9 +382,6 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     if (mounted) {
       setState(() {
         _categories = allCategories;
-        if (_selectedCategoryId == null && _categories.isNotEmpty) {
-          _selectedCategoryId = _categories.first.id;
-        }
       });
     }
     
@@ -574,43 +569,77 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               },
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<int>(
-              value: _selectedCategoryId,
-              decoration: const InputDecoration(
-                labelText: 'Category *',
-                prefixIcon: Icon(Icons.category),
-                border: OutlineInputBorder(),
-                helperText: 'Select a category or subcategory',
-              ),
-              items: _categories.map((category) {
-                // Build display name: show parent > subcategory if it's a subcategory
-                String displayName = category.name;
-                if (category.isSubcategory && category.parentCategory != null) {
-                  displayName = '${category.parentCategory!.name} > ${category.name}';
-                }
-                
-                return DropdownMenuItem<int>(
-                  value: category.id,
-                  child: Text(
-                    displayName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: category.isSubcategory ? FontWeight.w500 : FontWeight.normal,
-                      color: category.isSubcategory ? AppTheme.primaryGreen : AppTheme.black,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedCategoryId = value),
-              validator: (value) {
-                if (value == null) {
-                  return 'Please select a category';
-                }
-                return null;
-              },
-            ),
+            // Parent category dropdown
+            Builder(builder: (context) {
+              final parents = _categories.where((c) => c.isTopLevel).toList();
+              return DropdownButtonFormField<int>(
+                value: parents.any((c) => c.id == _selectedParentCategoryId)
+                    ? _selectedParentCategoryId
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Category *',
+                  prefixIcon: Icon(Icons.category),
+                  border: OutlineInputBorder(),
+                ),
+                items: parents.map((cat) {
+                  return DropdownMenuItem<int>(
+                    value: cat.id,
+                    child: Text(cat.name,
+                        style: const TextStyle(fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedParentCategoryId = value;
+                    _selectedCategoryId = null; // reset subcategory
+                  });
+                },
+                validator: (value) =>
+                    value == null ? 'Please select a category' : null,
+              );
+            }),
+            const SizedBox(height: 16),
+            // Subcategory dropdown (filtered by selected parent)
+            Builder(builder: (context) {
+              final subs = _selectedParentCategoryId == null
+                  ? <CategoryModel>[]
+                  : _categories
+                      .where((c) => c.parentCategoryId == _selectedParentCategoryId)
+                      .toList();
+              return DropdownButtonFormField<int>(
+                value: subs.any((c) => c.id == _selectedCategoryId)
+                    ? _selectedCategoryId
+                    : null,
+                decoration: InputDecoration(
+                  labelText: 'Subcategory *',
+                  prefixIcon: const Icon(Icons.subdirectory_arrow_right),
+                  border: const OutlineInputBorder(),
+                  helperText: _selectedParentCategoryId == null
+                      ? 'Select a category first'
+                      : (subs.isEmpty ? 'No subcategories available' : null),
+                ),
+                items: subs.map((cat) {
+                  return DropdownMenuItem<int>(
+                    value: cat.id,
+                    child: Text(cat.name,
+                        style: const TextStyle(fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1),
+                  );
+                }).toList(),
+                onChanged: subs.isEmpty
+                    ? null
+                    : (value) => setState(() => _selectedCategoryId = value),
+                validator: (value) {
+                  if (_selectedParentCategoryId == null) return null;
+                  if (subs.isEmpty) return null;
+                  if (value == null) return 'Please select a subcategory';
+                  return null;
+                },
+              );
+            }),
             const SizedBox(height: 16),
             TextFormField(
               controller: _descriptionController,

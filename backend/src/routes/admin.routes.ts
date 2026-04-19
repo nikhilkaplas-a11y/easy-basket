@@ -1,11 +1,22 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { RedisService } from '../services/redis.service';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(authorize('admin'));
+
+// Admin: flush Redis cache (use to invalidate stale cached responses)
+router.post('/cache/flush', async (_req, res) => {
+  try {
+    const deleted = await RedisService.deleteKeysMatching('cache:*');
+    res.json({ success: true, keysDeleted: deleted });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e) });
+  }
+});
 
 router.get('/dashboard', AdminController.getDashboardStats);
 router.get('/orders', AdminController.getAllOrders);

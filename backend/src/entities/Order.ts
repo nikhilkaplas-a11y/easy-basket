@@ -34,6 +34,24 @@ export class Order {
   @Column({ default: 'pending' }) // pending, accepted, preparing, out_for_delivery, delivered, cancelled
   status!: string;
 
+  @Column({
+    name: 'payment_status',
+    type: 'enum',
+    enum: ['initiated', 'success_unverified', 'paid', 'failed', 'refund_pending', 'refunded'],
+    nullable: true,
+  })
+  paymentStatus!:
+    | 'initiated'
+    | 'success_unverified'
+    | 'paid'
+    | 'failed'
+    | 'refund_pending'
+    | 'refunded'
+    | null;
+
+  @Column({ name: 'idempotency_key', type: 'char', length: 64, nullable: true })
+  idempotencyKey!: string | null;
+
   @Column({ nullable: true })
   paymentMethod!: string; // UPI, cash, etc.
 

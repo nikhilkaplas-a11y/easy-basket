@@ -71,16 +71,21 @@ class _PromoBannerWidgetState extends State<PromoBannerWidget>
         opacity: _fadeAnimation,
         child: GestureDetector(
           onTap: widget.onTap,
-          child: ClipRect(
-            child: SizedBox(
-              width: double.infinity,
-              height: 100,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                clipBehavior: Clip.hardEdge,
-                child: Image.asset(widget.imagePath),
-              ),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final screenWidth = constraints.maxWidth;
+              // Scale height based on screen width — 100px at 360px width, scales proportionally
+              final height = (screenWidth * 0.28).clamp(80.0, 140.0);
+              return SizedBox(
+                width: double.infinity,
+                height: height,
+                child: Image.asset(
+                  widget.imagePath,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              );
+            },
           ),
         ),
       ),

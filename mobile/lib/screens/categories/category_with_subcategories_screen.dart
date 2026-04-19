@@ -206,7 +206,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
         Expanded(
           child: Padding(
             padding: EdgeInsets.only(
-              bottom: cartProvider.itemCount > 0 ? 120 : 24, // Extra padding when cart bar is visible
+              bottom: cartProvider.itemCount > 0 ? 120 : 50, // Extra padding when cart bar is visible
             ),
             child: _isLoadingProducts
                 ? const Center(child: CircularProgressIndicator())

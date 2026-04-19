@@ -63,5 +63,20 @@ class CategoryModel {
 
   /// Check if this is a subcategory (has parent)
   bool get isSubcategory => parentCategoryId != null;
+
+  /// Create a copy with overridden fields
+  CategoryModel copyWith({int? parentCategoryId}) {
+    return CategoryModel(
+      id: id,
+      name: name,
+      description: description,
+      imageUrl: imageUrl,
+      isActive: isActive,
+      parentCategoryId: parentCategoryId ?? this.parentCategoryId,
+      parentCategory: parentCategory,
+      subcategories: subcategories,
+      displayOrder: displayOrder,
+    );
+  }
 }
 

@@ -1,68 +1,78 @@
-import Razorpay from 'razorpay';
+import { AppDataSource } from '../config/database';
+import { Order } from '../entities/Order';
+import { PaymentsV2Service } from './payments-v2.service';
+import { RazorpayService } from './razorpay.service';
 
+/**
+ * Backward-compatibility facade.
+ *
+ * Older code (e.g. OrderController.createOrder) calls PaymentService.createOrder(rupees, currency, receipt)
+ * and expects a Razorpay-shaped order object. We keep that signature but route through
+ * PaymentsV2Service.initiatePayment so a Payment row is persisted and the state machine stays coherent.
+ *
+ * New code should call PaymentsV2Service directly.
+ */
 export class PaymentService {
-  private static razorpayInstance: Razorpay | null = null;
-
   static initialize(): void {
-    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-      this.razorpayInstance = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-      });
-      console.log('Razorpay initialized');
-    } else {
-      console.warn('Razorpay credentials not configured');
-    }
+    // No-op: RazorpayService auto-initializes on import. Kept for import-side-effects callers.
   }
 
-  static async createOrder(amount: number, currency: string = 'INR', orderId: string) {
-    if (!this.razorpayInstance) {
-      throw new Error('Razorpay not initialized');
+  static async createOrder(
+    amountRupees: number,
+    currency: string = 'INR',
+    receipt: string
+  ): Promise<{ id: string; amount: number; currency: string }> {
+    const orderId = parseOrderIdFromReceipt(receipt);
+    if (orderId == null) {
+      // Legacy / unknown receipt format — fall back to a raw Razorpay order so we don't break callers.
+      const amountPaise = Math.round(amountRupees * 100);
+      const rzp = await RazorpayService.createOrder({ amountPaise, currency, receipt });
+      return { id: rzp.id, amount: Number(rzp.amount), currency: rzp.currency };
     }
 
-    try {
-      const options = {
-        amount: amount * 100, // Convert to paise
-        currency,
-        receipt: orderId,
-        notes: {
-          orderId,
-        },
-      };
+    const order = await AppDataSource.getRepository(Order).findOne({
+      where: { id: orderId },
+      relations: ['user'],
+    });
+    if (!order) throw new Error(`Order ${orderId} not found`);
 
-      const razorpayOrder = await this.razorpayInstance.orders.create(options);
-      return razorpayOrder;
-    } catch (error) {
-      console.error('Error creating Razorpay order:', error);
-      throw error;
-    }
+    const amountPaise = PaymentsV2Service.toPaise(amountRupees);
+    const out = await PaymentsV2Service.initiatePayment({
+      orderId,
+      userId: order.user.id,
+      amountPaise,
+    });
+
+    return {
+      id: out.razorpayOrderId,
+      amount: out.amountPaise,
+      currency: out.currency,
+    };
   }
 
+  /**
+   * @deprecated Use PaymentsV2Service.handleVerify (goes through the full state machine
+   * and returns a structured result). Kept only for any external callers.
+   */
   static async verifyPayment(
     paymentId: string,
-    orderId: string,
+    razorpayOrderId: string,
     signature: string
   ): Promise<boolean> {
-    if (!this.razorpayInstance) {
-      return false;
-    }
-
-    const crypto = require('crypto');
-    const generatedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
-      .update(orderId + '|' + paymentId)
-      .digest('hex');
-
-    return generatedSignature === signature;
-  }
-
-  // Cashfree integration (placeholder - implement based on Cashfree SDK)
-  static async createCashfreeOrder(amount: number, orderId: string) {
-    // TODO: Implement Cashfree integration
-    console.log('Cashfree integration not implemented yet');
-    return null;
+    return RazorpayService.verifyCheckoutSignature({
+      razorpayOrderId,
+      razorpayPaymentId: paymentId,
+      signature,
+    });
   }
 }
 
-// Initialize on module load
+function parseOrderIdFromReceipt(receipt: string): number | null {
+  const m = /^(?:ORDER_|order_)(\d+)$/.exec(receipt);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Preserve the module-load side effect the old file had so importers don't regress.
 PaymentService.initialize();
