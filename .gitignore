@@ -73,7 +73,8 @@ mobile/pubspec.lock
 backend/tsconfig.tsbuildinfo
 
 # Database
-*.sql
+*.sql 
+!backend/src/migrations/*.sql
 *.db
 *.sqlite
 *.sqlite3
