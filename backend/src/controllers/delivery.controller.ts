@@ -5,6 +5,9 @@ import { Order } from '../entities/Order';
 import { User } from '../entities/User';
 import { IsNull } from 'typeorm';
 import { Response } from 'express';
+import { DeliveryStateService } from '../services/delivery-state.service';
+import { RiderWalletService } from '../services/rider-wallet.service';
+import { RiderProfile } from '../entities/RiderProfile';
 
 export class DeliveryController {
   static async getAssignedOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -362,5 +365,313 @@ export class DeliveryController {
       console.error(error);
       res.status(500).json({ message: 'Error fetching earnings' });
     }
+  }
+
+  // =========================================================================
+  // Phase 1 additions — state-machine-driven endpoints
+  // =========================================================================
+
+  static async setAvailability(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const { availability } = req.body as {
+        availability?: 'offline' | 'idle' | 'busy';
+      };
+      if (availability !== 'offline' && availability !== 'idle' && availability !== 'busy') {
+        res.status(400).json({ message: "availability must be 'offline'|'idle'|'busy'" });
+        return;
+      }
+
+      const repo = AppDataSource.getRepository(RiderProfile);
+      let profile = await repo.findOne({ where: { userId: riderId } });
+      if (!profile) {
+        profile = repo.create({ userId: riderId, availability });
+      } else {
+        profile.availability = availability;
+      }
+      profile.lastSeenAt = new Date();
+      await repo.save(profile);
+      res.json({ availability: profile.availability, lastSeenAt: profile.lastSeenAt });
+    } catch (error) {
+      console.error('[delivery] setAvailability error', error);
+      res.status(500).json({ message: 'Error updating availability' });
+    }
+  }
+
+  static async updateLocation(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const { lat, lng } = req.body as { lat?: number; lng?: number };
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        res.status(400).json({ message: 'lat and lng (numbers) are required' });
+        return;
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        res.status(400).json({ message: 'lat/lng out of range' });
+        return;
+      }
+
+      const repo = AppDataSource.getRepository(RiderProfile);
+      let profile = await repo.findOne({ where: { userId: riderId } });
+      if (!profile) {
+        profile = repo.create({ userId: riderId, availability: 'idle' });
+      }
+      profile.currentLat = lat.toFixed(7);
+      profile.currentLng = lng.toFixed(7);
+      profile.lastSeenAt = new Date();
+      await repo.save(profile);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('[delivery] updateLocation error', error);
+      res.status(500).json({ message: 'Error updating location' });
+    }
+  }
+
+  static async arrivedAtStore(req: AuthRequest, res: Response): Promise<void> {
+    await respond(req, res, (orderId, riderId) =>
+      DeliveryStateService.arrivedAtStore(orderId, riderId)
+    );
+  }
+
+  static async picked(req: AuthRequest, res: Response): Promise<void> {
+    await respond(req, res, (orderId, riderId) =>
+      DeliveryStateService.picked(orderId, riderId)
+    );
+  }
+
+  static async startDelivery(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const result = await DeliveryStateService.startDelivery(orderId, riderId);
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      const payload: { deliveryStatus: string | null; otpDev?: string } = {
+        deliveryStatus: result.order.deliveryStatus,
+      };
+      if (result.otpDev) payload.otpDev = result.otpDev;
+      res.json(payload);
+    } catch (error) {
+      console.error('[delivery] startDelivery error', error);
+      res.status(500).json({ message: 'Error starting delivery' });
+    }
+  }
+
+  static async arrived(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const { lat, lng } = req.body as { lat?: number; lng?: number };
+      const loc =
+        typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : undefined;
+      const result = await DeliveryStateService.arrived(orderId, riderId, loc);
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      res.json({
+        deliveryStatus: result.order.deliveryStatus,
+        paymentMethod: result.order.paymentMethod,
+        amountDuePaise: Math.round(Number(result.order.totalAmount) * 100),
+      });
+    } catch (error) {
+      console.error('[delivery] arrived error', error);
+      res.status(500).json({ message: 'Error marking arrived' });
+    }
+  }
+
+  static async collectCash(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const { amountPaise, otp, lat, lng } = req.body as {
+        amountPaise?: number;
+        otp?: string;
+        lat?: number;
+        lng?: number;
+      };
+      if (typeof amountPaise !== 'number' || !otp) {
+        res.status(400).json({ message: 'amountPaise (number) and otp are required' });
+        return;
+      }
+      const gps = typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : undefined;
+      const result = await DeliveryStateService.collectCash({
+        orderId,
+        riderId,
+        amountPaise,
+        otp,
+        gps,
+      });
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+
+      const wallet = await RiderWalletService.getWallet(riderId);
+      res.json({
+        deliveryStatus: result.order.deliveryStatus,
+        cashCollectedPaise: Number(result.order.cashCollectedPaise ?? 0),
+        wallet: {
+          cashInHandPaise: Number(wallet.cashInHandPaise),
+          lifetimeCollectedPaise: Number(wallet.lifetimeCollectedPaise),
+        },
+      });
+    } catch (error) {
+      console.error('[delivery] collectCash error', error);
+      res.status(500).json({ message: 'Error collecting cash' });
+    }
+  }
+
+  static async switchToUpi(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const result = await DeliveryStateService.switchToUpi(orderId, riderId);
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      res.json({
+        razorpayOrderId: result.razorpayOrderId,
+        amountPaise: result.amountPaise,
+        key: result.keyId,
+      });
+    } catch (error) {
+      console.error('[delivery] switchToUpi error', error);
+      res.status(500).json({ message: 'Error switching to UPI' });
+    }
+  }
+
+  static async reportIssue(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const { reason, note } = req.body as { reason?: string; note?: string };
+      const validReasons = ['customer_refused', 'not_reachable', 'wrong_address', 'damaged', 'other'];
+      if (!reason || !validReasons.includes(reason)) {
+        res.status(400).json({ message: `reason must be one of ${validReasons.join(', ')}` });
+        return;
+      }
+      const result = await DeliveryStateService.reportIssue({
+        orderId,
+        riderId,
+        reason: reason as 'customer_refused' | 'not_reachable' | 'wrong_address' | 'damaged' | 'other',
+        note,
+      });
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      res.json({
+        deliveryStatus: result.order.deliveryStatus,
+        attempt: result.attempt,
+        nextAction: result.nextAction,
+      });
+    } catch (error) {
+      console.error('[delivery] reportIssue error', error);
+      res.status(500).json({ message: 'Error reporting issue' });
+    }
+  }
+
+  static async getWallet(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const wallet = await RiderWalletService.getWallet(riderId);
+      res.json({
+        cashInHandPaise: Number(wallet.cashInHandPaise),
+        lifetimeCollectedPaise: Number(wallet.lifetimeCollectedPaise),
+        lifetimeDepositedPaise: Number(wallet.lifetimeDepositedPaise),
+        pendingEarningsPaise: Number(wallet.pendingEarningsPaise),
+      });
+    } catch (error) {
+      console.error('[delivery] getWallet error', error);
+      res.status(500).json({ message: 'Error fetching wallet' });
+    }
+  }
+}
+
+/** Small helper so state-transition handlers are one-liners. */
+async function respond(
+  req: AuthRequest,
+  res: Response,
+  fn: (orderId: number, riderId: number) => Promise<
+    | { ok: true; order: Order }
+    | { ok: false; reason: string; code: number }
+  >
+): Promise<void> {
+  try {
+    const riderId = req.user?.id;
+    if (!riderId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+    const orderId = Number(req.params.id);
+    if (!Number.isFinite(orderId)) {
+      res.status(400).json({ message: 'Invalid order id' });
+      return;
+    }
+    const result = await fn(orderId, riderId);
+    if (!result.ok) {
+      res.status(result.code).json({ message: result.reason });
+      return;
+    }
+    res.json({ deliveryStatus: result.order.deliveryStatus });
+  } catch (error) {
+    console.error('[delivery] transition error', error);
+    res.status(500).json({ message: 'Error updating delivery status' });
   }
 }

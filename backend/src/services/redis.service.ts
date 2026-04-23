@@ -192,6 +192,38 @@ export class RedisService {
     }
   }
 
+  // --- Sorted Set (for popularity tracking) ---
+
+  /**
+   * Increment a member's score in a sorted set. Returns the new score.
+   * Used for search-query popularity: ZINCRBY "search:count" 1 "milk".
+   */
+  static async zIncrBy(key: string, increment: number, member: string): Promise<number> {
+    const c = await this.getClient();
+    const result = await c.zIncrBy(key, increment, member);
+    return typeof result === 'number' ? result : Number(result);
+  }
+
+  /**
+   * Reverse-rank of a member (0 = highest score). Null if member is not in the set.
+   * Used to decide whether a query is hot enough to deserve caching (rank < 100).
+   */
+  static async zRevRank(key: string, member: string): Promise<number | null> {
+    const c = await this.getClient();
+    const r = await c.zRevRank(key, member);
+    return r ?? null;
+  }
+
+  /**
+   * Trim a sorted set so only the top-N members remain (by score desc).
+   * Call periodically to keep `search:count` from growing unbounded.
+   */
+  static async zKeepTopN(key: string, topN: number): Promise<number> {
+    const c = await this.getClient();
+    // Remove the lowest-score members (ranks 0 .. -topN-1 from the low end)
+    return c.zRemRangeByRank(key, 0, -topN - 1);
+  }
+
   // --- Hash (optional) ---
 
   static async hSet(key: string, field: string, value: string): Promise<number> {

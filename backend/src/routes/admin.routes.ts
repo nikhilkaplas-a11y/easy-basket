@@ -31,4 +31,12 @@ router.put('/products/:id', AdminController.updateProduct);
 router.delete('/products/:id', AdminController.deleteProduct);
 router.post('/notifications/send', AdminController.sendPromoNotification);
 
+// --- Phase 1: rider management + delivery-aware order actions ---
+router.get('/riders', AdminController.listRiders);
+router.get('/riders/:id/wallet', AdminController.getRiderWallet);
+router.post('/riders/:id/deposit', AdminController.recordRiderDeposit);
+router.post('/orders/:id/assign-rider', AdminController.assignRiderToOrder);
+router.post('/orders/:id/complete-rto', AdminController.completeRto);
+router.get('/orders/:id/events', AdminController.getOrderEvents);
+
 export default router;

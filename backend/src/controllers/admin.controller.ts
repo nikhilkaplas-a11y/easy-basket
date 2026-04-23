@@ -10,6 +10,12 @@ import { User } from '../entities/User';
 import { Brackets } from 'typeorm';
 import { ProductController } from './product.controller';
 import { mapOrderPublic, mapProductPublic, normalizeMediaForStorage } from '../utils/media-url.util';
+import { OrderInventoryService } from '../services/order-inventory.service';
+import { PaymentsV2Service } from '../services/payments-v2.service';
+import { DeliveryStateService } from '../services/delivery-state.service';
+import { RiderWalletService } from '../services/rider-wallet.service';
+import { OrderEventsService } from '../services/order-events.service';
+import { RiderProfile } from '../entities/RiderProfile';
 
 export class AdminController {
   static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -107,12 +113,44 @@ export class AdminController {
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
         where: { id: Number(id) },
-        relations: ['user', 'deliveryBoy'],
+        relations: ['user', 'deliveryBoy', 'items', 'items.product', 'items.variant'],
       });
 
       if (!order) {
         res.status(404).json({ message: 'Order not found' });
         return;
+      }
+
+      // Admin-cancel hooks: restore inventory + refund any paid amount.
+      // Runs only on the transition INTO 'cancelled', and only once per order
+      // (idempotent via status guard + UNIQUE(payment_id, idempotency_key) on refunds).
+      let refundInitiated = false;
+      if (status === 'cancelled' && order.status !== 'cancelled') {
+        try {
+          await OrderInventoryService.restoreReservedStockForItems(order.items);
+        } catch (invErr) {
+          console.error(`[admin-cancel] inventory restore failed for order #${order.id}`, invErr);
+        }
+
+        if (order.paymentStatus === 'paid') {
+          try {
+            const result = await PaymentsV2Service.createRefund({
+              orderId: order.id,
+              userId: order.user.id,
+              actorUserId: req.user?.id ?? order.user.id,
+              reason: 'admin_cancelled',
+              idempotencyKey: `admin-cancel-${order.id}`,
+            });
+            refundInitiated = result.ok;
+            if (!result.ok) {
+              console.warn(
+                `[admin-cancel] refund not initiated for order #${order.id}: ${result.reason}`
+              );
+            }
+          } catch (refErr) {
+            console.error(`[admin-cancel] refund call failed for order #${order.id}`, refErr);
+          }
+        }
       }
 
       order.status = status;
@@ -176,7 +214,9 @@ export class AdminController {
           notificationBody = `Your order #${order.id} has been delivered! 🎉 Enjoy your fresh groceries. Thank you for choosing Easy Basket!`;
         } else if (status === 'cancelled') {
           notificationTitle = '😔 Order Cancelled';
-          notificationBody = `We're sorry! Your order #${order.id} has been cancelled. Please try again — we'd love to serve you! 🙏`;
+          notificationBody = refundInitiated
+            ? `Your order #${order.id} has been cancelled. Refund is being processed — the amount will reach your account in 2–7 working days. 🙏`
+            : `We're sorry! Your order #${order.id} has been cancelled. Please try again — we'd love to serve you! 🙏`;
         }
 
         const token = order.user.fcmToken;
@@ -601,6 +641,248 @@ export class AdminController {
         message: 'Error sending notification',
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+  }
+
+  // =========================================================================
+  // Phase 1 additions — rider management
+  // =========================================================================
+
+  /**
+   * GET /api/admin/riders
+   * Query: ?availability=idle|busy|offline (optional)
+   *
+   * Returns every user with role='delivery', plus their profile (availability,
+   * current lat/lng, last seen) and active order count.
+   */
+  static async listRiders(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userRepo = AppDataSource.getRepository(User);
+      const orderRepo = AppDataSource.getRepository(Order);
+      const profileRepo = AppDataSource.getRepository(RiderProfile);
+
+      const users = await userRepo.find({ where: { role: 'delivery', isActive: true } });
+      const userIds = users.map((u) => u.id);
+      if (userIds.length === 0) {
+        res.json([]);
+        return;
+      }
+
+      const [profiles, activeCounts] = await Promise.all([
+        profileRepo
+          .createQueryBuilder('p')
+          .where('p.userId IN (:...ids)', { ids: userIds })
+          .getMany(),
+        orderRepo
+          .createQueryBuilder('o')
+          .select('o.deliveryBoyId', 'riderId')
+          .addSelect('COUNT(*)', 'activeCount')
+          .where('o.deliveryBoyId IN (:...ids)', { ids: userIds })
+          .andWhere(
+            "(o.delivery_status IS NOT NULL AND o.delivery_status NOT IN ('delivered','rto_completed')) OR o.status = 'out_for_delivery'"
+          )
+          .groupBy('o.deliveryBoyId')
+          .getRawMany<{ riderId: number; activeCount: string }>(),
+      ]);
+
+      const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
+      const activeByUser = new Map(activeCounts.map((r) => [Number(r.riderId), Number(r.activeCount)]));
+
+      const availabilityFilter = req.query.availability as string | undefined;
+      const rows = users
+        .map((u) => {
+          const p = profileByUser.get(u.id);
+          return {
+            riderId: u.id,
+            name: u.name,
+            phoneNumber: u.phoneNumber,
+            availability: p?.availability ?? 'offline',
+            vehicleType: p?.vehicleType ?? 'bike',
+            currentLat: p?.currentLat ? Number(p.currentLat) : null,
+            currentLng: p?.currentLng ? Number(p.currentLng) : null,
+            lastSeenAt: p?.lastSeenAt ?? null,
+            rating: p?.rating ? Number(p.rating) : 5.0,
+            activeOrderCount: activeByUser.get(u.id) ?? 0,
+          };
+        })
+        .filter((r) => !availabilityFilter || r.availability === availabilityFilter);
+
+      res.json(rows);
+    } catch (error) {
+      console.error('[admin] listRiders error', error);
+      res.status(500).json({ message: 'Error listing riders' });
+    }
+  }
+
+  /**
+   * POST /api/admin/orders/:id/assign-rider
+   * Body: { riderId }
+   * Idempotent: assigning the same rider twice returns 200 with current state.
+   */
+  static async assignRiderToOrder(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const adminUserId = req.user?.id;
+      if (!adminUserId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      const { riderId } = req.body as { riderId?: number };
+      if (!Number.isFinite(orderId) || typeof riderId !== 'number') {
+        res.status(400).json({ message: 'Invalid orderId or riderId' });
+        return;
+      }
+
+      const result = await DeliveryStateService.assignRider({ orderId, riderId, adminUserId });
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      res.json({
+        orderId: result.order.id,
+        riderId,
+        deliveryStatus: result.order.deliveryStatus,
+        assignedAt: result.order.deliveryAssignedAt,
+      });
+    } catch (error) {
+      console.error('[admin] assignRiderToOrder error', error);
+      res.status(500).json({ message: 'Error assigning rider' });
+    }
+  }
+
+  /**
+   * GET /api/admin/riders/:id/wallet
+   */
+  static async getRiderWallet(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = Number(req.params.id);
+      if (!Number.isFinite(riderId)) {
+        res.status(400).json({ message: 'Invalid rider id' });
+        return;
+      }
+      const wallet = await RiderWalletService.getWallet(riderId);
+      res.json({
+        riderId,
+        cashInHandPaise: Number(wallet.cashInHandPaise),
+        lifetimeCollectedPaise: Number(wallet.lifetimeCollectedPaise),
+        lifetimeDepositedPaise: Number(wallet.lifetimeDepositedPaise),
+        pendingEarningsPaise: Number(wallet.pendingEarningsPaise),
+      });
+    } catch (error) {
+      console.error('[admin] getRiderWallet error', error);
+      res.status(500).json({ message: 'Error fetching wallet' });
+    }
+  }
+
+  /**
+   * POST /api/admin/riders/:id/deposit
+   * Header: Idempotency-Key (required)
+   * Body: { amountPaise, note? }
+   *
+   * Records the rider depositing cash at the hub. Debits cash_in_hand and
+   * credits lifetime_deposited. Idempotent per (riderId, idempotencyKey).
+   */
+  static async recordRiderDeposit(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const adminUserId = req.user?.id;
+      if (!adminUserId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const riderId = Number(req.params.id);
+      if (!Number.isFinite(riderId)) {
+        res.status(400).json({ message: 'Invalid rider id' });
+        return;
+      }
+      const idem = (req.header('idempotency-key') ?? '').trim();
+      const { amountPaise, note } = req.body as { amountPaise?: number; note?: string };
+      if (!idem) {
+        res.status(400).json({ message: 'Idempotency-Key header is required' });
+        return;
+      }
+      if (!/^[A-Za-z0-9_\-:]{8,64}$/.test(idem)) {
+        res.status(400).json({ message: 'Invalid Idempotency-Key' });
+        return;
+      }
+      if (typeof amountPaise !== 'number' || amountPaise <= 0) {
+        res.status(400).json({ message: 'amountPaise must be a positive number' });
+        return;
+      }
+
+      const result = await RiderWalletService.recordDeposit({
+        riderId,
+        adminUserId,
+        amountPaise,
+        note,
+        idempotencyKey: idem,
+      });
+
+      res.json({
+        depositId: result.deposit.id,
+        riderId,
+        amountPaise,
+        wallet: {
+          cashInHandPaise: Number(result.wallet.cashInHandPaise),
+          lifetimeCollectedPaise: Number(result.wallet.lifetimeCollectedPaise),
+          lifetimeDepositedPaise: Number(result.wallet.lifetimeDepositedPaise),
+        },
+      });
+    } catch (error) {
+      console.error('[admin] recordRiderDeposit error', error);
+      res.status(500).json({ message: 'Error recording deposit' });
+    }
+  }
+
+  /**
+   * GET /api/admin/orders/:id/events
+   * Full audit trail for an order.
+   */
+  static async getOrderEvents(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const events = await OrderEventsService.listForOrder(orderId);
+      res.json(events);
+    } catch (error) {
+      console.error('[admin] getOrderEvents error', error);
+      res.status(500).json({ message: 'Error fetching order events' });
+    }
+  }
+
+  /**
+   * POST /api/admin/orders/:id/complete-rto
+   * After the rider physically returns stock to the hub. Restores inventory and
+   * initiates refund if the order was prepaid.
+   */
+  static async completeRto(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const adminUserId = req.user?.id;
+      if (!adminUserId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const result = await DeliveryStateService.completeRto({ orderId, actorUserId: adminUserId });
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      res.json({
+        orderId: result.order.id,
+        deliveryStatus: result.order.deliveryStatus,
+        status: result.order.status,
+        paymentStatus: result.order.paymentStatus,
+      });
+    } catch (error) {
+      console.error('[admin] completeRto error', error);
+      res.status(500).json({ message: 'Error completing RTO' });
     }
   }
 }

@@ -7,6 +7,7 @@ import { WebhookEvent } from '../entities/WebhookEvent';
 import { RazorpayService } from './razorpay.service';
 import { RedisService } from './redis.service';
 import { OrderInventoryService } from './order-inventory.service';
+import { FCMService } from './fcm.service';
 
 /**
  * Payment orchestration.
@@ -372,15 +373,53 @@ export class PaymentsV2Service {
     refund.status = 'processed';
     await refundRepo.save(refund);
 
-    const paymentRepo = AppDataSource.getRepository(Payment);
-    const payment = await paymentRepo.findOne({ where: { id: refund.paymentId } });
-    if (payment && this.canTransition(payment.status, 'refunded')) {
-      payment.status = 'refunded';
-      await paymentRepo.save(payment);
+    await this.markPaymentRefunded(refund.paymentId);
+  }
 
-      await AppDataSource.getRepository(Order).update(
-        { id: payment.orderId },
-        { paymentStatus: 'refunded' }
+  /**
+   * Transition payment + order to `refunded` and notify the customer.
+   * Idempotent — if the payment is already `refunded`, returns without re-saving or re-notifying.
+   * Called from both the webhook (`refund.processed`) and the reconciler path.
+   */
+  static async markPaymentRefunded(paymentId: string): Promise<void> {
+    const paymentRepo = AppDataSource.getRepository(Payment);
+    const payment = await paymentRepo.findOne({ where: { id: paymentId } });
+    if (!payment) return;
+
+    // Already terminal → no-op. Guards against double notifications when the webhook
+    // and the reconciler both discover the refund around the same time.
+    if (payment.status === 'refunded') return;
+    if (!this.canTransition(payment.status, 'refunded')) return;
+
+    payment.status = 'refunded';
+    await paymentRepo.save(payment);
+
+    await AppDataSource.getRepository(Order).update(
+      { id: payment.orderId },
+      { paymentStatus: 'refunded' }
+    );
+
+    // Notify the customer their refund has completed.
+    const order = await AppDataSource.getRepository(Order).findOne({
+      where: { id: payment.orderId },
+      relations: ['user'],
+    });
+    const user = order?.user;
+    if (user?.id != null) {
+      const amountRupees = (Number(payment.amountPaise) / 100).toFixed(2);
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToUser(
+            user.id,
+            '💰 Refund Completed',
+            `₹${amountRupees} has been refunded for order #${payment.orderId}. It should reflect in your account within 2–7 working days.`,
+            {
+              orderId: String(payment.orderId),
+              paymentId: String(payment.id),
+              type: 'refund_completed',
+            }
+          ),
+        `notify refund completed order=#${payment.orderId} user=${user.id}`
       );
     }
   }

@@ -204,50 +204,49 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
       children: [
         // Products grid - No search bar for cleaner UI
         Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: cartProvider.itemCount > 0 ? 120 : 50, // Extra padding when cart bar is visible
-            ),
-            child: _isLoadingProducts
-                ? const Center(child: CircularProgressIndicator())
-                : provider.products.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.shopping_bag_outlined, size: 64, color: AppTheme.grey),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No products found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: AppTheme.grey,
-                              ),
+          child: _isLoadingProducts
+              ? const Center(child: CircularProgressIndicator())
+              : provider.products.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.shopping_bag_outlined, size: 64, color: AppTheme.grey),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No products found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: AppTheme.grey,
                             ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _loadProducts(widget.parentCategoryId),
-                        child: GridView.builder(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenWidth < 360 ? 8 : 12,
-                            vertical: screenWidth < 360 ? 8 : 12,
                           ),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            // More granular aspect ratio for better text rendering on small screens
-                            childAspectRatio: screenWidth < 360 ? 0.52 : screenWidth < 400 ? 0.54 : 0.56,
-                            crossAxisSpacing: screenWidth < 360 ? 8 : 12,
-                            mainAxisSpacing: screenWidth < 360 ? 8 : 12,
-                          ),
-                          itemCount: provider.products.length,
-                          itemBuilder: (context, index) {
-                            return ProductCard(product: provider.products[index]);
-                          },
-                        ),
+                        ],
                       ),
-          ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => _loadProducts(widget.parentCategoryId),
+                      child: GridView.builder(
+                        padding: EdgeInsets.only(
+                          left: screenWidth < 360 ? 8 : 12,
+                          right: screenWidth < 360 ? 8 : 12,
+                          top: screenWidth < 360 ? 8 : 12,
+                          // ~1/4 of screen height below the last card → cart bar never
+                          // overlaps and the user gets visual breathing room.
+                          bottom: MediaQuery.of(context).size.height / 4,
+                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          // More granular aspect ratio for better text rendering on small screens
+                          childAspectRatio: screenWidth < 360 ? 0.52 : screenWidth < 400 ? 0.54 : 0.56,
+                          crossAxisSpacing: screenWidth < 360 ? 8 : 12,
+                          mainAxisSpacing: screenWidth < 360 ? 8 : 12,
+                        ),
+                        itemCount: provider.products.length,
+                        itemBuilder: (context, index) {
+                          return ProductCard(product: provider.products[index]);
+                        },
+                      ),
+                    ),
         ),
       ],
     );
@@ -419,8 +418,6 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
         ? 2 
         : (availableWidth < 600 ? 2 : (availableWidth < 900 ? 3 : 4));
     
-    final cartItemCount = cartProvider?.itemCount ?? 0;
-    
     return _isLoadingProducts
         ? const Center(child: CircularProgressIndicator())
         : provider.products.isEmpty
@@ -461,7 +458,8 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                       left: screenWidth < 360 ? 8 : 12,
                       right: screenWidth < 360 ? 8 : 12,
                       top: screenWidth < 360 ? 8 : 12,
-                      bottom: cartItemCount > 0 ? 120 : 24,
+                      // ~1/4 of screen height below the last card.
+                      bottom: MediaQuery.of(context).size.height / 4,
                     ),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: crossAxisCount,

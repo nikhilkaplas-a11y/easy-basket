@@ -162,17 +162,8 @@ export class PaymentsReconcilerService {
         if (rzpRefund.status === 'processed') {
           r.status = 'processed';
           await refundRepo.save(r);
-          const payment = await AppDataSource.getRepository(Payment).findOne({
-            where: { id: r.paymentId },
-          });
-          if (payment) {
-            payment.status = 'refunded';
-            await AppDataSource.getRepository(Payment).save(payment);
-            await AppDataSource.getRepository(Order).update(
-              { id: payment.orderId },
-              { paymentStatus: 'refunded' }
-            );
-          }
+          // Delegated: handles idempotent state transition + FCM notification in one place.
+          await PaymentsV2Service.markPaymentRefunded(r.paymentId);
         } else if (rzpRefund.status === 'failed') {
           r.status = 'failed';
           await refundRepo.save(r);

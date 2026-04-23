@@ -7,37 +7,105 @@ import { Product } from '../entities/Product';
 import { RedisService } from '../services/redis.service';
 import { mapProductPublic, normalizeMediaForStorage, publicMediaUrl } from '../utils/media-url.util';
 
-import { Brackets } from 'typeorm';
+import { Brackets, In } from 'typeorm';
 
-/** Public product list GET /api/products — cache in Redis; invalidate on product/variant/stock changes */
-const PRODUCT_LIST_CACHE_PREFIX = 'cache:products:list:v1:';
+// ---------------------------------------------------------------------------
+// Search cache configuration
+// ---------------------------------------------------------------------------
+// Two parallel caches (each keyed by normalized query):
+//   cache:search:suggest:v1:{lang}:{q}                                 → autocomplete rows
+//   cache:search:results:v1:{lang}:{q}:{categoryId}:{page}:{limit}     → product IDs only
+//
+// We cache IDs (not full objects) for the results endpoint so product rows
+// stay fresh — price/stock/name edits never go stale by more than one DB read.
+//
+// Popularity: every /api/products search does ZINCRBY search:count. We only
+// write to the results cache when the query's reverse rank is < TOP_CACHE_N
+// so long-tail (one-off) queries don't bloat Redis.
+// ---------------------------------------------------------------------------
+
+const SUGGEST_CACHE_PREFIX = 'cache:search:suggest:v1:';
+const RESULTS_CACHE_PREFIX = 'cache:search:results:v1:';
+const SEARCH_CACHE_PATTERN_ALL = 'cache:search:*';
+const SEARCH_CACHE_TTL_SEC = 600; // 10 minutes
+
+const SEARCH_POPULARITY_KEY = 'search:count';
+const TOP_CACHE_N = 100; // only cache results for the top 100 queries
+
+// Legacy prefix — kept so existing invalidation helpers still wipe it.
 const PRODUCT_LIST_CACHE_PATTERN = 'cache:products:list:*';
-const PRODUCT_LIST_TTL_SEC = 300; // 5 minutes (shorter than categories; safety net if invalidation misses)
 
-function productListCacheKey(query: Request['query']): string {
-  const { categoryId, search, limit, page } = query;
-  const cat = categoryId ? String(Number(categoryId)) : '_';
-  const q =
-    search && String(search).trim()
-      ? createHash('sha256')
-          .update(String(search).trim().toLowerCase())
-          .digest('hex')
-          .slice(0, 16)
-      : '_';
-  const takeLimit = limit ? Number(limit) : search ? 50 : undefined;
-  const lim = takeLimit ? String(takeLimit) : 'all';
-  const pageKey =
-    takeLimit && page ? String(Math.max(1, Number(page))) : takeLimit ? '1' : '1';
-  return `${PRODUCT_LIST_CACHE_PREFIX}${cat}:${q}:${lim}:${pageKey}`;
+// Language hash — placeholder for future multi-language search. Our catalogue
+// is mono-lingual today so we freeze a single value at module load time.
+const LANG_HASH = createHash('sha256').update('en').digest('hex').slice(0, 6);
+
+/** Canonicalize a search string so two equivalent queries collapse onto one key. */
+function normalizeQuery(raw: unknown): string {
+  if (raw == null) return '';
+  return String(raw).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function suggestCacheKey(query: string): string {
+  return `${SUGGEST_CACHE_PREFIX}${LANG_HASH}:${query}`;
+}
+
+function resultsCacheKey(parts: {
+  query: string;
+  categoryId: string;
+  page: string;
+  limit: string;
+}): string {
+  return `${RESULTS_CACHE_PREFIX}${LANG_HASH}:${parts.query}:${parts.categoryId}:${parts.page}:${parts.limit}`;
+}
+
+/**
+ * Fetch products by IDs in one DB round-trip and return them in the exact order
+ * of `ids` (TypeORM's `In(...)` doesn't preserve input order). Variants are also
+ * sorted by displayOrder to match the shape `getAllProducts` produces on a miss.
+ */
+async function hydrateProductsInOrder(ids: number[]): Promise<unknown[]> {
+  if (ids.length === 0) return [];
+  const productRepository = AppDataSource.getRepository(Product);
+  const products = await productRepository.find({
+    where: { id: In(ids), isAvailable: true },
+    relations: ['category', 'variants'],
+  });
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const ordered: Product[] = [];
+  for (const id of ids) {
+    const p = byId.get(id);
+    if (p) ordered.push(p);
+  }
+  ordered.forEach((product) => {
+    if (product.variants) {
+      product.variants.sort((a, b) => {
+        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+        return a.quantity - b.quantity;
+      });
+    }
+  });
+  return ordered.map(mapProductPublic);
 }
 
 export class ProductController {
-  /** Wipe all product list cache entries (any query variant). */
+  /**
+   * Wipe every product-flavored cache entry on any product/variant/stock change.
+   * Covers:
+   *   - legacy list cache (`cache:products:list:*`)
+   *   - new search-results cache (`cache:search:results:*`)
+   *   - autocomplete cache (`cache:search:suggest:*`)
+   *
+   * The `search:count` sorted set is NOT touched — it's popularity, not stale data.
+   */
   static async invalidateProductListCache(): Promise<void> {
     try {
-      const n = await RedisService.deleteKeysMatching(PRODUCT_LIST_CACHE_PATTERN);
+      const [legacy, search] = await Promise.all([
+        RedisService.deleteKeysMatching(PRODUCT_LIST_CACHE_PATTERN),
+        RedisService.deleteKeysMatching(SEARCH_CACHE_PATTERN_ALL),
+      ]);
+      const n = legacy + search;
       if (n > 0) {
-        console.log(`🗑️ Product list cache invalidated (${n} key(s))`);
+        console.log(`🗑️ Product cache invalidated (${legacy} list + ${search} search)`);
       }
     } catch (e) {
       console.warn('Product list cache invalidation failed:', e);
@@ -46,43 +114,59 @@ export class ProductController {
 
   static async getSuggestions(req: Request, res: Response): Promise<void> {
     try {
-      const { search } = req.query;
+      const query = normalizeQuery(req.query.search);
 
-      if (!search || String(search).length < 2) {
+      if (query.length < 2) {
         res.json([]);
         return;
       }
 
-      const productRepository = AppDataSource.getRepository(Product);
+      // 1) Cache lookup — cheap string+image payload, safe to cache whole since it's
+      //    tiny (max 8 rows) and we only need dropdown display.
+      const cacheKey = suggestCacheKey(query);
+      try {
+        const cached = await RedisService.getJson<Array<{ name: string; imageUrl: string | null }>>(
+          cacheKey
+        );
+        if (cached) {
+          res.json(cached.map((s, index) => ({ id: index, name: s.name, imageUrl: s.imageUrl })));
+          return;
+        }
+      } catch {
+        // Redis hiccup — fall through to DB
+      }
 
-      // Use raw query for performance and flexibility
-      // We want to return unique names that match the search
-      // Split query into words and require all of them (AND logic)
-      const searchTerms = String(search)
-        .trim()
+      // 2) DB query — unchanged (MATCH AGAINST + LIKE fallback, grouped by name)
+      const productRepository = AppDataSource.getRepository(Product);
+      const searchTerms = query
         .split(/\s+/)
-        .map((term) => {
-          // If term is very short, don't force it with + as it might not be indexed
-          return term.length <= 2 ? `${term}*` : `+${term}*`;
-        })
+        .map((term) => (term.length <= 2 ? `${term}*` : `+${term}*`))
         .join(' ');
 
       const suggestions = await productRepository
         .createQueryBuilder('product')
         .select('product.name', 'name')
-        .addSelect('MAX(product.imageUrl)', 'imageUrl') // Pick one image for the name
+        .addSelect('MAX(product.imageUrl)', 'imageUrl')
         .where('product.isAvailable = :isAvailable', { isAvailable: true })
         .andWhere(
           new Brackets((qb) => {
             qb.where(
               `MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`,
               { search: searchTerms }
-            ).orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
+            ).orWhere('product.name LIKE :likeSearch', { likeSearch: `%${query}%` });
           })
         )
-        .groupBy('product.name') // Group by name to get distinct names
+        .groupBy('product.name')
         .limit(8)
-        .getRawMany();
+        .getRawMany<{ name: string; imageUrl: string | null }>();
+
+      // 3) Cache the raw (name, imageUrl) tuples — we resolve the public URL on the
+      //    response side so cached entries stay valid across S3 bucket renames.
+      try {
+        await RedisService.setJson(cacheKey, suggestions, SEARCH_CACHE_TTL_SEC);
+      } catch (e) {
+        console.warn('Suggest cache set failed:', e);
+      }
 
       res.json(
         suggestions.map((s, index) => ({
@@ -99,18 +183,54 @@ export class ProductController {
 
   static async getAllProducts(req: Request, res: Response): Promise<void> {
     try {
-      const { categoryId, search, limit, page } = req.query;
-      const cacheKey = productListCacheKey(req.query);
-      try {
-        const cached = await RedisService.getJson<unknown[]>(cacheKey);
-        if (cached) {
-          res.json(cached);
-          return;
+      const { categoryId, limit, page } = req.query;
+      const query = normalizeQuery(req.query.search);
+
+      const catKey = categoryId ? String(Number(categoryId)) : '_';
+      const takeLimit = limit ? Number(limit) : query ? 50 : undefined;
+      const pageNum = takeLimit && page ? Math.max(1, Number(page)) : 1;
+      const limKey = takeLimit ? String(takeLimit) : 'all';
+
+      // ----------------------------------------------------------------
+      // Popularity + cache flow (only when we actually have a search query)
+      // ----------------------------------------------------------------
+      const cacheable = query.length >= 2;
+      const cacheKey = cacheable
+        ? resultsCacheKey({ query, categoryId: catKey, page: String(pageNum), limit: limKey })
+        : null;
+
+      // 1) Track popularity — every request, even cache hits.
+      if (cacheable) {
+        try {
+          await RedisService.zIncrBy(SEARCH_POPULARITY_KEY, 1, query);
+        } catch (e) {
+          console.warn('Popularity increment failed:', e);
         }
-      } catch {
-        // Redis hiccup — fall through to DB
       }
 
+      // 2) Cache lookup — IDs only. We re-fetch full product rows on hit so prices
+      //    and stock never go stale by more than one DB read.
+      if (cacheKey) {
+        try {
+          const cachedIds = await RedisService.getJson<number[]>(cacheKey);
+          if (cachedIds && cachedIds.length > 0) {
+            const hydrated = await hydrateProductsInOrder(cachedIds);
+            res.json(hydrated);
+            return;
+          }
+          if (cachedIds && cachedIds.length === 0) {
+            // Cached empty result — legit "no matches".
+            res.json([]);
+            return;
+          }
+        } catch {
+          // Redis hiccup — fall through to DB
+        }
+      }
+
+      // ----------------------------------------------------------------
+      // 3) DB query — unchanged logic
+      // ----------------------------------------------------------------
       const productRepository = AppDataSource.getRepository(Product);
       const queryBuilder = productRepository
         .createQueryBuilder('product')
@@ -137,46 +257,28 @@ export class ProductController {
         queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId });
       }
 
-      if (search) {
-        // Use Full-Text Search with Boolean Mode for better matching
-        // Split query into words and require all of them (AND logic)
-        // e.g. "Chia Seeds" -> "+Chia* +Seeds*"
-        const searchTerms = String(search)
-          .trim()
+      if (query) {
+        const searchTerms = query
           .split(/\s+/)
-          .map((term) => {
-            // If term is very short, don't force it with + as it might not be indexed
-            // Exception: if the query ONLY has short words, we might need to rely on LIKE mostly
-            return term.length <= 2 ? `${term}*` : `+${term}*`;
-          })
+          .map((term) => (term.length <= 2 ? `${term}*` : `+${term}*`))
           .join(' ');
-
-        // Combine FTS with LIKE to catch short words/numbers (e.g., "1L") that FTS might miss
         queryBuilder.andWhere(
           new Brackets((qb) => {
             qb.where(
               `MATCH(product.name, product.tags, product.description) AGAINST(:search IN BOOLEAN MODE)`,
               { search: searchTerms }
-            ).orWhere('product.name LIKE :likeSearch', { likeSearch: `%${search}%` });
+            ).orWhere('product.name LIKE :likeSearch', { likeSearch: `%${query}%` });
           })
         );
       }
 
-      // Pagination support
-      // limit = kitne products ek page mein (default: all, search: 50)
-      // page = kaunsa page (1, 2, 3...) — offset calculate hota hai: (page-1) * limit
-      const takeLimit = limit ? Number(limit) : search ? 50 : undefined;
       if (takeLimit) {
         queryBuilder.take(takeLimit);
-        if (page) {
-          const pageNum = Math.max(1, Number(page));
-          queryBuilder.skip((pageNum - 1) * takeLimit);
-        }
+        queryBuilder.skip((pageNum - 1) * takeLimit);
       }
 
       const products = await queryBuilder.getMany();
 
-      // Sort variants by displayOrder for each product
       products.forEach((product) => {
         if (product.variants) {
           product.variants.sort((a, b) => {
@@ -190,10 +292,20 @@ export class ProductController {
 
       const publicProducts = products.map(mapProductPublic);
 
-      try {
-        await RedisService.setJson(cacheKey, publicProducts, PRODUCT_LIST_TTL_SEC);
-      } catch (e) {
-        console.warn('Product list cache set failed:', e);
+      // ----------------------------------------------------------------
+      // 4) Popularity-gated cache write — only top-N queries get cached
+      //    so the tail (one-off unique queries) can't bloat Redis.
+      // ----------------------------------------------------------------
+      if (cacheKey) {
+        try {
+          const rank = await RedisService.zRevRank(SEARCH_POPULARITY_KEY, query);
+          if (rank !== null && rank < TOP_CACHE_N) {
+            const ids = products.map((p) => p.id);
+            await RedisService.setJson(cacheKey, ids, SEARCH_CACHE_TTL_SEC);
+          }
+        } catch (e) {
+          console.warn('Results cache set failed:', e);
+        }
       }
 
       res.json(publicProducts);

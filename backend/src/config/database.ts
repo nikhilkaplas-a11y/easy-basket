@@ -3,12 +3,16 @@ import { Campaign } from '../entities/Campaign';
 import { Category } from '../entities/Category';
 import { DataSource } from 'typeorm';
 import { Order } from '../entities/Order';
+import { OrderEvent } from '../entities/OrderEvent';
 import { OrderItem } from '../entities/OrderItem';
 import { Payment } from '../entities/Payment';
 import { Product } from '../entities/Product';
 import { ProductVariant } from '../entities/ProductVariant';
 import { Refund } from '../entities/Refund';
 import { RefreshToken } from '../entities/RefreshToken';
+import { RiderCashDeposit } from '../entities/RiderCashDeposit';
+import { RiderProfile } from '../entities/RiderProfile';
+import { RiderWallet } from '../entities/RiderWallet';
 import { ServiceArea } from '../entities/ServiceArea';
 import { User } from '../entities/User';
 import { WebhookEvent } from '../entities/WebhookEvent';
@@ -39,6 +43,10 @@ export const AppDataSource = new DataSource({
     Payment,
     Refund,
     WebhookEvent,
+    RiderProfile,
+    RiderWallet,
+    RiderCashDeposit,
+    OrderEvent,
   ],
   subscribers: [],
   migrations: [],

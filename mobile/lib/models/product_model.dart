@@ -115,5 +115,17 @@ class ProductModel {
       'variants': variants?.map((v) => v.toJson()).toList(),
     };
   }
+
+  /// True when the product (or at least one of its variants, if it has variants)
+  /// is available to purchase right now. Use this anywhere you list / filter products.
+  bool get hasStock {
+    if (!isAvailable) return false;
+    if (hasVariants) {
+      final vs = variants;
+      if (vs == null || vs.isEmpty) return false;
+      return vs.any((v) => v.isAvailable && v.stock > 0);
+    }
+    return stock > 0;
+  }
 }
 

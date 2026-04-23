@@ -602,7 +602,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     );
                   }
 
-                  if (provider.products.isEmpty && !provider.isLoading) {
+                  // Show only in-stock items. Out-of-stock / unavailable products
+                  // (including those whose every variant is out of stock) are filtered out.
+                  final inStockProducts =
+                      provider.products.where((p) => p.hasStock).toList();
+
+                  if (inStockProducts.isEmpty && !provider.isLoading) {
                     return SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.only(top: 48),
@@ -636,9 +641,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     sliver: SliverGrid(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          return ProductCard(product: provider.products[index]);
+                          return ProductCard(product: inStockProducts[index]);
                         },
-                        childCount: provider.products.length,
+                        childCount: inStockProducts.length,
                       ),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
@@ -667,9 +672,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       ),
                     );
                   }
-                  // Bottom padding for cart bar
+                  // Leave ~1/4 of the screen height empty below the last card so the
+                  // floating cart bar never covers it and the last row has breathing room.
                   return SliverToBoxAdapter(
-                    child: SizedBox(height: MediaQuery.of(context).padding.bottom + 120),
+                    child: SizedBox(height: MediaQuery.of(context).size.height / 4),
                   );
                 },
               ),

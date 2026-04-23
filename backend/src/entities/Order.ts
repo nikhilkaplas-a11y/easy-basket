@@ -52,6 +52,57 @@ export class Order {
   @Column({ name: 'idempotency_key', type: 'char', length: 64, nullable: true })
   idempotencyKey!: string | null;
 
+  @Column({
+    name: 'delivery_status',
+    type: 'enum',
+    enum: [
+      'unassigned',
+      'assigned',
+      'at_store',
+      'picked',
+      'out_for_delivery',
+      'arrived',
+      'payment_pending',
+      'delivered',
+      'rto_pending',
+      'rto_completed',
+    ],
+    nullable: true,
+  })
+  deliveryStatus!:
+    | 'unassigned'
+    | 'assigned'
+    | 'at_store'
+    | 'picked'
+    | 'out_for_delivery'
+    | 'arrived'
+    | 'payment_pending'
+    | 'delivered'
+    | 'rto_pending'
+    | 'rto_completed'
+    | null;
+
+  @Column({ name: 'delivery_assigned_at', type: 'datetime', precision: 3, nullable: true })
+  deliveryAssignedAt!: Date | null;
+
+  @Column({ name: 'delivery_picked_at', type: 'datetime', precision: 3, nullable: true })
+  deliveryPickedAt!: Date | null;
+
+  @Column({ name: 'delivery_arrived_at', type: 'datetime', precision: 3, nullable: true })
+  deliveryArrivedAt!: Date | null;
+
+  @Column({ name: 'delivery_completed_at', type: 'datetime', precision: 3, nullable: true })
+  deliveryCompletedAt!: Date | null;
+
+  @Column({ name: 'cash_collected_paise', type: 'bigint', unsigned: true, nullable: true })
+  cashCollectedPaise!: string | null;
+
+  @Column({ name: 'delivery_attempts', type: 'tinyint', unsigned: true, default: 0 })
+  deliveryAttempts!: number;
+
+  @Column({ name: 'delivery_otp_hash', type: 'char', length: 64, nullable: true })
+  deliveryOtpHash!: string | null;
+
   @Column({ nullable: true })
   paymentMethod!: string; // UPI, cash, etc.
 
