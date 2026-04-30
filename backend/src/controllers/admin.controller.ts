@@ -160,6 +160,11 @@ export class AdminController {
       }
 
       // Allow assigning delivery boy when accepting, preparing, or out_for_delivery
+      const isFirstAssignment =
+        deliveryBoyId &&
+        order.deliveryBoy?.id !== deliveryBoyId &&
+        ['accepted', 'preparing', 'out_for_delivery'].includes(status);
+
       if (deliveryBoyId && ['accepted', 'preparing', 'out_for_delivery'].includes(status)) {
         const userRepository = AppDataSource.getRepository(User);
         const deliveryBoy = await userRepository.findOneBy({
@@ -194,7 +199,51 @@ export class AdminController {
         }
       }
 
+      // ──────────────────────────────────────────────────────────────────────
+      // Backfill the new state machine.
+      //
+      // The legacy admin UI calls this endpoint with status + deliveryBoyId.
+      // Without this block, `delivery_status` stays NULL, so the rider's app
+      // falls into the legacy button path and never enters the new flow
+      // (no OTP, no wallet credit). We mirror legacy status onto delivery_status
+      // here so EVERY assignment, legacy or new, transparently gets the state
+      // machine + audit log.
+      // ──────────────────────────────────────────────────────────────────────
+      const fromDeliveryState = order.deliveryStatus;
+      let newDeliveryState: typeof order.deliveryStatus = order.deliveryStatus;
+
+      if (isFirstAssignment && !order.deliveryStatus) {
+        newDeliveryState = 'assigned';
+        order.deliveryAssignedAt = new Date();
+      }
+      // Map legacy status → state-machine state, but never go backwards.
+      const legacyMap: Record<string, typeof order.deliveryStatus> = {
+        out_for_delivery: 'out_for_delivery',
+        delivered: 'delivered',
+      };
+      const fwd = legacyMap[status];
+      if (fwd && order.deliveryBoy && (newDeliveryState === null || _isForward(newDeliveryState, fwd))) {
+        newDeliveryState = fwd;
+        if (fwd === 'out_for_delivery' && !order.deliveryPickedAt) order.deliveryPickedAt = new Date();
+        if (fwd === 'delivered') order.deliveryCompletedAt = new Date();
+      }
+      order.deliveryStatus = newDeliveryState;
+
       await orderRepository.save(order);
+
+      // Audit: write an order_events row for the assignment so the timeline
+      // reflects who assigned the rider and when.
+      if (isFirstAssignment) {
+        await OrderEventsService.log({
+          orderId: order.id,
+          actorUserId: req.user?.id ?? null,
+          actorRole: 'admin',
+          eventType: 'rider_assigned',
+          fromState: fromDeliveryState ?? null,
+          toState: 'assigned',
+          payload: { riderId: deliveryBoyId, via: 'legacy_status_endpoint' },
+        }).catch((e) => console.warn('[admin-assign] order_events write failed', e));
+      }
 
       if (order.user.fcmToken) {
         let notificationTitle = 'Order Update';
@@ -885,4 +934,28 @@ export class AdminController {
       res.status(500).json({ message: 'Error completing RTO' });
     }
   }
+}
+
+/**
+ * Forward-only delivery_status check. Used by the legacy admin updateOrderStatus
+ * to avoid writing a state that's "behind" the order's current state when the
+ * admin sets a status out of order (e.g. retroactively setting 'preparing' on
+ * an order already 'delivered').
+ */
+const _DS_RANK: Record<string, number> = {
+  unassigned: 0,
+  assigned: 1,
+  at_store: 2,
+  picked: 3,
+  out_for_delivery: 4,
+  arrived: 5,
+  payment_pending: 6,
+  delivered: 7,
+  rto_pending: 8,
+  rto_completed: 9,
+};
+function _isForward(from: string | null | undefined, to: string): boolean {
+  const f = from ? _DS_RANK[from] ?? -1 : -1;
+  const t = _DS_RANK[to] ?? -1;
+  return t >= f;
 }
