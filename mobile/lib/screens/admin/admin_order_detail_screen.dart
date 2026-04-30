@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/order_model.dart';
@@ -155,6 +156,28 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
           onPressed: () => popOrRoleHub(context),
         ),
         actions: [
+          // Phase 3: Timeline view — full audit trail of state transitions.
+          IconButton(
+            tooltip: 'Order timeline',
+            icon: const Icon(Icons.history),
+            onPressed: () => context.push('/admin/order/${order.id}/timeline'),
+          ),
+          // Phase 3: Assign rider — only when not yet assigned and order is live.
+          if (order.deliveryBoy == null &&
+              order.status != 'delivered' &&
+              order.status != 'cancelled')
+            IconButton(
+              tooltip: 'Assign rider',
+              icon: const Icon(Icons.person_add_alt_1),
+              onPressed: () => _showAssignRiderSheet(order),
+            ),
+          // Phase 3: Complete RTO — only when in rto_pending.
+          if (order.deliveryStatus == 'rto_pending')
+            IconButton(
+              tooltip: 'Mark RTO complete',
+              icon: const Icon(Icons.assignment_return),
+              onPressed: () => _confirmCompleteRto(order),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -952,6 +975,195 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
         return Colors.red;
       default:
         return AppTheme.primaryGreen;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Phase 3 — Assign rider + Complete RTO actions
+  // ════════════════════════════════════════════════════════════════════════
+
+  /// Bottom sheet listing every rider with availability + active count, sorted
+  /// idle-first so admin's eye lands on the best candidate.
+  Future<void> _showAssignRiderSheet(OrderModel order) async {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+    if (token == null) return;
+
+    // Fetch fresh — availability changes minute-to-minute.
+    await adminProvider.fetchRiders(token: token);
+    if (!mounted) return;
+
+    final riders = [...adminProvider.riders];
+    // Sort: idle > busy > offline; within each, fewer active orders first.
+    int rank(Map<String, dynamic> r) {
+      switch (r['availability'] as String? ?? 'offline') {
+        case 'idle':
+          return 0;
+        case 'busy':
+          return 1;
+        default:
+          return 2;
+      }
+    }
+    riders.sort((a, b) {
+      final cmp = rank(a).compareTo(rank(b));
+      if (cmp != 0) return cmp;
+      final ac = (a['activeOrderCount'] as int?) ?? 0;
+      final bc = (b['activeOrderCount'] as int?) ?? 0;
+      return ac.compareTo(bc);
+    });
+
+    final selectedRiderId = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('Assign rider',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('${riders.length} rider${riders.length == 1 ? '' : 's'} available',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetCtx).size.height * 0.6,
+                ),
+                child: riders.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text('No riders found.\nMake sure rider users have role=\'delivery\'.',
+                            textAlign: TextAlign.center),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: riders.length,
+                        itemBuilder: (_, i) {
+                          final r = riders[i];
+                          final av = r['availability'] as String? ?? 'offline';
+                          final color = av == 'idle'
+                              ? Colors.green
+                              : av == 'busy'
+                                  ? Colors.orange
+                                  : Colors.grey;
+                          final activeCount = (r['activeOrderCount'] as int?) ?? 0;
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: color.withValues(alpha: 0.15),
+                              foregroundColor: color,
+                              child: Text(((r['name'] as String?) ?? '?')[0].toUpperCase()),
+                            ),
+                            title: Text(r['name'] as String? ?? 'Rider',
+                                style: const TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text(
+                              '${r['phoneNumber'] ?? ''} · $activeCount active',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                av.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: color,
+                                ),
+                              ),
+                            ),
+                            onTap: () => Navigator.pop(sheetCtx, r['riderId'] as int),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selectedRiderId == null || !mounted) return;
+
+    final ok = await adminProvider.assignRiderToOrder(
+      token: token,
+      orderId: order.id,
+      riderId: selectedRiderId,
+    );
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Rider assigned'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+      await _loadOrder();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(adminProvider.error ?? 'Failed to assign rider'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  /// Confirm + call complete-rto. Restores inventory + auto-refunds prepaid.
+  Future<void> _confirmCompleteRto(OrderModel order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark RTO complete?'),
+        content: const Text(
+          'Confirm the rider has physically returned the inventory to the hub. '
+          'Stock will be restored and any prepaid amount will be refunded.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+    if (token == null) return;
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final ok = await adminProvider.completeRto(token: token, orderId: order.id);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('RTO completed — stock restored, refund initiated if prepaid.'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+      await _loadOrder();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(adminProvider.error ?? 'Failed to complete RTO'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 }

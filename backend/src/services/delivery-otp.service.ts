@@ -42,9 +42,30 @@ export class DeliveryOtpService {
    * Verify an OTP supplied by the rider. Returns true only on a match.
    * On success, the OTP is consumed (Redis key deleted + hash cleared on order)
    * so the same code can't be reused.
+   *
+   * Bypass mechanism (Phase 1.5 — temporary):
+   *   If `DELIVERY_OTP_BYPASS_CODE` env var is set, that code is also accepted as
+   *   valid for ANY order. Use this ONLY while the SMS/FCM OTP delivery channel
+   *   is offline. Remove the env var once SMS is wired (do NOT ship to production
+   *   with this enabled long-term — anyone with rider creds could fake-deliver).
    */
   static async verify(orderId: number, code: string): Promise<boolean> {
     if (!/^\d{6}$/.test(code)) return false;
+
+    // --- Optional bypass ---
+    const bypass = process.env.DELIVERY_OTP_BYPASS_CODE?.trim();
+    if (bypass && bypass.length === 6 && constantTimeStringEqual(bypass, code)) {
+      console.warn(
+        `[OTP] BYPASS used for order ${orderId} — DELIVERY_OTP_BYPASS_CODE is set; ` +
+          `disable in production once SMS is restored.`
+      );
+      // Bypass also consumes any real OTP so the rider can't reuse it later.
+      await Promise.all([
+        RedisService.del(this.redisKey(orderId)),
+        AppDataSource.getRepository(Order).update({ id: orderId }, { deliveryOtpHash: null }),
+      ]);
+      return true;
+    }
 
     const submittedHash = this.hash(code);
 
@@ -102,6 +123,16 @@ function constantTimeEqual(a: string, b: string): boolean {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+/** Constant-time compare for plain (non-hex) strings — used for the bypass code. */
+function constantTimeStringEqual(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
   } catch {
     return false;
   }

@@ -579,7 +579,12 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                   // From checkout — select and stay on list
                                   setState(() => _selectedAddressId = address.id);
                                 } else {
-                                  // From home — set default in background, go home immediately
+                                  // From home / address-pill — set default in background, pop back
+                                  // to the previous screen (home) instead of `go('/home')`.
+                                  // Why pop, not go? `go` rebuilds the home stack from scratch,
+                                  // re-running `_initSmartAddressFlow` which can wipe the user's
+                                  // manual pick. Pop preserves the existing home instance and the
+                                  // Consumer<AddressProvider> rebuilds with the new selection.
                                   final authProvider = Provider.of<AuthProvider>(context, listen: false);
                                   final orderProvider = Provider.of<OrderProvider>(context, listen: false);
                                   if (authProvider.token != null && !address.isDefault) {
@@ -590,7 +595,13 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                       isDefault: true,
                                     );
                                   }
-                                  context.go('/home');
+                                  if (context.canPop()) {
+                                    context.pop();
+                                  } else {
+                                    // Edge case: address list opened as the entry route — fall
+                                    // back to navigating home explicitly.
+                                    context.go('/home');
+                                  }
                                 }
                               },
                               child: Padding(
@@ -898,8 +909,13 @@ class _AddressListScreenState extends State<AddressListScreen> {
         // Reset proximity so home screen re-checks with new address
         Provider.of<ProximityProvider>(context, listen: false).reset();
 
-        // Go to home directly — no delay
-        context.go('/home');
+        // Pop back to whichever screen pushed this list. Don't `go('/home')` —
+        // that rebuilds the home stack and would re-run the smart flow.
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

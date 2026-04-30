@@ -720,4 +720,125 @@ class AdminProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Phase 3 — rider management + audit endpoints
+  // ════════════════════════════════════════════════════════════════════════
+
+  /// Cached list of riders from `GET /api/admin/riders`. Includes availability,
+  /// active-order count, last-seen, vehicle info — everything the admin's
+  /// "assign rider" picker needs to make a good call.
+  List<Map<String, dynamic>> _riders = [];
+  List<Map<String, dynamic>> get riders => _riders;
+
+  /// Fetches ALL riders. Optional `availability` filter (idle|busy|offline).
+  Future<void> fetchRiders({String? token, String? availability}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      var endpoint = '/admin/riders';
+      if (availability != null && availability.isNotEmpty) {
+        endpoint += '?availability=$availability';
+      }
+      final response = await apiService.get(endpoint, token: token);
+      final List<dynamic> data = response is List ? response : [];
+      _riders = data.map((j) => Map<String, dynamic>.from(j as Map)).toList();
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Wallet snapshot: cash_in_hand, lifetime totals, pending earnings.
+  Future<Map<String, dynamic>?> fetchRiderWallet({
+    required String token,
+    required int riderId,
+  }) async {
+    try {
+      final response = await apiService.get('/admin/riders/$riderId/wallet', token: token);
+      return response is Map<String, dynamic> ? response : null;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return null;
+    }
+  }
+
+  /// Records cash deposit from rider to hub. Idempotency-Key header is required
+  /// by the backend; we generate one from `(riderId, amount, ms-of-the-day)` so
+  /// double-taps within ~1s collapse but two intentional deposits a moment apart
+  /// don't.
+  Future<Map<String, dynamic>?> recordRiderDeposit({
+    required String token,
+    required int riderId,
+    required int amountPaise,
+    String? note,
+  }) async {
+    try {
+      final idem =
+          'admin-deposit-$riderId-$amountPaise-${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+      final response = await apiService.post(
+        '/admin/riders/$riderId/deposit',
+        {
+          'amountPaise': amountPaise,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+        token: token,
+        extraHeaders: {'Idempotency-Key': idem},
+      );
+      return response is Map<String, dynamic> ? response : null;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return null;
+    }
+  }
+
+  /// Assigns a rider to an order. Returns true on success.
+  Future<bool> assignRiderToOrder({
+    required String token,
+    required int orderId,
+    required int riderId,
+  }) async {
+    try {
+      await apiService.post(
+        '/admin/orders/$orderId/assign-rider',
+        {'riderId': riderId},
+        token: token,
+      );
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    }
+  }
+
+  /// Marks an RTO complete after the rider physically returns inventory to hub.
+  /// Restores stock + auto-refunds prepaid orders.
+  Future<bool> completeRto({required String token, required int orderId}) async {
+    try {
+      await apiService.post('/admin/orders/$orderId/complete-rto', {}, token: token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    }
+  }
+
+  /// Pulls the chronological audit log for an order — every state transition
+  /// with actor, timestamp, and event payload. Read-only.
+  Future<List<Map<String, dynamic>>> fetchOrderEvents({
+    required String token,
+    required int orderId,
+  }) async {
+    try {
+      final response = await apiService.get('/admin/orders/$orderId/events', token: token);
+      final List<dynamic> data = response is List ? response : [];
+      return data.map((j) => Map<String, dynamic>.from(j as Map)).toList();
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return [];
+    }
+  }
 }

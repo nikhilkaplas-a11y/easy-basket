@@ -81,6 +81,17 @@ class OrderModel {
   final DateTime updatedAt;
   final UserModel? deliveryBoy;
 
+  /// Phase 1 delivery state-machine fields. All nullable so this model still
+  /// parses orders created before the migration ran.
+  final String? deliveryStatus; // unassigned|assigned|at_store|picked|out_for_delivery|arrived|payment_pending|delivered|rto_pending|rto_completed
+  final String? paymentStatus; // initiated|success_unverified|paid|failed|refund_pending|refunded
+  final int? cashCollectedPaise;
+  final int deliveryAttempts;
+  final DateTime? deliveryAssignedAt;
+  final DateTime? deliveryPickedAt;
+  final DateTime? deliveryArrivedAt;
+  final DateTime? deliveryCompletedAt;
+
   OrderModel({
     required this.id,
     required this.user,
@@ -95,7 +106,22 @@ class OrderModel {
     required this.createdAt,
     required this.updatedAt,
     this.deliveryBoy,
+    this.deliveryStatus,
+    this.paymentStatus,
+    this.cashCollectedPaise,
+    this.deliveryAttempts = 0,
+    this.deliveryAssignedAt,
+    this.deliveryPickedAt,
+    this.deliveryArrivedAt,
+    this.deliveryCompletedAt,
   });
+
+  /// Convenience: is this a Cash-on-Delivery order?
+  /// Uses the same string the backend stores (`paymentMethod='cash'`).
+  bool get isCod => (paymentMethod?.toLowerCase() == 'cash');
+
+  /// Amount in paise the rider must collect at the door (or 0 for prepaid).
+  int get amountToCollectPaise => isCod && !isPaid ? (totalAmount * 100).round() : 0;
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     // Helper to parse numeric values (handles both string and num from MySQL DECIMAL)
@@ -120,6 +146,27 @@ class OrderModel {
       }
     }
 
+    DateTime? parseNullableDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      if (value is String && value.isNotEmpty) {
+        try {
+          return DateTime.parse(value);
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    int? parseNullableInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
     return OrderModel(
       id: json['id'] as int,
       user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
@@ -138,6 +185,14 @@ class OrderModel {
       deliveryBoy: json['deliveryBoy'] != null
           ? UserModel.fromJson(json['deliveryBoy'] as Map<String, dynamic>)
           : null,
+      deliveryStatus: json['deliveryStatus'] as String? ?? json['delivery_status'] as String?,
+      paymentStatus: json['paymentStatus'] as String? ?? json['payment_status'] as String?,
+      cashCollectedPaise: parseNullableInt(json['cashCollectedPaise'] ?? json['cash_collected_paise']),
+      deliveryAttempts: parseNullableInt(json['deliveryAttempts'] ?? json['delivery_attempts']) ?? 0,
+      deliveryAssignedAt: parseNullableDateTime(json['deliveryAssignedAt'] ?? json['delivery_assigned_at']),
+      deliveryPickedAt: parseNullableDateTime(json['deliveryPickedAt'] ?? json['delivery_picked_at']),
+      deliveryArrivedAt: parseNullableDateTime(json['deliveryArrivedAt'] ?? json['delivery_arrived_at']),
+      deliveryCompletedAt: parseNullableDateTime(json['deliveryCompletedAt'] ?? json['delivery_completed_at']),
     );
   }
 

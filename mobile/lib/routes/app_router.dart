@@ -25,9 +25,12 @@ import '../screens/delivery/delivery_dashboard_screen.dart';
 import '../screens/delivery/delivery_orders_screen.dart';
 import '../screens/delivery/delivery_order_detail_screen.dart';
 import '../screens/delivery/delivery_map_view_screen.dart';
+import '../screens/delivery/delivery_cod_collect_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/admin_orders_screen.dart';
 import '../screens/admin/admin_order_detail_screen.dart';
+import '../screens/admin/admin_order_timeline_screen.dart';
+import '../screens/admin/admin_riders_screen.dart';
 import '../screens/admin/admin_users_screen.dart';
 import '../screens/admin/admin_products_screen.dart';
 import '../screens/admin/admin_categories_screen.dart';
@@ -312,6 +315,13 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/delivery/cod/:id',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          return DeliveryCodCollectScreen(orderId: id);
+        },
+      ),
+      GoRoute(
         path: '/delivery/map',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
@@ -346,6 +356,19 @@ class AppRouter {
           final orderId = int.parse(state.pathParameters['id']!);
           return AdminOrderDetailScreen(orderId: orderId);
         },
+      ),
+      // Phase 3: timeline. Admin order detail uses `/admin/order/:id/timeline`
+      // (singular `order`) so we mount that exact path here.
+      GoRoute(
+        path: '/admin/order/:id/timeline',
+        builder: (context, state) {
+          final orderId = int.parse(state.pathParameters['id']!);
+          return AdminOrderTimelineScreen(orderId: orderId);
+        },
+      ),
+      GoRoute(
+        path: '/admin/riders',
+        builder: (context, state) => const AdminRidersScreen(),
       ),
       GoRoute(
         path: '/admin/users',

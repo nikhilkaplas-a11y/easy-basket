@@ -88,14 +88,20 @@ class ApiService {
     String endpoint,
     Map<String, dynamic> data, {
     String? token,
+    Map<String, String>? extraHeaders,
   }) async {
     try {
       final headers = <String, String>{
         'Content-Type': 'application/json',
       };
-      
+
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
+      }
+
+      // Optional caller-provided headers (e.g. Idempotency-Key for non-replayable POSTs).
+      if (extraHeaders != null) {
+        headers.addAll(extraHeaders);
       }
 
       print('[API][POST] $baseUrl$endpoint');

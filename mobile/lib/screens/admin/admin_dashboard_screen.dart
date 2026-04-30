@@ -356,6 +356,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
                           color: Colors.blue,
                           onTap: () => context.push('/admin/users'),
                         ),
+                        // Phase 3: rider management — list, wallet, deposits.
+                        _ActionCard(
+                          title: 'Riders',
+                          icon: Icons.delivery_dining,
+                          color: Colors.indigo,
+                          onTap: () => context.push('/admin/riders'),
+                        ),
                         _ActionCard(
                           title: 'Products',
                           icon: Icons.inventory,

@@ -202,6 +202,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (!mounted) return;
 
+    // Early-out: if the user has already manually picked an address (e.g. from
+    // /addresses or the address-completion sheet), respect that choice. The smart
+    // flow auto-picks for first-time users; once the user has taken a stand, we
+    // back off and only do the soft service-area check on their pick.
+    if (addressProvider.manuallySelected && addressProvider.selectedAddress != null) {
+      debugPrint('🏠 [Home] Manual selection in place → skipping auto-pick');
+      await _softServiceAreaCheck(addressProvider, locationProvider);
+      return;
+    }
+
     // Step 3: Proximity check
     proximityProvider.checkProximity(
       locationProvider: locationProvider,
@@ -216,12 +226,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (result.decision == ProximityDecision.noGps) {
         // No GPS — silently use default saved address
         final defaultAddr = addressProvider.defaultAddress;
-        if (defaultAddr != null) addressProvider.selectAddress(defaultAddr);
+        if (defaultAddr != null) addressProvider.autoSelectAddress(defaultAddr);
         debugPrint('🏠 [Home] No GPS → default address');
       } else if (result.nearestAddress != null &&
           result.decision != ProximityDecision.forceNew) {
         // Near a saved address → silently select it
-        addressProvider.selectAddress(result.nearestAddress!);
+        addressProvider.autoSelectAddress(result.nearestAddress!);
         debugPrint('🏠 [Home] Silently selected: ${result.nearestAddress?.tag}');
       } else {
         // Far from saved (or no saved) → use GPS partial

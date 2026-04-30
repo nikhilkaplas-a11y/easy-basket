@@ -586,38 +586,9 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
             if (order.status != 'delivered' && order.status != 'cancelled')
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (order.status == 'accepted')
-                      ElevatedButton(
-                        onPressed: () => _updateStatus('preparing'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: const Text('Start Preparing'),
-                      ),
-                    if (order.status == 'preparing')
-                      ElevatedButton(
-                        onPressed: () => _updateStatus('out_for_delivery'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: const Text('Mark as Out for Delivery'),
-                      ),
-                    if (order.status == 'out_for_delivery')
-                      ElevatedButton(
-                        onPressed: () => _updateStatus('delivered'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: const Text('Mark as Delivered'),
-                      ),
-                  ],
-                ),
+                child: order.deliveryStatus != null
+                    ? _buildStateMachineActions(order)
+                    : _buildLegacyActions(order),
               ),
 
             const SizedBox(height: 16),
@@ -645,6 +616,312 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
       default:
         return AppTheme.primaryGreen;
     }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // Action buttons
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /// Pre-migration / legacy orders (no `delivery_status` column populated).
+  /// Keep the original three-step flow so old in-flight orders don't break.
+  Widget _buildLegacyActions(OrderModel order) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (order.status == 'accepted')
+          ElevatedButton(
+            onPressed: () => _updateStatus('preparing'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('Start Preparing'),
+          ),
+        if (order.status == 'preparing')
+          ElevatedButton(
+            onPressed: () => _updateStatus('out_for_delivery'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('Mark as Out for Delivery'),
+          ),
+        if (order.status == 'out_for_delivery')
+          ElevatedButton(
+            onPressed: () => _updateStatus('delivered'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('Mark as Delivered'),
+          ),
+      ],
+    );
+  }
+
+  /// Phase 1 state-machine actions. Each transition button is gated on the
+  /// order's current `deliveryStatus` so only the legal next step is shown
+  /// (the backend rejects illegal ones with 409 anyway, but no-show is friendlier).
+  ///
+  /// COD orders at `arrived`/`payment_pending` route to the dedicated COD
+  /// collection screen — that's where OTP entry + cash collection lives.
+  Widget _buildStateMachineActions(OrderModel order) {
+    final ds = order.deliveryStatus;
+
+    Widget bigButton({
+      required String label,
+      required IconData icon,
+      required Color color,
+      required VoidCallback onPressed,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 22),
+          label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (ds == 'unassigned' || ds == null)
+          const _InfoBanner(
+            text: 'Waiting for admin to assign this order',
+            color: Colors.grey,
+          ),
+        if (ds == 'assigned')
+          bigButton(
+            label: 'Arrived at Store',
+            icon: Icons.storefront_outlined,
+            color: Colors.blue.shade600,
+            onPressed: () => _runTransition(
+              (token) => Provider.of<DeliveryProvider>(context, listen: false)
+                  .arrivedAtStore(token: token, orderId: order.id),
+            ),
+          ),
+        if (ds == 'at_store')
+          bigButton(
+            label: 'Picked Order',
+            icon: Icons.shopping_bag_outlined,
+            color: Colors.orange.shade700,
+            onPressed: () => _runTransition(
+              (token) => Provider.of<DeliveryProvider>(context, listen: false)
+                  .pickedOrder(token: token, orderId: order.id),
+            ),
+          ),
+        if (ds == 'picked')
+          bigButton(
+            label: 'Start Delivery (Send OTP)',
+            icon: Icons.local_shipping_outlined,
+            color: Colors.purple.shade600,
+            onPressed: () => _runStartDelivery(order),
+          ),
+        if (ds == 'out_for_delivery')
+          bigButton(
+            label: 'Mark Arrived',
+            icon: Icons.flag_outlined,
+            color: Colors.indigo.shade600,
+            onPressed: () => _runTransition(
+              (token) => Provider.of<DeliveryProvider>(context, listen: false)
+                  .arrivedAtCustomer(token: token, orderId: order.id),
+            ),
+          ),
+        if (ds == 'arrived' || ds == 'payment_pending') ...[
+          if (order.isCod)
+            bigButton(
+              label: 'Collect Cash ₹${order.totalAmount.toStringAsFixed(0)}',
+              icon: Icons.payments_outlined,
+              color: const Color(0xFFD32F2F),
+              onPressed: () => context.push('/delivery/cod/${order.id}'),
+            )
+          else
+            bigButton(
+              label: 'Mark Delivered',
+              icon: Icons.check_circle_outline,
+              color: Colors.green.shade600,
+              onPressed: () => _updateStatus('delivered'), // prepaid uses legacy path for now
+            ),
+        ],
+        if (ds == 'rto_pending')
+          const _InfoBanner(
+            text: 'Order returning to hub. Hand it to the supervisor at the store.',
+            color: Color(0xFFD84315),
+          ),
+        if (ds != 'delivered' && ds != 'rto_completed') ...[
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: () => _showReportIssueSheet(order),
+            icon: const Icon(Icons.error_outline, size: 20),
+            label: const Text('Report a Problem'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Generic wrapper for any state transition that returns a {deliveryStatus}
+  /// map. Refreshes the screen + handles errors uniformly so each button is a one-liner.
+  Future<void> _runTransition(
+    Future<Map<String, dynamic>> Function(String token) call,
+  ) async {
+    final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+    if (token == null) return;
+    try {
+      await call(token);
+      if (mounted) await _loadOrderDetails();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
+  /// Special wrapper for start-delivery — surfaces the dev OTP in the snackbar
+  /// in non-production so testing without SMS is possible.
+  Future<void> _runStartDelivery(OrderModel order) async {
+    final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+    if (token == null) return;
+    try {
+      final result = await Provider.of<DeliveryProvider>(context, listen: false)
+          .startDelivery(token: token, orderId: order.id);
+      final otpDev = result['otpDev'] as String?;
+      if (mounted) {
+        await _loadOrderDetails();
+        if (otpDev != null && otpDev.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('OTP sent to customer. Dev OTP: $otpDev'),
+              duration: const Duration(seconds: 8),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('OTP sent to customer.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
+  /// Bottom sheet to capture an issue reason + optional note. Reasons match
+  /// the backend's whitelist (customer_refused | not_reachable | wrong_address |
+  /// damaged | other).
+  Future<void> _showReportIssueSheet(OrderModel order) async {
+    final reasons = const [
+      ('not_reachable', 'Customer not reachable', Icons.phone_disabled),
+      ('customer_refused', 'Customer refused order', Icons.cancel_outlined),
+      ('wrong_address', 'Wrong / unreachable address', Icons.wrong_location),
+      ('damaged', 'Items damaged in transit', Icons.broken_image_outlined),
+      ('other', 'Other', Icons.more_horiz),
+    ];
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('What happened?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            for (final r in reasons)
+              ListTile(
+                leading: Icon(r.$3),
+                title: Text(r.$2),
+                onTap: () => Navigator.pop(sheetCtx, r.$1),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+    if (token == null) return;
+    try {
+      final result = await Provider.of<DeliveryProvider>(context, listen: false)
+          .reportIssue(token: token, orderId: order.id, reason: selected);
+      if (mounted) {
+        await _loadOrderDetails();
+        final next = result['nextAction'] as String?;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next == 'return_to_hub'
+                ? 'Issue logged — return order to hub.'
+                : 'Issue logged — try again later.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    }
+  }
+}
+
+/// Static info banner used when no action is available (waiting / RTO transit).
+class _InfoBanner extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _InfoBanner({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
 }
 

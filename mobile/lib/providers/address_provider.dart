@@ -49,6 +49,23 @@ class AddressProvider extends ChangeNotifier {
   /// Can be different from default — user might select temporarily
   AddressModel? _selectedAddress;
 
+  /// True ONLY when the user explicitly picked an address (tapped a card,
+  /// completed the address sheet, etc). False when the smart-flow auto-selected
+  /// it based on GPS proximity, default address, etc.
+  ///
+  /// Why we need this:
+  ///   The home-screen smart flow (`_initSmartAddressFlow`) re-runs on every
+  ///   home init and can decide "user is far from any saved address" → wipe the
+  ///   selection. That's the right call on first load (user might have travelled),
+  ///   but WRONG after the user has just manually picked. This flag lets the
+  ///   smart flow back off when the user has already taken a stand.
+  ///
+  /// Cleared by:
+  ///   - `clearSelection()` — explicit unset
+  ///   - `reset()` — logout / nuke all state
+  ///   - `deleteAddress()` if the deleted one was the selected
+  bool _manuallySelected = false;
+
   /// Loading state — show shimmer while fetching
   bool _isLoading = false;
 
@@ -64,6 +81,10 @@ class AddressProvider extends ChangeNotifier {
 
   /// Currently selected address
   AddressModel? get selectedAddress => _selectedAddress;
+
+  /// True only when the user has explicitly picked the current selection.
+  /// The home-screen smart flow uses this to back off and not overwrite a manual choice.
+  bool get manuallySelected => _manuallySelected;
 
   /// Is any operation in progress?
   bool get isLoading => _isLoading;
@@ -139,21 +160,34 @@ class AddressProvider extends ChangeNotifier {
   // METHOD 2: Select an address (for delivery)
   // ══════════════════════════════════════════════════
 
-  /// Set which address to deliver to
-  /// This updates the home screen header immediately
+  /// User-driven selection — call this from address-list tap, address-completion-sheet
+  /// save, etc. Sets `_manuallySelected = true` so the home-screen smart flow won't
+  /// overwrite this on its next pass.
   ///
   /// Note: This does NOT change the default address in backend.
   /// It's a temporary selection for this session.
   /// To change default, use setDefault() method.
   void selectAddress(AddressModel address) {
     _selectedAddress = address;
-    debugPrint('📍 [Address] Selected: ${address.tag} - ${address.addressLine1}');
+    _manuallySelected = true;
+    debugPrint('📍 [Address] Selected (manual): ${address.tag} - ${address.addressLine1}');
     notifyListeners(); // Home screen header updates instantly
   }
 
+  /// Smart-flow selection — call this from `_initSmartAddressFlow` and similar
+  /// auto-pick code paths. Does NOT touch `_manuallySelected`, so a previous
+  /// manual pick keeps its sticky status.
+  void autoSelectAddress(AddressModel address) {
+    _selectedAddress = address;
+    debugPrint('📍 [Address] Selected (auto): ${address.tag} - ${address.addressLine1}');
+    notifyListeners();
+  }
+
   /// Clear session selection so UI can show GPS partial only (e.g. >20km from saved).
+  /// Also clears the manual-pick flag — caller is asserting "go back to auto".
   void clearSelection() {
     _selectedAddress = null;
+    _manuallySelected = false;
     notifyListeners();
   }
 
@@ -352,9 +386,11 @@ class AddressProvider extends ChangeNotifier {
         token: token,
       );
 
-      // If deleted address was the selected one, reset selection
+      // If deleted address was the selected one, reset selection.
+      // Also clear the manual-pick flag — the user no longer has a sticky choice.
       if (_selectedAddress?.id == addressId) {
         _selectedAddress = null;
+        _manuallySelected = false;
       }
 
       // Refresh from backend
@@ -450,6 +486,7 @@ class AddressProvider extends ChangeNotifier {
   void reset() {
     _addresses = [];
     _selectedAddress = null;
+    _manuallySelected = false;
     _isLoading = false;
     _error = null;
     notifyListeners();
