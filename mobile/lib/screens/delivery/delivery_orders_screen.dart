@@ -172,6 +172,11 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     final bool showCodBanner = order.isCod && !order.isPaid;
+    // Prefer delivery_status when present — it's more granular than the legacy
+    // customer-facing status (e.g. 'picked', 'arrived', 'payment_pending').
+    final String badgeKey = (order.deliveryStatus as String?) ?? order.status;
+    final String badgeLabel = _humanizeStatus(badgeKey);
+    final Color badgeColor = _getStatusColor(badgeKey);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -221,15 +226,15 @@ class _OrderCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(order.status).withOpacity(0.2),
+                          color: badgeColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          order.statusText,
+                          badgeLabel,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: _getStatusColor(order.status),
+                            color: badgeColor,
                           ),
                         ),
                       ),
@@ -319,20 +324,65 @@ class _OrderCard extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
+      // Legacy Order.status values
       case 'pending':
         return Colors.grey;
       case 'accepted':
+      case 'assigned':
         return Colors.blue;
       case 'preparing':
+      case 'at_store':
         return Colors.orange;
+      case 'picked':
+        return Colors.deepOrange;
       case 'out_for_delivery':
         return Colors.purple;
+      case 'arrived':
+        return Colors.indigo;
+      case 'payment_pending':
+        return const Color(0xFFD32F2F);
       case 'delivered':
         return Colors.green;
       case 'cancelled':
+      case 'rto_pending':
+      case 'rto_completed':
         return Colors.red;
       default:
         return AppTheme.primaryGreen;
+    }
+  }
+
+  /// Human-readable label for either legacy `status` or new `delivery_status`.
+  String _humanizeStatus(String s) {
+    switch (s) {
+      case 'pending':
+        return 'Pending';
+      case 'accepted':
+        return 'Accepted';
+      case 'assigned':
+        return 'Assigned';
+      case 'preparing':
+        return 'Preparing';
+      case 'at_store':
+        return 'At Store';
+      case 'picked':
+        return 'Picked Up';
+      case 'out_for_delivery':
+        return 'Out for Delivery';
+      case 'arrived':
+        return 'Arrived';
+      case 'payment_pending':
+        return 'Awaiting Payment';
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'rto_pending':
+        return 'Return to Hub';
+      case 'rto_completed':
+        return 'Returned';
+      default:
+        return s;
     }
   }
 }

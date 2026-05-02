@@ -22,12 +22,13 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       if (authProvider.accessToken != null) {
         final token = authProvider.accessToken!;
         deliveryProvider.fetchStats(token: token);
         deliveryProvider.fetchOrders(token: token);
-        deliveryProvider.fetchAvailableOrders(token: token); // Fetch available orders
+        deliveryProvider.fetchAvailableOrders(token: token);
+        deliveryProvider.fetchWallet(token: token);
       }
     });
   }
@@ -49,6 +50,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                 deliveryProvider.fetchStats(token: token);
                 deliveryProvider.fetchOrders(token: token);
                 deliveryProvider.fetchAvailableOrders(token: token);
+                deliveryProvider.fetchWallet(token: token);
               }
             },
           ),
@@ -107,12 +109,18 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
             await deliveryProvider.fetchStats(token: token);
             await deliveryProvider.fetchOrders(token: token);
             await deliveryProvider.fetchAvailableOrders(token: token);
+            await deliveryProvider.fetchWallet(token: token);
           }
         },
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // BIG wallet card — first thing the rider sees on dashboard.
+              // Cash-in-hand is the number that matters most: it's what they
+              // owe the company and need to deposit at end of day.
+              _WalletCard(wallet: deliveryProvider.wallet),
+
               // Stats Cards
               if (deliveryProvider.stats != null)
                 Padding(
@@ -612,6 +620,148 @@ class _AvailableOrderCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Big "Cash In Hand" card displayed at the top of the rider dashboard.
+///
+/// Reads `wallet.cashInHandPaise` (paise -> rupees) and shows it large so a
+/// rider glancing at the screen mid-shift can immediately see how much cash
+/// they're carrying. Lifetime collected/deposited shown as small chips below.
+class _WalletCard extends StatelessWidget {
+  final Map<String, dynamic>? wallet;
+  const _WalletCard({required this.wallet});
+
+  @override
+  Widget build(BuildContext context) {
+    final cashPaise = (wallet?['cashInHandPaise'] as num?)?.toInt() ?? 0;
+    final lifetimeCollectedPaise =
+        (wallet?['lifetimeCollectedPaise'] as num?)?.toInt() ?? 0;
+    final lifetimeDepositedPaise =
+        (wallet?['lifetimeDepositedPaise'] as num?)?.toInt() ?? 0;
+
+    String fmt(int paise) {
+      final rupees = paise / 100.0;
+      return NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(rupees);
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1B5E20).withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.account_balance_wallet,
+                  color: Colors.white, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'CASH IN HAND',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            wallet == null ? '—' : fmt(cashPaise),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 44,
+              fontWeight: FontWeight.w900,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Deposit to admin at end of shift',
+            style: TextStyle(
+              color: Color(0xFFC8E6C9),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (wallet != null) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _MiniStat(
+                  label: 'Collected',
+                  value: fmt(lifetimeCollectedPaise),
+                ),
+                const SizedBox(width: 12),
+                _MiniStat(
+                  label: 'Deposited',
+                  value: fmt(lifetimeDepositedPaise),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _MiniStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFFC8E6C9),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),

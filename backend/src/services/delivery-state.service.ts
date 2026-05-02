@@ -100,8 +100,13 @@ export class DeliveryStateService {
       order.deliveryBoy = rider;
       order.deliveryStatus = 'assigned';
       order.deliveryAssignedAt = new Date();
-      // Mirror onto mobile-visible status so the customer sees "accepted" when assigned.
-      if (order.status === 'pending') order.status = 'accepted';
+      // Mirror onto customer-visible status: assignment is when packing starts in
+      // a real warehouse (a rider's been assigned, so the bag gets picked off the
+      // shelf for them). Customer should see "Being prepared" right away rather
+      // than the rider's internal at_store/picked milestones.
+      if (order.status === 'pending' || order.status === 'accepted') {
+        order.status = 'preparing';
+      }
       await orderRepo.save(order);
 
       // Mark rider busy (best-effort).
@@ -197,12 +202,14 @@ export class DeliveryStateService {
   }
 
   static picked(orderId: number, riderId: number) {
+    // No mirror: by the time the rider has the bag, packing is done — flashing
+    // "preparing" to the customer here would actually be backwards. Customer-
+    // visible status flips to 'out_for_delivery' on Start Delivery.
     return this.riderTransition({
       orderId,
       riderId,
       to: 'picked',
       eventType: 'order_picked',
-      mirrorOrderStatus: 'preparing',
       timestampField: 'deliveryPickedAt',
     });
   }

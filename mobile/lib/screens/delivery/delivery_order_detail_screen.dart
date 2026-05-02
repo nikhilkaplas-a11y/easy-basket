@@ -259,6 +259,57 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // BIG COD collect banner — first thing the rider sees on this screen.
+            // Only renders when there is cash to collect. Prepaid orders skip this.
+            if (order.isCod && !order.isPaid)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD32F2F),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.payments_outlined, color: Colors.white, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'COLLECT FROM CUSTOMER',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      currencyFormat.format(order.totalAmount),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'CASH ON DELIVERY',
+                      style: TextStyle(
+                        color: Color(0xFFFFCDD2),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Status Card
             Container(
               width: double.infinity,
@@ -282,6 +333,25 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (order.isCod && order.isPaid) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'CASH COLLECTED',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2E7D32),
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -582,13 +652,13 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
               ),
             ),
 
-            // Action Buttons
+            // Action Buttons — always state-machine flow (legacy 3-button fork removed).
+            // Orders with delivery_status=null fall through to the "Waiting for admin"
+            // banner inside _buildStateMachineActions until backfill SQL runs on prod.
             if (order.status != 'delivered' && order.status != 'cancelled')
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: order.deliveryStatus != null
-                    ? _buildStateMachineActions(order)
-                    : _buildLegacyActions(order),
+                child: _buildStateMachineActions(order),
               ),
 
             const SizedBox(height: 16),
@@ -621,43 +691,6 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
   // ═════════════════════════════════════════════════════════════════════════
   // Action buttons
   // ═════════════════════════════════════════════════════════════════════════
-
-  /// Pre-migration / legacy orders (no `delivery_status` column populated).
-  /// Keep the original three-step flow so old in-flight orders don't break.
-  Widget _buildLegacyActions(OrderModel order) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (order.status == 'accepted')
-          ElevatedButton(
-            onPressed: () => _updateStatus('preparing'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: const Text('Start Preparing'),
-          ),
-        if (order.status == 'preparing')
-          ElevatedButton(
-            onPressed: () => _updateStatus('out_for_delivery'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: const Text('Mark as Out for Delivery'),
-          ),
-        if (order.status == 'out_for_delivery')
-          ElevatedButton(
-            onPressed: () => _updateStatus('delivered'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: const Text('Mark as Delivered'),
-          ),
-      ],
-    );
-  }
 
   /// Phase 1 state-machine actions. Each transition button is gated on the
   /// order's current `deliveryStatus` so only the legal next step is shown
