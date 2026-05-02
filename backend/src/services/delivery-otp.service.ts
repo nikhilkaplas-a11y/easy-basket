@@ -48,6 +48,15 @@ export class DeliveryOtpService {
    *   valid for ANY order. Use this ONLY while the SMS/FCM OTP delivery channel
    *   is offline. Remove the env var once SMS is wired (do NOT ship to production
    *   with this enabled long-term — anyone with rider creds could fake-deliver).
+   *
+   * TODO (at launch): swap this whole service to TwilioService (the same Twilio
+   * Verify integration used for login OTP). Steps:
+   *   1. Replace generateForOrder body with TwilioService.sendVerification(customer.phoneNumber).
+   *   2. Replace this verify body with TwilioService.checkVerification(customer.phoneNumber, code).
+   *   3. Drop `delivery_otp_hash` column + Redis key — Twilio holds state for us.
+   *   4. Remove FCM OTP push from delivery-state.service (SMS replaces it).
+   *   5. Unset DELIVERY_OTP_BYPASS_CODE on prod (or gate it behind NODE_ENV !== 'production').
+   * Kept bypass-only ('123456') for now to save SMS cost during dev/QA.
    */
   static async verify(orderId: number, code: string): Promise<boolean> {
     if (!/^\d{6}$/.test(code)) return false;
