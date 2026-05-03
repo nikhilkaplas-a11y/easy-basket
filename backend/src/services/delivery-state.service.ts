@@ -215,13 +215,13 @@ export class DeliveryStateService {
   }
 
   /**
-   * Start delivery: generate OTP, flip status to out_for_delivery, push OTP to customer.
-   * Returns the plaintext OTP for dev/test visibility; production clients should ignore it.
+   * Start delivery: flip status to out_for_delivery, send OTP to customer
+   * via Twilio SMS (same provider as login OTP). No FCM push for OTP — SMS only.
    */
   static async startDelivery(
     orderId: number,
     riderId: number
-  ): Promise<DeliveryTransitionResult & { otpDev?: string }> {
+  ): Promise<DeliveryTransitionResult> {
     const result = await this.riderTransition({
       orderId,
       riderId,
@@ -231,15 +231,13 @@ export class DeliveryStateService {
     });
     if (!result.ok) return result;
 
-    // OTP generation outside the transaction — Redis write isn't part of DB commit.
-    const otp = await DeliveryOtpService.generateForOrder(orderId);
-    notifyCustomerOtp(result.order, otp).catch(() => undefined);
-
-    const out: DeliveryTransitionResult & { otpDev?: string } = result;
-    if (process.env.NODE_ENV !== 'production') {
-      out.otpDev = otp;
-    }
-    return out;
+    // SMS dispatch lives outside the DB transaction — Twilio call is best-effort
+    // from the rider's POV. Bypass code (DELIVERY_OTP_BYPASS_CODE) still works
+    // at verify-time even if Twilio is offline, so dev/QA isn't blocked.
+    DeliveryOtpService.generateForOrder(orderId).catch((err) =>
+      console.error(`[delivery] SMS OTP send failed for order ${orderId}`, err)
+    );
+    return result;
   }
 
   /**
@@ -562,25 +560,6 @@ async function notifyRiderAssignment(rider: User, order: Order): Promise<void> {
         rider.id
       ),
     `rider-assign #${oid}`
-  );
-}
-
-async function notifyCustomerOtp(order: Order, otp: string): Promise<void> {
-  if (!order.user?.fcmToken) return;
-  const token = order.user.fcmToken;
-  const oid = order.id;
-  const customerId = order.user.id;
-  FCMService.enqueue(
-    () =>
-      FCMService.sendNotification(
-        token,
-        '🔐 Delivery OTP',
-        `Your delivery OTP for order #${oid} is ${otp}. Share only with our delivery partner.`,
-        { orderId: String(oid), otp, type: 'delivery_otp' },
-        `delivery-otp order=#${oid} customerId=${customerId}`,
-        customerId
-      ),
-    `delivery-otp #${oid}`
   );
 }
 

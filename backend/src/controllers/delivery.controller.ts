@@ -464,11 +464,8 @@ export class DeliveryController {
         res.status(result.code).json({ message: result.reason });
         return;
       }
-      const payload: { deliveryStatus: string | null; otpDev?: string } = {
-        deliveryStatus: result.order.deliveryStatus,
-      };
-      if (result.otpDev) payload.otpDev = result.otpDev;
-      res.json(payload);
+      // OTP is sent via Twilio SMS; nothing useful to return to the rider here.
+      res.json({ deliveryStatus: result.order.deliveryStatus });
     } catch (error) {
       console.error('[delivery] startDelivery error', error);
       res.status(500).json({ message: 'Error starting delivery' });

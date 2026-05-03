@@ -824,29 +824,18 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
     }
   }
 
-  /// Special wrapper for start-delivery — surfaces the dev OTP in the snackbar
-  /// in non-production so testing without SMS is possible.
+  /// Wrapper for start-delivery. OTP is sent via Twilio SMS by the backend.
   Future<void> _runStartDelivery(OrderModel order) async {
     final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
     if (token == null) return;
     try {
-      final result = await Provider.of<DeliveryProvider>(context, listen: false)
+      await Provider.of<DeliveryProvider>(context, listen: false)
           .startDelivery(token: token, orderId: order.id);
-      final otpDev = result['otpDev'] as String?;
       if (mounted) {
         await _loadOrderDetails();
-        if (otpDev != null && otpDev.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('OTP sent to customer. Dev OTP: $otpDev'),
-              duration: const Duration(seconds: 8),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('OTP sent to customer.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP sent to customer via SMS.')),
+        );
       }
     } catch (e) {
       if (mounted) {
