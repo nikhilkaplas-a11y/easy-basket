@@ -28,10 +28,19 @@ class DeliveryCodCollectScreen extends StatefulWidget {
   State<DeliveryCodCollectScreen> createState() => _DeliveryCodCollectScreenState();
 }
 
-class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen> {
+class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
+    with SingleTickerProviderStateMixin {
   OrderModel? _order;
   bool _isLoadingOrder = true;
   bool _isSubmitting = false;
+
+  // Success-view state. Once true, the form disappears, success view shows
+  // for 3s, then we go(/delivery/dashboard) — go() replaces the stack so the
+  // rider can't navigate back into the OTP form to re-submit and double-credit.
+  bool _isCompleted = false;
+  double _completedAmount = 0;
+  late final AnimationController _checkController;
+  late final Animation<double> _checkScale;
 
   // 6 single-digit boxes — easier to type with one thumb than a 6-char field.
   final List<TextEditingController> _otpControllers =
@@ -41,11 +50,17 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen> {
   @override
   void initState() {
     super.initState();
+    _checkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _checkScale = CurvedAnimation(parent: _checkController, curve: Curves.elasticOut);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrder());
   }
 
   @override
   void dispose() {
+    _checkController.dispose();
     for (final c in _otpControllers) {
       c.dispose();
     }
@@ -102,18 +117,19 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen> {
         otp: otp,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Payment collected. Order delivered.'),
-          backgroundColor: Color(0xFF2E7D32),
-        ),
-      );
-      // Pop back to detail/list — caller will refresh on focus.
-      if (context.canPop()) {
-        context.pop(true);
-      } else {
-        context.go('/delivery/dashboard');
-      }
+      // Take over the screen with a success view so the rider can't tap
+      // "Payment Collected" twice and double-credit. After 3s we go() to the
+      // dashboard — go() replaces the stack so back-button can't return here.
+      setState(() {
+        _isCompleted = true;
+        _completedAmount = order.totalAmount;
+        _isSubmitting = false;
+      });
+      _checkController.forward();
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) context.go('/delivery/dashboard');
+      });
+      return;
     } catch (e) {
       if (!mounted) return;
       // Clear the OTP on failure so the rider doesn't accidentally retry the same wrong code.
@@ -250,6 +266,14 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isCompleted) {
+      // Form is gone, OTP boxes unreachable, amount + auto-redirect visible.
+      // PopScope blocks back-button so rider can't bounce back to the form.
+      return PopScope(
+        canPop: false,
+        child: _buildSuccessView(),
+      );
+    }
     if (_isLoadingOrder) {
       return Scaffold(
         appBar: AppBar(title: const Text('Collect Cash')),
@@ -431,6 +455,70 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen> {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Full-screen success takeover shown for ~3s after a successful collection.
+  /// Mirrors the customer-side "Order Placed!" pattern so it feels familiar.
+  Widget _buildSuccessView() {
+    final amountStr =
+        NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(_completedAmount);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ScaleTransition(
+                  scale: _checkScale,
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    size: 96,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Delivery Completed',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$amountStr collected in cash',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Wallet has been credited',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                ),
+                const SizedBox(height: 28),
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Returning to dashboard…',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                ),
+              ],
+            ),
           ),
         ),
       ),

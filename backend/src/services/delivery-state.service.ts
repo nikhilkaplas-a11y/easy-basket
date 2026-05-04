@@ -1,4 +1,3 @@
-import { EntityManager } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
 import { User } from '../entities/User';
@@ -329,6 +328,15 @@ export class DeliveryStateService {
       if (!order) return err(404, 'Order not found');
 
       const from = (order.deliveryStatus ?? null) as DeliveryStatus | null;
+
+      // Idempotency / double-credit guard: if the order is already delivered
+      // OR already paid (e.g. customer slipped through "Switch to UPI" while
+      // the rider was typing OTP), short-circuit BEFORE crediting the wallet.
+      // canTransition treats 'delivered' -> 'delivered' as a legal no-op, so
+      // without this check a stale-data retry would credit cash_in_hand twice.
+      if (from === 'delivered' || order.isPaid) {
+        return err(409, 'Order already delivered or paid');
+      }
       if (!this.canTransition(from, 'delivered')) {
         return err(409, `Illegal transition ${from} → delivered`);
       }
