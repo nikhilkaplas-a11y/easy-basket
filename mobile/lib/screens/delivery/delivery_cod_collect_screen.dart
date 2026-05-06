@@ -110,16 +110,26 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
 
     setState(() => _isSubmitting = true);
     try {
-      await Provider.of<DeliveryProvider>(context, listen: false).collectCash(
-        token: token,
-        orderId: order.id,
-        amountPaise: (order.totalAmount * 100).round(),
-        otp: otp,
-      );
+      // Branch on payment method: COD goes through collect-cash (verifies amount,
+      // credits wallet); prepaid goes through mark-prepaid-delivered (just OTP gate).
+      if (order.isCod) {
+        await Provider.of<DeliveryProvider>(context, listen: false).collectCash(
+          token: token,
+          orderId: order.id,
+          amountPaise: (order.totalAmount * 100).round(),
+          otp: otp,
+        );
+      } else {
+        await Provider.of<DeliveryProvider>(context, listen: false).markPrepaidDelivered(
+          token: token,
+          orderId: order.id,
+          otp: otp,
+        );
+      }
       if (!mounted) return;
-      // Take over the screen with a success view so the rider can't tap
-      // "Payment Collected" twice and double-credit. After 3s we go() to the
-      // dashboard — go() replaces the stack so back-button can't return here.
+      // Take over the screen with a success view so the rider can't tap the
+      // button twice. After 3s we go() to the dashboard — go() replaces the
+      // stack so back-button can't return here.
       setState(() {
         _isCompleted = true;
         _completedAmount = order.totalAmount;
@@ -289,12 +299,17 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
     }
 
     final amountStr = NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(order.totalAmount);
+    // Theme: red for COD (collect cash), green for prepaid (just verify).
+    final bool isCod = order.isCod;
+    final accent = isCod ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32);
+    final accentTint = isCod ? const Color(0xFFFFF5F5) : const Color(0xFFF1F8E9);
+    final accentLight = isCod ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF5F5),
+      backgroundColor: accentTint,
       appBar: AppBar(
         title: Text('Order #${order.id}'),
-        backgroundColor: const Color(0xFFD32F2F),
+        backgroundColor: accent,
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
@@ -307,8 +322,8 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: const Color(0xFFFFEBEE),
-                    foregroundColor: const Color(0xFFD32F2F),
+                    backgroundColor: accentLight,
+                    foregroundColor: accent,
                     child: Text(
                       (order.user.name ?? '#').characters.first.toUpperCase(),
                       style: const TextStyle(fontWeight: FontWeight.w800),
@@ -338,15 +353,15 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
               ),
               const SizedBox(height: 28),
 
-              // The "collect" callout — huge font, undeniable.
+              // Headline callout — COD shows "COLLECT ₹X", prepaid shows "PREPAID — verify OTP"
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD32F2F),
+                  color: accent,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFD32F2F).withValues(alpha: 0.3),
+                      color: accent.withValues(alpha: 0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -354,9 +369,9 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
                 ),
                 child: Column(
                   children: [
-                    const Text(
-                      'COLLECT',
-                      style: TextStyle(
+                    Text(
+                      isCod ? 'COLLECT' : 'PREPAID — VERIFY',
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Colors.white70,
                         fontWeight: FontWeight.w800,
@@ -365,9 +380,9 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      amountStr,
-                      style: const TextStyle(
-                        fontSize: 56,
+                      isCod ? amountStr : 'OTP CHECK',
+                      style: TextStyle(
+                        fontSize: isCod ? 56 : 38,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         height: 1.1,
@@ -375,7 +390,10 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'in cash from ${order.user.name ?? 'customer'}',
+                      isCod
+                          ? 'in cash from ${order.user.name ?? 'customer'}'
+                          : 'Order is paid online ($amountStr) — confirm with OTP',
+                      textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 14, color: Colors.white70),
                     ),
                   ],
@@ -400,7 +418,7 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
               ),
               const SizedBox(height: 28),
 
-              // Primary action
+              // Primary action — label changes based on payment method.
               SizedBox(
                 height: 60,
                 child: ElevatedButton.icon(
@@ -411,9 +429,13 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
                           height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.payments_outlined, size: 24),
+                      : Icon(
+                          isCod ? Icons.payments_outlined : Icons.check_circle_outline,
+                          size: 24),
                   label: Text(
-                    _isSubmitting ? 'Verifying…' : 'Payment Collected',
+                    _isSubmitting
+                        ? 'Verifying…'
+                        : (isCod ? 'Payment Collected' : 'Mark Delivered'),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -425,21 +447,24 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
               ),
               const SizedBox(height: 12),
 
-              // Secondary actions
+              // Secondary actions: "Switch to UPI" only relevant for COD
+              // (prepaid is already paid online — no fallback needed).
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isSubmitting ? null : _switchToUpi,
-                      icon: const Icon(Icons.qr_code_scanner, size: 20),
-                      label: const Text('Switch to UPI'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  if (isCod) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isSubmitting ? null : _switchToUpi,
+                        icon: const Icon(Icons.qr_code_scanner, size: 20),
+                        label: const Text('Switch to UPI'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
+                    const SizedBox(width: 10),
+                  ],
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _isSubmitting ? null : _reportIssue,
@@ -466,6 +491,7 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
   Widget _buildSuccessView() {
     final amountStr =
         NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(_completedAmount);
+    final wasCod = _order?.isCod ?? true;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -494,13 +520,13 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$amountStr collected in cash',
+                  wasCod ? '$amountStr collected in cash' : 'Order delivered ($amountStr prepaid)',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 15, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Wallet has been credited',
+                  wasCod ? 'Wallet has been credited' : 'Customer has received the order',
                   style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                 ),
                 const SizedBox(height: 28),

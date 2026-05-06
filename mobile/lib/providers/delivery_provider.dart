@@ -217,6 +217,24 @@ class DeliveryProvider with ChangeNotifier {
     return _postTransition(token: token, orderId: orderId, verb: 'collect-cash', body: body);
   }
 
+  /// Mark a PREPAID order delivered after verifying the customer's OTP.
+  /// Returns `{ deliveryStatus }`. No wallet credit (no cash exchanged).
+  Future<Map<String, dynamic>> markPrepaidDelivered({
+    required String token,
+    required int orderId,
+    required String otp,
+    double? lat,
+    double? lng,
+  }) {
+    final body = <String, dynamic>{'otp': otp};
+    if (lat != null && lng != null) {
+      body['lat'] = lat;
+      body['lng'] = lng;
+    }
+    return _postTransition(
+        token: token, orderId: orderId, verb: 'mark-prepaid-delivered', body: body);
+  }
+
   /// Generate a fresh Razorpay order at the door so the customer can pay UPI/QR
   /// instead of cash. Returns `{ razorpayOrderId, amountPaise, key }`.
   Future<Map<String, dynamic>> switchToUpi({required String token, required int orderId}) =>

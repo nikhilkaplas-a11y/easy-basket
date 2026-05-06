@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/order_model.dart';
 import '../../utils/theme.dart';
 import '../../utils/date_utils.dart';
 import 'package:intl/intl.dart';
@@ -15,22 +16,34 @@ class DeliveryDashboardScreen extends StatefulWidget {
   State<DeliveryDashboardScreen> createState() => _DeliveryDashboardScreenState();
 }
 
-class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
+class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    // Rebuild on tab change so the list below the bar swaps without animating.
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       if (authProvider.accessToken != null) {
         final token = authProvider.accessToken!;
-        deliveryProvider.fetchStats(token: token);
         deliveryProvider.fetchOrders(token: token);
-        deliveryProvider.fetchAvailableOrders(token: token);
         deliveryProvider.fetchWallet(token: token);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -47,9 +60,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
             onPressed: () {
               final token = authProvider.accessToken;
               if (token != null) {
-                deliveryProvider.fetchStats(token: token);
                 deliveryProvider.fetchOrders(token: token);
-                deliveryProvider.fetchAvailableOrders(token: token);
                 deliveryProvider.fetchWallet(token: token);
               }
             },
@@ -106,296 +117,120 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
         onRefresh: () async {
           final token = authProvider.accessToken;
           if (token != null) {
-            await deliveryProvider.fetchStats(token: token);
             await deliveryProvider.fetchOrders(token: token);
-            await deliveryProvider.fetchAvailableOrders(token: token);
             await deliveryProvider.fetchWallet(token: token);
           }
         },
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // BIG wallet card — first thing the rider sees on dashboard.
-              // Cash-in-hand is the number that matters most: it's what they
-              // owe the company and need to deposit at end of day.
-              _WalletCard(wallet: deliveryProvider.wallet),
+        child: _buildBody(deliveryProvider),
+      ),
+    );
+  }
 
-              // Stats Cards
-              if (deliveryProvider.stats != null)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.2,
-                    children: [
-                      _StatCard(
-                        title: 'Total Deliveries',
-                        value: '${deliveryProvider.stats!['total'] ?? 0}',
-                        icon: Icons.local_shipping,
-                        color: AppTheme.primaryGreen,
-                      ),
-                      _StatCard(
-                        title: 'Pending',
-                        value: '${deliveryProvider.stats!['pending'] ?? 0}',
-                        icon: Icons.pending,
-                        color: Colors.orange,
-                      ),
-                      _StatCard(
-                        title: 'Today',
-                        value: '${deliveryProvider.stats!['today'] ?? 0}',
-                        icon: Icons.today,
-                        color: Colors.blue,
-                      ),
-                      _StatCard(
-                        title: 'Completed',
-                        value: '${deliveryProvider.stats!['completed'] ?? 0}',
-                        icon: Icons.check_circle,
-                        color: Colors.green,
-                      ),
-                    ],
-                  ),
-                ),
-              
-              // Quick Actions
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+  /// Body: wallet card → tab bar (Current | Past) → top-3 orders for the
+  /// selected tab → "View All" link. Whole thing scrolls as a single column;
+  /// each tab swaps the list inline rather than using a TabBarView so the
+  /// wallet card stays sticky at the top of the scroll.
+  Widget _buildBody(DeliveryProvider deliveryProvider) {
+    final all = deliveryProvider.orders;
+    final isPastTab = _tabController.index == 1;
+
+    bool isPast(OrderModel o) {
+      final ds = o.deliveryStatus;
+      if (ds == 'delivered' || ds == 'rto_completed') return true;
+      // Fallback for orders that never entered the new state machine.
+      if (o.status == 'delivered' || o.status == 'cancelled') return true;
+      return false;
+    }
+
+    final filtered = all.where((o) => isPastTab ? isPast(o) : !isPast(o)).toList();
+    final shown = filtered.take(3).toList();
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _WalletCard(wallet: deliveryProvider.wallet),
+          const SizedBox(height: 8),
+
+          // Tabs
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F8E9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: AppTheme.primaryGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppTheme.primaryGreen,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              tabs: const [
+                Tab(text: 'Current Orders'),
+                Tab(text: 'Past Orders'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // List body
+          if (deliveryProvider.isLoading && all.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(40),
+              child: Center(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Quick Actions',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Icon(
+                      isPastTab ? Icons.history : Icons.inbox_outlined,
+                      size: 56,
+                      color: Colors.grey.shade300,
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActionCard(
-                            title: 'New Orders',
-                            icon: Icons.add_shopping_cart,
-                            color: AppTheme.primaryGreen,
-                            onTap: () => context.push('/delivery/orders?status=accepted'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _ActionCard(
-                            title: 'Out for Delivery',
-                            icon: Icons.delivery_dining,
-                            color: Colors.orange,
-                            onTap: () => context.push('/delivery/orders?status=out_for_delivery'),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      isPastTab ? 'No past deliveries yet' : 'No active orders',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                     ),
                   ],
                 ),
               ),
-              
-              const SizedBox(height: 24),
-              
-              // Available Orders (Unassigned)
-              if (deliveryProvider.availableOrders.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Available Orders',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${deliveryProvider.availableOrders.length}',
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: deliveryProvider.availableOrders.length > 3 ? 3 : deliveryProvider.availableOrders.length,
-                        itemBuilder: (context, index) {
-                          final order = deliveryProvider.availableOrders[index];
-                          return _AvailableOrderCard(order: order);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              
-              const SizedBox(height: 24),
-              
-              // Recent Orders
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Recent Orders',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => context.push('/delivery/orders'),
-                      child: const Text('View All'),
-                    ),
-                  ],
-                ),
-              ),
-              
-              if (deliveryProvider.isLoading && deliveryProvider.orders.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (deliveryProvider.orders.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(Icons.inbox, size: 64, color: AppTheme.grey),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No orders assigned',
-                          style: TextStyle(color: AppTheme.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: deliveryProvider.orders.length > 5 ? 5 : deliveryProvider.orders.length,
-                  itemBuilder: (context, index) {
-                    final order = deliveryProvider.orders[index];
-                    return _OrderCard(order: order);
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: shown.length,
+              itemBuilder: (context, i) => _OrderCard(order: shown[i]),
+            ),
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
+          // View all (only when there are more than 3)
+          if (filtered.length > 3)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => context.push('/delivery/orders'),
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: Text('View all (${filtered.length})'),
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
-class _ActionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -521,110 +356,6 @@ class _OrderCard extends StatelessWidget {
       default:
         return AppTheme.primaryGreen;
     }
-  }
-}
-
-class _AvailableOrderCard extends StatelessWidget {
-  final dynamic order;
-
-  const _AvailableOrderCard({required this.order});
-
-  @override
-  Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
-    final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.orange.withOpacity(0.05),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Order #${order.id}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    order.statusText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.orange,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Customer: ${order.user.name ?? order.user.phoneNumber}',
-              style: TextStyle(fontSize: 14, color: AppTheme.grey),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${order.deliveryAddress.addressLine1}, ${order.deliveryAddress.city}',
-              style: TextStyle(fontSize: 12, color: AppTheme.grey),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  currencyFormat.format(order.totalAmount),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    if (authProvider.accessToken != null) {
-                      final success = await deliveryProvider.acceptOrder(
-                        token: authProvider.accessToken!,
-                        orderId: order.id,
-                      );
-                      if (success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Order accepted successfully!')),
-                        );
-                      } else if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(deliveryProvider.error ?? 'Failed to accept order')),
-                        );
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.check, size: 18),
-                  label: const Text('Accept Order'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

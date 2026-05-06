@@ -40,50 +40,6 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
     });
   }
 
-  Future<void> _updateStatus(String status) async {
-    final deliveryProvider = Provider.of<DeliveryProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    if (authProvider.accessToken == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Update Status to ${status.replaceAll('_', ' ').toUpperCase()}?'),
-        content: const Text('This will notify the customer about the status change.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final success = await deliveryProvider.updateOrderStatus(
-        token: authProvider.accessToken!,
-        orderId: widget.orderId,
-        status: status,
-      );
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Status updated successfully!')),
-        );
-        await _loadOrderDetails();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(deliveryProvider.error ?? 'Failed to update status')),
-        );
-      }
-    }
-  }
-
   Future<void> _openNavigation() async {
     if (_order == null) return;
 
@@ -778,10 +734,12 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
             )
           else
             bigButton(
-              label: 'Mark Delivered',
+              label: 'Verify OTP & Deliver',
               icon: Icons.check_circle_outline,
               color: Colors.green.shade600,
-              onPressed: () => _updateStatus('delivered'), // prepaid uses legacy path for now
+              // Same screen as COD; it self-detects prepaid via order.isCod
+              // and switches the API call + UI accents.
+              onPressed: () => context.push('/delivery/cod/${order.id}'),
             ),
         ],
         if (ds == 'rto_pending')

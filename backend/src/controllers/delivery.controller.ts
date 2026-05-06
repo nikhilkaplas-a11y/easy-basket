@@ -553,6 +553,45 @@ export class DeliveryController {
     }
   }
 
+  static async markPrepaidDelivered(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const riderId = req.user?.id;
+      if (!riderId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const orderId = Number(req.params.id);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      const { otp, lat, lng } = req.body as {
+        otp?: string;
+        lat?: number;
+        lng?: number;
+      };
+      if (!otp) {
+        res.status(400).json({ message: 'otp is required' });
+        return;
+      }
+      const gps = typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : undefined;
+      const result = await DeliveryStateService.markPrepaidDelivered({
+        orderId,
+        riderId,
+        otp,
+        gps,
+      });
+      if (!result.ok) {
+        res.status(result.code).json({ message: result.reason });
+        return;
+      }
+      res.json({ deliveryStatus: result.order.deliveryStatus });
+    } catch (error) {
+      console.error('[delivery] markPrepaidDelivered error', error);
+      res.status(500).json({ message: 'Error marking delivered' });
+    }
+  }
+
   static async switchToUpi(req: AuthRequest, res: Response): Promise<void> {
     try {
       const riderId = req.user?.id;

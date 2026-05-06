@@ -26,6 +26,7 @@ router.post('/orders/:id/picked', DeliveryController.picked);
 router.post('/orders/:id/start-delivery', DeliveryController.startDelivery);
 router.post('/orders/:id/arrived', DeliveryController.arrived);
 router.post('/orders/:id/collect-cash', DeliveryController.collectCash);
+router.post('/orders/:id/mark-prepaid-delivered', DeliveryController.markPrepaidDelivered);
 router.post('/orders/:id/switch-to-upi', DeliveryController.switchToUpi);
 router.post('/orders/:id/report-issue', DeliveryController.reportIssue);
 

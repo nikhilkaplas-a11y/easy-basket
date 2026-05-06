@@ -382,6 +382,98 @@ export class DeliveryStateService {
   }
 
   /**
+   * Mark a PREPAID order delivered. Mirrors collectCash but:
+   *   - no amount-match check (no cash exchanged)
+   *   - no wallet credit
+   *   - rejects COD orders (those go through collectCash)
+   *
+   * Same OTP gate as COD — without it, a malicious rider could mark every
+   * prepaid bag "delivered" from the parking lot. The customer's OTP is the
+   * proof they actually received the bag.
+   */
+  static async markPrepaidDelivered(params: {
+    orderId: number;
+    riderId: number;
+    otp: string;
+    gps?: { lat: number; lng: number };
+  }): Promise<DeliveryTransitionResult> {
+    const expectedOrder = await AppDataSource.getRepository(Order).findOne({
+      where: { id: params.orderId },
+      relations: ['deliveryBoy', 'user'],
+    });
+    if (!expectedOrder) return err(404, 'Order not found');
+    if (!expectedOrder.deliveryBoy || expectedOrder.deliveryBoy.id !== params.riderId) {
+      return err(403, 'Order not assigned to you');
+    }
+    if (expectedOrder.paymentMethod?.toLowerCase() === 'cash') {
+      return err(400, 'COD orders must use collect-cash');
+    }
+    if (!expectedOrder.isPaid) {
+      // Prepaid means already paid online. If isPaid is false the customer
+      // never completed payment — sending them down this path would close the
+      // order without payment ever landing.
+      return err(409, 'Order is not paid yet — wait for payment to confirm');
+    }
+
+    const otpOk = await DeliveryOtpService.verify(params.orderId, params.otp);
+    if (!otpOk) {
+      await OrderEventsService.log({
+        orderId: params.orderId,
+        actorUserId: params.riderId,
+        actorRole: 'delivery',
+        eventType: 'otp_verification_failed',
+        payload: { gps: params.gps ?? null, flow: 'prepaid' },
+      });
+      return err(401, 'OTP is invalid or expired');
+    }
+
+    return AppDataSource.manager.transaction(async (em) => {
+      const orderRepo = em.getRepository(Order);
+      const order = await orderRepo.findOne({
+        where: { id: params.orderId },
+        relations: ['user', 'deliveryBoy'],
+      });
+      if (!order) return err(404, 'Order not found');
+
+      const from = (order.deliveryStatus ?? null) as DeliveryStatus | null;
+      // Idempotency: don't re-close an already-closed order.
+      if (from === 'delivered') {
+        return err(409, 'Order already delivered');
+      }
+      if (!this.canTransition(from, 'delivered')) {
+        return err(409, `Illegal transition ${from} → delivered`);
+      }
+
+      order.deliveryStatus = 'delivered';
+      order.status = 'delivered';
+      order.deliveryCompletedAt = new Date();
+      await orderRepo.save(order);
+
+      await OrderEventsService.log(
+        {
+          orderId: order.id,
+          actorUserId: params.riderId,
+          actorRole: 'delivery',
+          eventType: 'prepaid_delivered',
+          fromState: from ?? null,
+          toState: 'delivered',
+          payload: { gps: params.gps ?? null },
+        },
+        em
+      );
+
+      // Bump rider stats (best effort; not COD-specific so only the lifetime counter).
+      await em
+        .getRepository(RiderProfile)
+        .increment({ userId: params.riderId }, 'totalDeliveries', 1)
+        .catch(() => undefined);
+
+      notifyCustomerDelivered(order).catch(() => undefined);
+      return { ok: true, order };
+    });
+  }
+
+  /**
    * Rider chooses "Switch to UPI" at the door — generate a fresh Razorpay order the
    * customer can pay via QR / link. Once the webhook lands, the existing payments flow
    * promotes the order. We don't transition to delivered here — the rider still taps

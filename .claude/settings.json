@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Read(//d/easy/kaplas-website/**)",
+      "PowerShell(Get-ChildItem D:\\\\easy\\\\kaplas-website\\\\src -Recurse -File | ForEach-Object { $_.FullName.Replace\\('D:\\\\easy\\\\kaplas-website\\\\', ''\\) })"
+    ],
+    "additionalDirectories": [
+      "D:\\easy\\kaplas-website\\src\\lib",
+      "D:\\easy\\kaplas-website\\src\\components\\ui",
+      "D:\\easy\\kaplas-website\\src\\components\\layout",
+      "D:\\easy\\kaplas-website\\src\\app",
+      "D:\\easy\\kaplas-website\\src\\components\\sections"
     ]
   }
 }
