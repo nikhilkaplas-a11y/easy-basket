@@ -122,7 +122,7 @@ export default function AboutPage() {
                   Engineering Manager · Payments &amp; Wallet Platform
                 </p>
                 <p className="mt-5 text-[15px] leading-relaxed text-[#8B91A1]">
-                  Seven years of engineering across Josh Technology, Amazon, and Zupee —
+                  Eight years of engineering across Josh Technology, Amazon, and Zupee —
                   with a sharp focus on payments, distributed systems, and high-availability
                   infrastructure. Currently mentoring a 20-engineer team while running
                   Kaplas Technology on the side.

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Easy Basket — Case Study · Kaplas Technologies</title>
+<meta name="description" content="How Kaplas built Easy Basket — three apps, real-time tracking, COD reconciliation, and OTP-verified delivery. 240 orders/day, 99.4% OTP success, 22-min avg fulfillment.">
+<meta name="theme-color" content="#05070D">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+(function(){try{var s=localStorage.getItem('kaplas-theme');var l=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches;if((s||(l?'light':'dark'))==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();
+</script>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<header class="navbar">
+  <nav class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <img src="assets/logo.png" alt="" width="32" height="32">
+      <span class="nav-logo-text"><span class="nav-logo-name">KAPLAS</span><span class="nav-logo-sub">TECHNOLOGIES</span></span>
+    </a>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html#services">Services</a>
+      <a class="nav-link active" href="index.html#work">Work</a>
+      <a class="nav-link" href="index.html#process">Process</a>
+      <a class="nav-link" href="index.html#tiers">Engagement</a>
+      <a class="nav-link" href="index.html#team">Team</a>
+      <a class="nav-link" href="training.html">Training</a>
+    </div>
+    <a href="index.html#contact" class="btn btn-primary btn-sm btn-arrow btn-magnetic nav-cta">Book a call
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
+    <button class="menu-toggle" aria-label="Toggle menu"></button>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </nav>
+  <div class="mobile-menu">
+    <a class="nav-link" href="index.html#services">Services</a>
+    <a class="nav-link" href="index.html#work">Work</a>
+    <a class="nav-link" href="index.html#process">Process</a>
+    <a class="nav-link" href="index.html#tiers">Engagement</a>
+    <a class="nav-link" href="index.html#team">Team</a>
+    <a class="nav-link" href="training.html">Training</a>
+    <a href="index.html#contact" class="btn btn-primary btn-arrow">Book a call</a>
+  </div>
+</header>
+
+<!-- PAGE HERO -->
+<section class="page-hero" id="top">
+  <div class="mesh-bg"></div>
+  <div class="grid-bg"></div>
+  <div class="dots-bg"></div>
+  <div class="beam-sweep"></div>
+  <div class="container container-narrow" style="position:relative;z-index:2;">
+    <span class="eyebrow">Case Study · Live in production</span>
+    <h1><span class="text-gradient">Easy Basket.</span><br><span class="text-gradient-primary italic-display">Hyperlocal grocery, end-to-end.</span></h1>
+    <p>Three apps, one backend, real-time tracking, COD reconciliation, and OTP-verified delivery — designed and shipped by Kaplas Technologies.</p>
+    <a href="index.html" class="page-back">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to home
+    </a>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="container">
+  <div class="cs-stats reveal">
+    <div class="cs-stat"><div class="cs-stat-val" data-count="240+">0</div><div class="cs-stat-lbl">Orders / day</div></div>
+    <div class="cs-stat"><div class="cs-stat-val" data-count="22m">0</div><div class="cs-stat-lbl">Avg delivery</div></div>
+    <div class="cs-stat"><div class="cs-stat-val" data-count="99.4%">0</div><div class="cs-stat-lbl">OTP success</div></div>
+    <div class="cs-stat"><div class="cs-stat-val" data-count="3">0</div><div class="cs-stat-lbl">Apps shipped</div></div>
+  </div>
+</section>
+
+<!-- THE BRIEF -->
+<section>
+  <div class="container">
+    <div class="cs-block reveal">
+      <span class="eyebrow">The brief</span>
+      <h2 style="margin-top:18px;"><span class="text-gradient-primary italic-display">A delivery platform built for tier-2 India.</span></h2>
+      <p>Build a hyperlocal grocery delivery platform from scratch — designed for tier-2 Indian cities, with strong COD support, multilingual interfaces, and reliable delivery in patchy-network areas.</p>
+      <p>The catch: ship three coordinated apps (customer, rider, merchant) and a backend that holds them all together — without burning months of runway.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4 CHALLENGES -->
+<section class="section">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2><span class="text-gradient">Four hard problems we </span><span class="text-gradient-primary italic-display">solved.</span></h2>
+    </div>
+
+    <div class="cs-challenges">
+      <article class="card card-tilt reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+        <h3 class="card-title">Three apps, one source of truth</h3>
+        <p class="card-body">Customer, rider, merchant — each with different needs but all working off the same order state. Required a careful state machine and event-driven sync across clients.</p>
+      </article>
+
+      <article class="card card-tilt reveal reveal-delay-1">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+        <h3 class="card-title">Real-time rider tracking</h3>
+        <p class="card-body">Rider location updates every 5 seconds, broadcast to customers watching their order. Solved with WebSocket-backed pub/sub on Redis and exponential back-off on weak networks.</p>
+      </article>
+
+      <article class="card card-tilt reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+        <h3 class="card-title">COD reconciliation without errors</h3>
+        <p class="card-body">Cash-on-delivery means physical cash flows we have to track. Dedicated reconciliation service with rider wallet ledgers, so no rupee goes unaccounted for.</p>
+      </article>
+
+      <article class="card card-tilt reveal reveal-delay-1">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <h3 class="card-title">OTP-verified delivery</h3>
+        <p class="card-body">Originally FCM-push, swapped to Twilio SMS at launch for higher reliability. 99.4% first-time OTP delivery now — even in low-network zones.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- STACK -->
+<section class="section">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2><span class="text-gradient">Architecture &amp; </span><span class="text-gradient-primary italic-display">stack.</span></h2>
+      <p>Modern, battle-tested choices — picked for reliability, not hype.</p>
+    </div>
+
+    <div class="cs-stack-grid">
+      <div class="cs-stack-card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
+        <h4>Mobile</h4>
+        <div class="cs-stack-tags"><span class="tag">Flutter</span><span class="tag">Riverpod</span><span class="tag">Mapbox SDK</span></div>
+      </div>
+      <div class="cs-stack-card reveal reveal-delay-1">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+        <h4>Backend</h4>
+        <div class="cs-stack-tags"><span class="tag">Node.js</span><span class="tag">TypeScript</span><span class="tag">Express</span><span class="tag">Redis Pub/Sub</span></div>
+      </div>
+      <div class="cs-stack-card reveal reveal-delay-2">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+        <h4>Database</h4>
+        <div class="cs-stack-tags"><span class="tag">PostgreSQL</span><span class="tag">Redis</span></div>
+      </div>
+      <div class="cs-stack-card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h4>Integrations</h4>
+        <div class="cs-stack-tags"><span class="tag">Twilio SMS+OTP</span><span class="tag">Razorpay</span><span class="tag">FCM Push</span></div>
+      </div>
+      <div class="cs-stack-card reveal reveal-delay-1">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></div>
+        <h4>Infrastructure</h4>
+        <div class="cs-stack-tags"><span class="tag">AWS EC2</span><span class="tag">S3</span><span class="tag">CloudFront</span><span class="tag">PM2</span></div>
+      </div>
+      <div class="cs-stack-card reveal reveal-delay-2">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h4l5 5V6L9 11z"/></svg></div>
+        <h4>Observability</h4>
+        <div class="cs-stack-tags"><span class="tag">New Relic</span><span class="tag">Custom logs</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OUTCOME -->
+<section>
+  <div class="container">
+    <div class="cs-outcome reveal">
+      <span class="mono-label">// outcome</span>
+      <h2 style="margin-top:14px;"><span class="text-gradient">Live, profitable,</span> <span class="text-gradient-primary italic-display">and growing.</span></h2>
+      <p style="margin-top:22px; font-size:1.125rem; line-height:1.7; color:var(--text-muted);">Easy Basket runs in production today, processing hundreds of orders per day with 99.4% OTP delivery and a 22-minute average fulfillment time. The COD reconciliation system has yet to lose a single rupee.</p>
+      <p style="margin-top:14px; font-size:1.125rem; line-height:1.7; color:var(--text-muted);">More importantly, the architecture handles 3× growth without changes — proving that getting the foundation right pays off when scale arrives.</p>
+      <div class="hero-cta" style="justify-content:flex-start; margin-top:32px;">
+        <a href="index.html#contact" class="btn btn-primary btn-arrow btn-magnetic">
+          Build something like this
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="index.html#work" class="btn btn-secondary btn-magnetic">More projects</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" style="padding-top: 100px;">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2><span class="text-gradient">Have a project in mind?</span> <span class="text-gradient-primary italic-display">Let&rsquo;s talk.</span></h2>
+      <p>From a v1 MVP to scaling past your first million users — we build the systems that ship money, food, and trust.</p>
+      <div class="hero-cta">
+        <a href="index.html#contact" class="btn btn-primary btn-lg btn-arrow btn-magnetic">Start a project
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="https://wa.me/918360339165" target="_blank" rel="noopener" class="btn btn-secondary btn-lg btn-magnetic">Chat on WhatsApp</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="gap:12px;">
+          <img src="assets/logo.png" alt="" width="40" height="40">
+          <span class="nav-logo-text" style="display:flex"><span class="nav-logo-name" style="font-size:1rem;">KAPLAS</span><span class="nav-logo-sub">TECHNOLOGIES</span></span>
+        </a>
+        <p>Senior engineers building products that scale. From MVP to millions of users.</p>
+      </div>
+      <div class="footer-col"><h4>Navigate</h4>
+        <ul>
+          <li><a href="index.html#services">Services</a></li>
+          <li><a href="index.html#work">Work</a></li>
+          <li><a href="index.html#process">Process</a></li>
+          <li><a href="index.html#tiers">Engagement</a></li>
+          <li><a href="training.html">Training</a></li>
+          <li><a href="index.html#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col"><h4>Get in touch</h4>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><a href="mailto:nikhil.kaplas@gmail.com">nikhil.kaplas@gmail.com</a></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><a href="tel:+918360339165">+91 8360 339 165</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-foot">
+      <span>© <span id="year">2026</span> Kaplas Technologies. All rights reserved.</span>
+    </div>
+  </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/motion.js" defer></script>
+<script src="js/main.js" defer></script>
+</body>
+</html>

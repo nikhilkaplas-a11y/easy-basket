@@ -230,7 +230,7 @@ export const trainingHighlights = [
 ];
 
 export const founderStats = [
-  { value: "7+", label: "Years engineering" },
+  { value: "8+", label: "Years engineering" },
   { value: "20", label: "Engineers led" },
   { value: "$10K", label: "Monthly cost saved with one rewrite" },
   { value: "100K+", label: "Daily payouts orchestrated" },
