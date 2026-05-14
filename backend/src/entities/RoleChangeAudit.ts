@@ -20,10 +20,10 @@ export class RoleChangeAudit {
   @Column({ length: 32 })
   toRole!: UserRole;
 
-  @Column({ length: 64, nullable: true })
+  @Column({ type: 'varchar', length: 64, nullable: true })
   ip!: string | null;
 
-  @Column({ length: 512, nullable: true })
+  @Column({ type: 'varchar', length: 512, nullable: true })
   userAgent!: string | null;
 
   @CreateDateColumn()
