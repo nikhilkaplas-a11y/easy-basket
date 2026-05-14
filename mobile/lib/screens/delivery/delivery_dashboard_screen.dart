@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +20,11 @@ class DeliveryDashboardScreen extends StatefulWidget {
 class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  // 30s background fetch — belt-and-suspenders for FCM. If a rider has push
+  // disabled or the token is stale, this keeps the orders list current while
+  // they have the dashboard open. Cheap: one GET every 30s, no isLoading flicker
+  // because fetchOrders only flips the spinner when the list is empty.
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -37,11 +43,20 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen>
         deliveryProvider.fetchOrders(token: token);
         deliveryProvider.fetchWallet(token: token);
       }
+      _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (!mounted) return;
+        final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+        if (token == null) return;
+        final dp = Provider.of<DeliveryProvider>(context, listen: false);
+        dp.fetchOrders(token: token);
+        dp.fetchWallet(token: token);
+      });
     });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }

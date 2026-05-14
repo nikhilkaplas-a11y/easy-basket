@@ -13,6 +13,7 @@ import { RefreshToken } from '../entities/RefreshToken';
 import { RiderCashDeposit } from '../entities/RiderCashDeposit';
 import { RiderProfile } from '../entities/RiderProfile';
 import { RiderWallet } from '../entities/RiderWallet';
+import { RoleChangeAudit } from '../entities/RoleChangeAudit';
 import { ServiceArea } from '../entities/ServiceArea';
 import { User } from '../entities/User';
 import { WebhookEvent } from '../entities/WebhookEvent';
@@ -47,6 +48,7 @@ export const AppDataSource = new DataSource({
     RiderWallet,
     RiderCashDeposit,
     OrderEvent,
+    RoleChangeAudit,
   ],
   subscribers: [],
   migrations: [],

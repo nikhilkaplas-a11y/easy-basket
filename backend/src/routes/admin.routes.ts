@@ -25,6 +25,7 @@ router.put('/orders/:id/status', AdminController.updateOrderStatus);
 router.get('/users', AdminController.getAllUsers);
 router.get('/delivery-agents', AdminController.getDeliveryAgents);
 router.put('/users/:id', AdminController.updateUser);
+router.post('/users/:id/role', AdminController.changeUserRole);
 router.get('/products', AdminController.getAllProducts);
 router.post('/products', AdminController.createProduct);
 router.put('/products/:id', AdminController.updateProduct);

@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import * as util from 'util';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
+import { UserRole } from '../constants/roles';
 
 /** PM2 / aggregators sometimes hide stderr; mirror critical lines to stdout too. */
 function fcmEmitFailureLine(context: string, detail: string): void {
@@ -196,7 +197,7 @@ export class FCMService {
   }
 
   static async sendNotificationToRole(
-    role: string,
+    role: UserRole,
     title: string,
     body: string,
     data?: Record<string, string>

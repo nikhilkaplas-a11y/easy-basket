@@ -26,6 +26,10 @@ import campaignRoutes from './routes/campaign.routes';
 // Load environment variables FIRST before importing any modules that use them
 dotenv.config();
 
+// Validate JWT_SECRET at boot — exits the process if missing or too short.
+// Must run after dotenv.config() and before any route handlers can serve traffic.
+require('./config/jwt');
+
 // Re-initialize S3Service after dotenv.config() to ensure env vars are loaded
 // (S3Service.initialize() is called on module load, but env vars might not be ready)
 S3Service.initialize();

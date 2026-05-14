@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Address } from './Address';
 import { Order } from './Order';
+import { UserRole } from '../constants/roles';
 
 @Entity()
 export class User {
@@ -27,7 +28,7 @@ export class User {
   birthday!: Date | null;
 
   @Column({ default: 'customer' }) // customer, admin, delivery
-  role!: string;
+  role!: UserRole;
 
   /** Full FCM device tokens are ~140–180 chars; avoid VARCHAR(255) truncation in MySQL. */
   @Column({ type: 'varchar', length: 512, nullable: true, charset: 'utf8mb4' })

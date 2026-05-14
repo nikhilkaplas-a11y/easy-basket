@@ -103,8 +103,18 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
 
     if (authProvider.accessToken == null) return;
 
-    // If accepting or preparing, show delivery agent selection dialog (optional)
-    if ((newStatus == 'accepted' || newStatus == 'preparing') && deliveryBoyId == null) {
+    // If accepting or preparing AND no partner is already attached to this order,
+    // show the delivery agent selection dialog. If a partner is already assigned
+    // (e.g. admin assigned at "accepted" stage and is now clicking "preparing"),
+    // skip the dialog and keep the existing assignment — don't re-pass the id
+    // either, otherwise the backend would re-fire an "order assigned" FCM push
+    // to the rider on every status update.
+    final existing = adminProvider.orders.where((o) => o.id == orderId).toList();
+    final hasPartnerAttached = existing.isNotEmpty && existing.first.deliveryBoy != null;
+
+    if ((newStatus == 'accepted' || newStatus == 'preparing') &&
+        deliveryBoyId == null &&
+        !hasPartnerAttached) {
       final selectedAgent = await _showDeliveryAgentDialog(adminProvider, authProvider.accessToken!);
       // If user cancelled the dialog, don't proceed
       if (selectedAgent == -1 && mounted) {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 
 import { AppDataSource } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { JWT_SECRET } from '../config/jwt';
 import { RefreshToken } from '../entities/RefreshToken';
 import { TwilioService } from '../services/twilio.service';
 import { User } from '../entities/User';
@@ -147,7 +148,7 @@ export class AuthController {
       // Generate Access Token (short-lived: 15 minutes)
       const accessToken = jwt.sign(
         { userId: user.id, phoneNumber: user.phoneNumber, role: user.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        JWT_SECRET,
         { expiresIn: '15m' } // Access token expires in 15 minutes
       );
 
@@ -322,7 +323,7 @@ export class AuthController {
           phoneNumber: tokenRecord.user.phoneNumber,
           role: tokenRecord.user.role,
         },
-        process.env.JWT_SECRET || 'your-secret-key',
+        JWT_SECRET,
         { expiresIn: '15m' } // Access token expires in 15 minutes
       );
 

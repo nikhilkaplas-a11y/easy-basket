@@ -16,6 +16,8 @@ import { DeliveryStateService } from '../services/delivery-state.service';
 import { RiderWalletService } from '../services/rider-wallet.service';
 import { OrderEventsService } from '../services/order-events.service';
 import { RiderProfile } from '../entities/RiderProfile';
+import { RoleChangeAudit } from '../entities/RoleChangeAudit';
+import { isUserRole } from '../constants/roles';
 
 export class AdminController {
   static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
@@ -333,7 +335,7 @@ export class AdminController {
   static async updateUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, email, role, isActive } = req.body;
+      const { name, email, isActive } = req.body;
 
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOneBy({ id: Number(id) });
@@ -345,7 +347,6 @@ export class AdminController {
 
       if (name) user.name = name;
       if (email) user.email = email;
-      if (role) user.role = role;
       if (isActive !== undefined) user.isActive = isActive;
 
       await userRepository.save(user);
@@ -353,6 +354,75 @@ export class AdminController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error updating user' });
+    }
+  }
+
+  /**
+   * Dedicated, audited role-change endpoint.
+   * Rejects unknown roles, blocks self-edits, and writes a row to role_change_audit
+   * for every successful change. Keep this endpoint separate from updateUser so role
+   * transitions can be reviewed/gated independently of routine profile edits.
+   */
+  static async changeUserRole(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const actor = req.user;
+      if (!actor) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+
+      const targetId = Number(req.params.id);
+      const newRole = req.body?.role;
+
+      if (!Number.isFinite(targetId)) {
+        res.status(400).json({ message: 'Invalid user id' });
+        return;
+      }
+      if (!isUserRole(newRole)) {
+        res.status(400).json({ message: 'Invalid role. Allowed: customer, admin, delivery' });
+        return;
+      }
+      if (actor.id === targetId) {
+        res.status(403).json({ message: 'You cannot change your own role' });
+        return;
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const target = await userRepository.findOneBy({ id: targetId });
+      if (!target) {
+        res.status(404).json({ message: 'User not found' });
+        return;
+      }
+
+      if (target.role === newRole) {
+        res.json({ message: 'Role unchanged', user: target });
+        return;
+      }
+
+      const previousRole = target.role;
+      target.role = newRole;
+      await userRepository.save(target);
+
+      const auditRepo = AppDataSource.getRepository(RoleChangeAudit);
+      await auditRepo.save(
+        auditRepo.create({
+          actorUserId: actor.id,
+          targetUserId: target.id,
+          fromRole: previousRole,
+          toRole: newRole,
+          ip: req.ip ?? null,
+          userAgent: req.headers['user-agent']?.slice(0, 512) ?? null,
+        })
+      );
+
+      console.log(
+        `[ROLE_CHANGE] actor=${actor.id} target=${target.id} ${previousRole} -> ${newRole}`
+      );
+
+      res.json({ message: 'Role updated', user: target });
+    } catch (error) {
+      console.error('Error changing user role:', error);
+      res.status(500).json({ message: 'Error changing user role' });
     }
   }
 
