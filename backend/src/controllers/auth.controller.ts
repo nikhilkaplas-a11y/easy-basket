@@ -3,9 +3,11 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { JWT_SECRET } from '../config/jwt';
+import { RateLimitService } from '../services/rate-limit.service';
 import { RefreshToken } from '../entities/RefreshToken';
 import { TwilioService } from '../services/twilio.service';
 import { User } from '../entities/User';
+import { canonicalizeIndianMobile } from '../utils/phone.util';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
@@ -38,29 +40,64 @@ export class AuthController {
   }
 
   static async login(req: Request, res: Response): Promise<void> {
-    const { phoneNumber } = req.body;
-
-    if (!phoneNumber) {
-      res.status(400).json({ message: 'Phone number is required' });
+    const canonical = canonicalizeIndianMobile(req.body?.phoneNumber);
+    if (!canonical) {
+      res.status(400).json({ message: 'A valid 10-digit Indian mobile number is required' });
       return;
     }
 
     try {
       const useTestOtp = AuthController.isLoginTestOtpEnabled();
-      if (TwilioService.isConfigured() && !useTestOtp) {
-        await TwilioService.sendVerification(phoneNumber, 'sms');
-        console.log(`OTP sent via Twilio for ${phoneNumber}`);
+      const willSendSms = TwilioService.isConfigured() && !useTestOtp;
+
+      // Rate-limit only when an SMS will actually be sent (cost + harassment defense).
+      // Phone first: caps harassment of a specific number. IP second: caps cost-drain
+      // attacks that rotate phone numbers from one source.
+      if (willSendSms) {
+        const phoneCheck = await RateLimitService.checkAndIncrement(
+          `otp:phone:${canonical}`,
+          3,
+          15 * 60
+        );
+        if (!phoneCheck.allowed) {
+          res.set('Retry-After', String(phoneCheck.resetInSec));
+          res.status(429).json({
+            message: 'Too many OTP requests for this number. Try again in a few minutes.',
+            retryAfterSec: phoneCheck.resetInSec,
+          });
+          return;
+        }
+
+        const ip = req.ip ?? 'unknown';
+        const ipCheck = await RateLimitService.checkAndIncrement(
+          `otp:ip:${ip}`,
+          10,
+          60 * 60
+        );
+        if (!ipCheck.allowed) {
+          res.set('Retry-After', String(ipCheck.resetInSec));
+          res.status(429).json({
+            message: 'Too many OTP requests from this device. Try again later.',
+            retryAfterSec: ipCheck.resetInSec,
+          });
+          return;
+        }
+      }
+
+      if (willSendSms) {
+        await TwilioService.sendVerification(canonical, 'sms');
+        console.log(`OTP sent via Twilio for ${canonical}`);
         res.json({ message: 'OTP sent successfully to your phone number.' });
       } else if (TwilioService.isConfigured() && useTestOtp) {
         console.log(
-          `OTP test mode (LOGIN_USE_TEST_OTP) for ${phoneNumber}; SMS not sent. Use ${AuthController.LOGIN_TEST_OTP_VALUE}.`
+          `OTP test mode (LOGIN_USE_TEST_OTP) for ${canonical}; SMS not sent. Use ${AuthController.LOGIN_TEST_OTP_VALUE}.`
         );
         res.json({
           message: `OTP not sent (test mode). Use ${AuthController.LOGIN_TEST_OTP_VALUE} to verify.`,
         });
       } else {
         console.log(
-          `OTP request for ${phoneNumber}. Use OTP: ${AuthController.LOGIN_TEST_OTP_VALUE}`
+          `OTP request for ${canonical}. Use OTP: ${AuthController.LOGIN_TEST_OTP_VALUE}`
         );
         res.json({
           message: `OTP sent successfully. Use ${AuthController.LOGIN_TEST_OTP_VALUE} for testing.`,
