@@ -12,6 +12,19 @@ import { FCMService } from '../services/fcm.service';
 import { OrderInventoryService } from '../services/order-inventory.service';
 import { ProductController } from './product.controller';
 
+/**
+ * Thrown inside the order-creation transaction when a stock UPDATE finds
+ * insufficient stock. Causes the entire transaction to roll back — no order
+ * row, no order_items, no partial stock decrements. Caught by createOrder's
+ * catch and mapped to a 409 response.
+ */
+class InsufficientStockError extends Error {
+  constructor(public readonly itemKey: string) {
+    super(`Insufficient stock for ${itemKey}`);
+    this.name = 'InsufficientStockError';
+  }
+}
+
 export class OrderController {
   static async createOrder(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -50,6 +63,15 @@ export class OrderController {
       if (!address) {
         res.status(404).json({ message: 'Address not found' });
         return;
+      }
+
+      // Validate quantities up front — these values are later inlined into
+      // the SET clause of an UPDATE statement (safe only if they're positive ints).
+      for (const item of items) {
+        if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+          res.status(400).json({ message: 'Item quantity must be a positive integer' });
+          return;
+        }
       }
 
       const productRepository = AppDataSource.getRepository(Product);
@@ -143,38 +165,49 @@ export class OrderController {
         orderItems.push(orderItem);
       }
 
-      // Create order
-      const orderRepository = AppDataSource.getRepository(Order);
-      const order = orderRepository.create({
-        user,
-        deliveryAddress: address,
-        items: orderItems,
-        totalAmount,
-        paymentMethod: paymentMethod || 'UPI',
-        notes,
-        status: 'pending',
-      });
-
-      await orderRepository.save(order);
-
-      // Update product/variant stock
-      for (const item of items) {
-        if (item.variantId) {
-          // Update variant stock
-          const variant = await variantRepository.findOneBy({ id: item.variantId });
-          if (variant) {
-            variant.stock -= item.quantity;
-            await variantRepository.save(variant);
-          }
-        } else {
-          // Update product stock
-          const product = await productRepository.findOneBy({ id: item.productId });
-          if (product) {
-            product.stock -= item.quantity;
-            await productRepository.save(product);
+      // Atomically: decrement stock with row-level guards, then insert the order.
+      // The conditional UPDATE (`stock >= :q`) is the real safety net against
+      // overselling — even if two requests pass the pre-check above, only one
+      // can affect a row when stock is the last unit. If any item fails,
+      // InsufficientStockError rolls back the whole transaction, so no order
+      // row, no order_items, no partial stock decrement survives.
+      const order = await AppDataSource.transaction(async (manager) => {
+        for (const item of items) {
+          if (item.variantId) {
+            const result = await manager
+              .createQueryBuilder()
+              .update(ProductVariant)
+              .set({ stock: () => `stock - ${item.quantity}` })
+              .where('id = :id AND stock >= :q', { id: item.variantId, q: item.quantity })
+              .execute();
+            if (result.affected !== 1) {
+              throw new InsufficientStockError(`variant ${item.variantId}`);
+            }
+          } else {
+            const result = await manager
+              .createQueryBuilder()
+              .update(Product)
+              .set({ stock: () => `stock - ${item.quantity}` })
+              .where('id = :id AND stock >= :q', { id: item.productId, q: item.quantity })
+              .execute();
+            if (result.affected !== 1) {
+              throw new InsufficientStockError(`product ${item.productId}`);
+            }
           }
         }
-      }
+
+        const orderRepo = manager.getRepository(Order);
+        const created = orderRepo.create({
+          user,
+          deliveryAddress: address,
+          items: orderItems,
+          totalAmount,
+          paymentMethod: paymentMethod || 'UPI',
+          notes,
+          status: 'pending',
+        });
+        return orderRepo.save(created);
+      });
 
       await ProductController.invalidateProductListCache();
 
@@ -205,6 +238,12 @@ export class OrderController {
         paymentOrder, // Razorpay order details if UPI
       });
     } catch (error) {
+      if (error instanceof InsufficientStockError) {
+        res.status(409).json({
+          message: 'An item just went out of stock. Please refresh your cart and try again.',
+        });
+        return;
+      }
       console.error(error);
       res.status(500).json({ message: 'Error creating order' });
     }
