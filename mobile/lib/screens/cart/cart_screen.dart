@@ -409,7 +409,9 @@ class CartScreen extends StatelessWidget {
                 child: AppTheme.gradientButton(
                   onPressed: () {
                     if (!authProvider.isAuthenticated) {
-                      context.go('/login');
+                      // Bounce back to /cart after OTP so the user keeps their items
+                      // and the button auto-updates to "Add Address" / "Proceed to Checkout".
+                      context.go('/login?returnTo=${Uri.encodeComponent('/cart')}');
                     } else if (!hasAddress) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

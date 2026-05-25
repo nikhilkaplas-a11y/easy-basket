@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/service_area_provider.dart';
 import '../../utils/theme.dart';
 
 /// Location Permission Screen — Premium onboarding with skeleton loading
@@ -584,17 +585,46 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
 
     if (!mounted) return;
 
-    if (locationProvider.detectedAddress != null || locationProvider.currentPosition != null) {
-      // Success — navigate to home
-      context.go('/home');
-    } else {
+    final partial = locationProvider.detectedAddress;
+    final hasUsableLocation =
+        partial != null || locationProvider.currentPosition != null;
+
+    if (!hasUsableLocation) {
       // Detection failed — show error, allow retry
       setState(() {
         _isLoadingLocation = false;
         _isRequestingPermission = false;
         _errorMessage = 'Could not detect location. Please try again.';
       });
+      return;
     }
+
+    // Pincode-based serviceability check so unserviceable users don't land on /home
+    // and only later discover "we don't deliver here" at checkout.
+    if (partial?.pincode != null) {
+      final serviceAreaProvider =
+          Provider.of<ServiceAreaProvider>(context, listen: false);
+      final isServiceable = await serviceAreaProvider.checkServiceAvailability(
+        pincode: partial!.pincode!,
+        country: 'India',
+      );
+
+      if (!mounted) return;
+
+      if (!isServiceable) {
+        context.go('/service-not-available', extra: {
+          'pincode': partial.pincode,
+          'city': partial.city,
+          'state': partial.state,
+          'country': 'India',
+          'returnTo': '/home',
+          'isOnboarding': true,
+        });
+        return;
+      }
+    }
+
+    context.go('/home');
   }
 }
 

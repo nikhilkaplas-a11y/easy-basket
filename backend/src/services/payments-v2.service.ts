@@ -482,6 +482,10 @@ export class PaymentsV2Service {
     | { ok: true; refundId: string; razorpayRefundId: string | null }
     | { ok: false; reason: string; code: number }
   > {
+    type RefundResult =
+      | { ok: true; refundId: string; razorpayRefundId: string | null }
+      | { ok: false; reason: string; code: number };
+
     const paymentRepo = AppDataSource.getRepository(Payment);
     const refundRepo = AppDataSource.getRepository(Refund);
 
@@ -492,8 +496,11 @@ export class PaymentsV2Service {
     if (!payment || !payment.razorpayPaymentId) {
       return { ok: false, reason: 'No paid payment found for order', code: 404 };
     }
+    const razorpayPaymentId = payment.razorpayPaymentId;
 
-    // Idempotency: if a refund row already exists for (payment, key), return it.
+    // Fast path: idempotent retry from the same client with the same key.
+    // The cross-flow guard below uses the same lookup but inside the lock; this
+    // outer check saves a lock acquisition for the common retry case.
     const existing = await refundRepo.findOne({
       where: { paymentId: payment.id, idempotencyKey: params.idempotencyKey },
     });
@@ -505,57 +512,116 @@ export class PaymentsV2Service {
       };
     }
 
-    // Insert refund row first (pending). If the DB write wins but Razorpay call loses,
-    // the reconciler will pick it up.
-    const refund = refundRepo.create({
-      paymentId: payment.id,
-      userId: params.userId,
-      razorpayRefundId: null,
-      amountPaise: payment.amountPaise,
-      status: 'pending',
-      reason: params.reason ?? null,
-      idempotencyKey: params.idempotencyKey,
-    });
-    try {
-      await refundRepo.save(refund);
-    } catch (err) {
-      if (isDuplicateKeyError(err)) {
-        const again = await refundRepo.findOne({
+    // Hold the payment-level lock while we check the invariant and create the
+    // refund. Without this lock, two simultaneous calls with *different* keys
+    // (e.g. customer-initiated + admin-cancel) could both read sum=0, both
+    // create refund rows, and both call Razorpay → customer is refunded twice.
+    const locked = await this.withPaymentLock(
+      payment.razorpayOrderId,
+      async (): Promise<RefundResult> => {
+        // Re-check same-key existence inside the lock: a parallel caller with
+        // the same key may have completed between our outer check and lock acquire.
+        const sameKey = await refundRepo.findOne({
           where: { paymentId: payment.id, idempotencyKey: params.idempotencyKey },
         });
-        if (again) {
-          return { ok: true, refundId: again.id, razorpayRefundId: again.razorpayRefundId };
+        if (sameKey) {
+          return {
+            ok: true,
+            refundId: sameKey.id,
+            razorpayRefundId: sameKey.razorpayRefundId,
+          };
         }
+
+        // Invariant: total non-failed refunds (pending + processed) for a payment
+        // must never exceed payment.amountPaise. This catches the double-refund
+        // race regardless of what idempotency key the second caller used.
+        const sumRow = await refundRepo
+          .createQueryBuilder('r')
+          .select('COALESCE(SUM(r.amountPaise), 0)', 'sum')
+          .where('r.paymentId = :pid', { pid: payment.id })
+          .andWhere('r.status IN (:...statuses)', { statuses: ['pending', 'processed'] })
+          .getRawOne<{ sum: string | null }>();
+        const activeSum = Number(sumRow?.sum ?? 0);
+        const newAmount = Number(payment.amountPaise);
+        const cap = Number(payment.amountPaise);
+        if (activeSum + newAmount > cap) {
+          return {
+            ok: false,
+            reason: 'Refund already issued or in progress for this payment',
+            code: 409,
+          };
+        }
+
+        // Insert refund row first (pending). If the DB write wins but Razorpay
+        // call loses, the reconciler will pick it up.
+        const refund = refundRepo.create({
+          paymentId: payment.id,
+          userId: params.userId,
+          razorpayRefundId: null,
+          amountPaise: payment.amountPaise,
+          status: 'pending',
+          reason: params.reason ?? null,
+          idempotencyKey: params.idempotencyKey,
+        });
+        try {
+          await refundRepo.save(refund);
+        } catch (err) {
+          if (isDuplicateKeyError(err)) {
+            const again = await refundRepo.findOne({
+              where: { paymentId: payment.id, idempotencyKey: params.idempotencyKey },
+            });
+            if (again) {
+              return {
+                ok: true,
+                refundId: again.id,
+                razorpayRefundId: again.razorpayRefundId,
+              };
+            }
+          }
+          throw err;
+        }
+
+        // Transition payment → refund_pending (best-effort, idempotent).
+        if (this.canTransition(payment.status, 'refund_pending')) {
+          payment.status = 'refund_pending';
+          await paymentRepo.save(payment);
+          await AppDataSource.getRepository(Order).update(
+            { id: payment.orderId },
+            { paymentStatus: 'refund_pending' }
+          );
+        }
+
+        // Call Razorpay.
+        try {
+          const rzpRefund = await RazorpayService.createRefund({
+            razorpayPaymentId,
+            amountPaise: Number(payment.amountPaise),
+            notes: { refund_id: refund.id, order_id: String(params.orderId) },
+            idempotencyKey: params.idempotencyKey,
+          });
+          refund.razorpayRefundId = (rzpRefund as { id: string }).id;
+          await refundRepo.save(refund);
+        } catch (err) {
+          console.error('[refund] razorpay call failed — reconciler will retry', err);
+          // Don't mark failed here; reconciler will verify actual Razorpay state.
+        }
+
+        return {
+          ok: true,
+          refundId: refund.id,
+          razorpayRefundId: refund.razorpayRefundId,
+        };
       }
-      throw err;
-    }
+    );
 
-    // Transition payment → refund_pending (best-effort, idempotent).
-    if (this.canTransition(payment.status, 'refund_pending')) {
-      payment.status = 'refund_pending';
-      await paymentRepo.save(payment);
-      await AppDataSource.getRepository(Order).update(
-        { id: payment.orderId },
-        { paymentStatus: 'refund_pending' }
-      );
+    if (!locked.ran) {
+      return {
+        ok: false,
+        reason: 'Another refund operation is in progress for this payment. Please retry shortly.',
+        code: 409,
+      };
     }
-
-    // Call Razorpay.
-    try {
-      const rzpRefund = await RazorpayService.createRefund({
-        razorpayPaymentId: payment.razorpayPaymentId,
-        amountPaise: Number(payment.amountPaise),
-        notes: { refund_id: refund.id, order_id: String(params.orderId) },
-        idempotencyKey: params.idempotencyKey,
-      });
-      refund.razorpayRefundId = (rzpRefund as { id: string }).id;
-      await refundRepo.save(refund);
-    } catch (err) {
-      console.error('[refund] razorpay call failed — reconciler will retry', err);
-      // Don't mark failed here; reconciler will verify actual Razorpay state.
-    }
-
-    return { ok: true, refundId: refund.id, razorpayRefundId: refund.razorpayRefundId };
+    return locked.result;
   }
 }
 

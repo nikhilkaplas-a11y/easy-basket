@@ -126,10 +126,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final orderProvider = Provider.of<OrderProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Sequential: GPS first → then products (products depend on location)
+      // Sequential: GPS first → then products (products depend on location).
+      // Guests don't have saved addresses / active orders, but they still need
+      // GPS so the address bar and the soft service-area banner work.
       if (authProvider.token != null) {
         orderProvider.fetchActiveOrders(authProvider.token!, getUpdatedToken: () => authProvider.token);
         await _initSmartAddressFlow(authProvider.token!);
+      } else {
+        final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+        final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+        await locationProvider.detectLocation(force: true);
+        if (mounted) {
+          await _softServiceAreaCheck(addressProvider, locationProvider);
+        }
       }
 
       // GPS done → now fetch products for this location

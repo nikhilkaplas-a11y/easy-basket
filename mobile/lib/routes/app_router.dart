@@ -51,6 +51,17 @@ import '../screens/address/location_permission_screen.dart' as customer_location
 import '../core/startup_deep_link.dart';
 
 class AppRouter {
+  /// Routes that require an authenticated customer (or admin/delivery).
+  /// Blinkit-style: browsing + cart is open; only transactions and personal data gate.
+  /// When a guest hits one of these, we redirect to /login?returnTo=<originalPath>.
+  static bool _requiresLogin(String path) {
+    if (path.startsWith('/payment')) return true;
+    if (path == '/orders' || path.startsWith('/order/')) return true;
+    if (path == '/profile' || path.startsWith('/profile/')) return true;
+    if (path == '/addresses' || path.startsWith('/address/add') || path.startsWith('/address/edit')) return true;
+    return false;
+  }
+
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) {
@@ -59,9 +70,11 @@ class AppRouter {
       final isLoginRoute = state.matchedLocation == '/login';
       final currentLocation = state.matchedLocation;
 
-      // If not authenticated, redirect to login (except splash and login routes)
-      if (!isAuthenticated && !isLoginRoute && currentLocation != '/splash') {
-        return '/login';
+      // Guests are blocked only from login-required routes (checkout, profile, orders, address book).
+      // Everything else — splash, home, location-gate, categories, products, cart, address-search/map — is open.
+      if (!isAuthenticated && !isLoginRoute && _requiresLogin(currentLocation)) {
+        final returnTo = Uri.encodeComponent(state.uri.toString());
+        return '/login?returnTo=$returnTo';
       }
 
       // If authenticated, check role and redirect accordingly
@@ -118,6 +131,12 @@ class AppRouter {
             return null;
           }
           if (isLoginRoute) {
+            // If checkout/profile/etc bounced here for OTP and user is already authenticated,
+            // jump straight to the original destination instead of looping back to home.
+            final returnTo = state.uri.queryParameters['returnTo'];
+            if (returnTo != null && returnTo.isNotEmpty) {
+              return Uri.decodeComponent(returnTo);
+            }
             return '/home';
           }
         }

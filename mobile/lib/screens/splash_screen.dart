@@ -21,8 +21,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   /// Do not use a long fixed delay + go(home): it races FCM cold-start deep links and
   /// replaces the stack, so users land on home instead of order detail.
-  /// Customers: resolve location permission on `/location-gate` before `/home` so the
-  /// address bar does not flash a stale saved pin while GPS is still unsettled.
+  /// Blinkit-style: location is resolved BEFORE login. Guests can browse;
+  /// login is only required at checkout / for profile / orders / addresses.
+  /// Admin & delivery roles still go through login (handled by /login screen).
   void _navigateToNext() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 120), () async {
@@ -34,21 +35,21 @@ class _SplashScreenState extends State<SplashScreen> {
         }
 
         final auth = Provider.of<AuthProvider>(context, listen: false);
-        if (!auth.isAuthenticated) {
-          context.go('/login');
-          return;
+
+        // Admin / delivery: skip location flow, go to their dashboards.
+        if (auth.isAuthenticated) {
+          final role = auth.user?.role;
+          if (role == 'admin') {
+            context.go('/admin/dashboard');
+            return;
+          }
+          if (role == 'delivery') {
+            context.go('/delivery/dashboard');
+            return;
+          }
         }
 
-        final role = auth.user?.role;
-        if (role == 'admin') {
-          context.go('/admin/dashboard');
-          return;
-        }
-        if (role == 'delivery') {
-          context.go('/delivery/dashboard');
-          return;
-        }
-
+        // Customer + guest: location-first.
         final loc = Provider.of<LocationProvider>(context, listen: false);
         await loc.checkPermission();
         if (!mounted) return;

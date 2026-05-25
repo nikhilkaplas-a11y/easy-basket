@@ -112,8 +112,15 @@ class _LoginScreenState extends State<LoginScreen>
         } else if (userRole == 'delivery') {
           context.go('/delivery/dashboard');
         } else {
-          // Customer login — check address/location before going to home
-          await _handleCustomerPostLogin();
+          // Customer login — if we were sent here by a gated route (checkout, profile, etc.),
+          // honor returnTo and skip location/address re-detection. The guest cart is in
+          // SharedPreferences, so it persists across the login transition automatically.
+          final returnTo = GoRouterState.of(context).uri.queryParameters['returnTo'];
+          if (returnTo != null && returnTo.isNotEmpty) {
+            if (mounted) context.go(Uri.decodeComponent(returnTo));
+          } else {
+            await _handleCustomerPostLogin();
+          }
         }
       }
     } else {
