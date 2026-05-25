@@ -10,6 +10,7 @@ import {
 import { User } from './User';
 import { Address } from './Address';
 import { OrderItem } from './OrderItem';
+import { PaymentMethod } from '../constants/payment-method';
 
 @Entity({ name: 'orders' })
 export class Order {
@@ -103,8 +104,8 @@ export class Order {
   @Column({ name: 'delivery_otp_hash', type: 'char', length: 64, nullable: true })
   deliveryOtpHash!: string | null;
 
-  @Column({ nullable: true })
-  paymentMethod!: string; // UPI, cash, etc.
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  paymentMethod!: PaymentMethod | null;
 
   @Column({ nullable: true })
   paymentId!: string; // Razorpay/Cashfree payment ID

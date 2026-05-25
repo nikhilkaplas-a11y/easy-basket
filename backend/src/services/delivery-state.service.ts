@@ -258,8 +258,8 @@ export class DeliveryStateService {
     });
     if (!step1.ok) return step1;
 
-    // COD branching: if `cash` payment method, push to payment_pending.
-    if (step1.order.paymentMethod?.toLowerCase() === 'cash') {
+    // COD branching: if `cod` payment method, push to payment_pending.
+    if (step1.order.paymentMethod === 'cod') {
       return this.riderTransition({
         orderId,
         riderId,
@@ -405,7 +405,7 @@ export class DeliveryStateService {
     if (!expectedOrder.deliveryBoy || expectedOrder.deliveryBoy.id !== params.riderId) {
       return err(403, 'Order not assigned to you');
     }
-    if (expectedOrder.paymentMethod?.toLowerCase() === 'cash') {
+    if (expectedOrder.paymentMethod === 'cod') {
       return err(400, 'COD orders must use collect-cash');
     }
     if (!expectedOrder.isPaid) {

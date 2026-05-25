@@ -2,9 +2,7 @@ import { LessThan, In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Payment } from '../entities/Payment';
 import { Refund } from '../entities/Refund';
-import { Order } from '../entities/Order';
 import { RazorpayService } from './razorpay.service';
-import { OrderInventoryService } from './order-inventory.service';
 import { PaymentsV2Service } from './payments-v2.service';
 
 /**
@@ -95,7 +93,9 @@ export class PaymentsReconcilerService {
       // No payment attempted at all — if row is very old, mark failed and release inventory.
       const ageMs = Date.now() - p.createdAt.getTime();
       if (ageMs > 60 * 60 * 1000) {
-        await this.markPaymentFailed(p, 'RECONCILER_TIMEOUT');
+        await PaymentsV2Service.withPaymentLock(p.razorpayOrderId, () =>
+          PaymentsV2Service.markPaymentFailed(p, 'RECONCILER_TIMEOUT')
+        );
       }
       return;
     }
@@ -105,40 +105,49 @@ export class PaymentsReconcilerService {
     const latestAmount = Number(latest.amount);
 
     if (latestStatus === 'captured') {
-      // Feed it through the webhook handler logic for a consistent transition.
-      const synthesized = synthesizePaymentCapturedEvent(p.razorpayOrderId, latestId, latestAmount);
-      await PaymentsV2Service.handleWebhook(synthesized);
-      console.log(`[Reconciler] fixed missing payment.captured for ${p.razorpayOrderId}`);
+      // Explicit amount check at the reconciler layer — the source of truth for what
+      // we expected is p.amountPaise (set at payment initiation from order.totalAmount).
+      // If Razorpay captured a different amount, this is real fraud or a wiring bug:
+      // fail the payment, release inventory, and let admin trigger a refund.
+      if (latestAmount !== Number(p.amountPaise)) {
+        console.error('[Reconciler] AMOUNT_MISMATCH', {
+          rzpOrder: p.razorpayOrderId,
+          expected: p.amountPaise,
+          received: latestAmount,
+        });
+        const out = await PaymentsV2Service.withPaymentLock(p.razorpayOrderId, () =>
+          PaymentsV2Service.markPaymentFailed(p, 'AMOUNT_MISMATCH')
+        );
+        if (!out.ran) {
+          console.log(`[Reconciler] lock busy for ${p.razorpayOrderId}; will retry next tick`);
+        }
+        return;
+      }
+
+      const out = await PaymentsV2Service.withPaymentLock(p.razorpayOrderId, () =>
+        PaymentsV2Service.markPaymentPaid(p, latestId)
+      );
+      if (out.ran) {
+        console.log(`[Reconciler] fixed missing payment.captured for ${p.razorpayOrderId}`);
+      } else {
+        console.log(`[Reconciler] lock busy for ${p.razorpayOrderId}; will retry next tick`);
+      }
       return;
     }
 
     if (latestStatus === 'failed') {
-      const synthesized = synthesizePaymentFailedEvent(p.razorpayOrderId, latestId, latestAmount);
-      await PaymentsV2Service.handleWebhook(synthesized);
-      console.log(`[Reconciler] marked failed for ${p.razorpayOrderId}`);
+      const out = await PaymentsV2Service.withPaymentLock(p.razorpayOrderId, () =>
+        PaymentsV2Service.markPaymentFailed(p, 'PAYMENT_FAILED')
+      );
+      if (out.ran) {
+        console.log(`[Reconciler] marked failed for ${p.razorpayOrderId}`);
+      } else {
+        console.log(`[Reconciler] lock busy for ${p.razorpayOrderId}; will retry next tick`);
+      }
       return;
     }
 
     // authorized / created / else — not terminal yet, leave for next tick.
-  }
-
-  private static async markPaymentFailed(p: Payment, code: string): Promise<void> {
-    const paymentRepo = AppDataSource.getRepository(Payment);
-    p.status = 'failed';
-    p.failureCode = code;
-    await paymentRepo.save(p);
-
-    const orderRepo = AppDataSource.getRepository(Order);
-    const order = await orderRepo.findOne({
-      where: { id: p.orderId },
-      relations: ['items', 'items.product', 'items.variant'],
-    });
-    if (order && order.status === 'pending') {
-      await OrderInventoryService.restoreReservedStockForItems(order.items);
-      order.status = 'cancelled';
-      order.paymentStatus = 'failed';
-      await orderRepo.save(order);
-    }
   }
 
   /**
@@ -175,55 +184,3 @@ export class PaymentsReconcilerService {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Synthesize the event envelope the webhook handler expects.
-// ---------------------------------------------------------------------------
-
-function synthesizePaymentCapturedEvent(
-  razorpayOrderId: string,
-  razorpayPaymentId: string,
-  amountPaise: number
-): { eventId: string; eventType: string; payload: Record<string, unknown> } {
-  return {
-    eventId: `reconciler:captured:${razorpayPaymentId}`,
-    eventType: 'payment.captured',
-    payload: {
-      event: 'payment.captured',
-      payload: {
-        payment: {
-          entity: {
-            id: razorpayPaymentId,
-            order_id: razorpayOrderId,
-            amount: amountPaise,
-            status: 'captured',
-          },
-        },
-      },
-    },
-  };
-}
-
-function synthesizePaymentFailedEvent(
-  razorpayOrderId: string,
-  razorpayPaymentId: string,
-  amountPaise: number
-): { eventId: string; eventType: string; payload: Record<string, unknown> } {
-  return {
-    eventId: `reconciler:failed:${razorpayPaymentId}`,
-    eventType: 'payment.failed',
-    payload: {
-      event: 'payment.failed',
-      payload: {
-        payment: {
-          entity: {
-            id: razorpayPaymentId,
-            order_id: razorpayOrderId,
-            amount: amountPaise,
-            status: 'failed',
-            error_code: 'PAYMENT_FAILED',
-          },
-        },
-      },
-    },
-  };
-}

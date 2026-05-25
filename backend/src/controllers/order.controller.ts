@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
 import { OrderItem } from '../entities/OrderItem';
@@ -7,10 +7,13 @@ import { ProductVariant } from '../entities/ProductVariant';
 import { Address } from '../entities/Address';
 import { User } from '../entities/User';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { idempotencyKeyFromReq } from '../middleware/idempotency.middleware';
+import { normalizePaymentMethod } from '../constants/payment-method';
 import { PaymentService } from '../services/payment.service';
 import { FCMService } from '../services/fcm.service';
 import { OrderInventoryService } from '../services/order-inventory.service';
 import { ProductController } from './product.controller';
+import { QueryFailedError } from 'typeorm';
 
 /**
  * Thrown inside the order-creation transaction when a stock UPDATE finds
@@ -44,6 +47,14 @@ export class OrderController {
 
       if (!addressId) {
         res.status(400).json({ message: 'Delivery address is required' });
+        return;
+      }
+
+      const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+      if (!normalizedPaymentMethod) {
+        res
+          .status(400)
+          .json({ message: 'Invalid paymentMethod. Allowed: upi, cod (aliases: cash).' });
         return;
       }
 
@@ -202,9 +213,10 @@ export class OrderController {
           deliveryAddress: address,
           items: orderItems,
           totalAmount,
-          paymentMethod: paymentMethod || 'UPI',
+          paymentMethod: normalizedPaymentMethod,
           notes,
           status: 'pending',
+          idempotencyKey: idempotencyKeyFromReq(req),
         });
         return orderRepo.save(created);
       });
@@ -213,7 +225,7 @@ export class OrderController {
 
       // Create payment order if UPI
       let paymentOrder = null;
-      if (paymentMethod === 'UPI') {
+      if (normalizedPaymentMethod === 'upi') {
         try {
           paymentOrder = await PaymentService.createOrder(totalAmount, 'INR', `ORDER_${order.id}`);
         } catch (error) {
@@ -241,6 +253,14 @@ export class OrderController {
       if (error instanceof InsufficientStockError) {
         res.status(409).json({
           message: 'An item just went out of stock. Please refresh your cart and try again.',
+        });
+        return;
+      }
+      // DB unique-constraint hit: duplicate (user, idempotency_key) — the Redis fast-path
+      // missed (e.g. Redis was unreachable when this request started), but the DB caught it.
+      if (error instanceof QueryFailedError && (error as QueryFailedError & { code?: string }).code === 'ER_DUP_ENTRY') {
+        res.status(409).json({
+          message: 'Duplicate request detected. Please refresh to see your existing order.',
         });
         return;
       }
@@ -392,12 +412,26 @@ export class OrderController {
     }
   }
 
-  static async getOrderStatus(req: Request, res: Response): Promise<void> {
+  static async getOrderStatus(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+
       const orderRepository = AppDataSource.getRepository(Order);
+      // Ownership check baked into the WHERE clause: a hit means the order
+      // exists AND belongs to the caller. Anything else returns the same 404
+      // so we don't leak existence of other users' orders.
       const order = await orderRepository.findOne({
-        where: { id: Number(id) },
+        where: { id, user: { id: userId } },
         relations: ['items', 'items.product'],
       });
 

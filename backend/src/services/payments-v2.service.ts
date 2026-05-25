@@ -268,6 +268,93 @@ export class PaymentsV2Service {
     }
   }
 
+  /**
+   * Promote a payment from initiated/success_unverified → paid and confirm the order.
+   * Idempotent. Caller is responsible for the amount-matches-expected check.
+   * Shared between the webhook handler (after its amount guard) and the reconciler
+   * (which guards explicitly before calling).
+   */
+  static async markPaymentPaid(
+    payment: Payment,
+    razorpayPaymentId: string | null,
+    rawPayload: Record<string, unknown> | null = null
+  ): Promise<void> {
+    if (payment.status === 'paid' || payment.status === 'refunded') return;
+    if (!this.canTransition(payment.status, 'paid')) return;
+
+    const paymentRepo = AppDataSource.getRepository(Payment);
+    payment.status = 'paid';
+    if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
+    if (rawPayload) payment.rawWebhookJson = rawPayload;
+    await paymentRepo.save(payment);
+
+    const orderRepo = AppDataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ where: { id: payment.orderId } });
+    if (order) {
+      if (order.status === 'pending') {
+        order.status = 'accepted';
+      }
+      order.paymentStatus = 'paid';
+      order.isPaid = true;
+      if (razorpayPaymentId) order.paymentId = razorpayPaymentId;
+      await orderRepo.save(order);
+    }
+  }
+
+  /**
+   * Demote a payment to failed and release reserved inventory.
+   * Idempotent — bails on rows that are already terminal, and only restores stock
+   * when the order is still pending (so duplicate calls can't double-credit inventory).
+   * Shared between the webhook handler, the amount-mismatch path, and the reconciler.
+   */
+  static async markPaymentFailed(
+    payment: Payment,
+    code: string,
+    rawPayload: Record<string, unknown> | null = null
+  ): Promise<void> {
+    if (payment.status === 'failed' || payment.status === 'refunded') return;
+    if (!this.canTransition(payment.status, 'failed')) return;
+
+    const paymentRepo = AppDataSource.getRepository(Payment);
+    payment.status = 'failed';
+    payment.failureCode = code;
+    if (rawPayload) payment.rawWebhookJson = rawPayload;
+    await paymentRepo.save(payment);
+
+    const orderRepo = AppDataSource.getRepository(Order);
+    const order = await orderRepo.findOne({
+      where: { id: payment.orderId },
+      relations: ['items', 'items.product', 'items.variant'],
+    });
+    if (order && order.status === 'pending') {
+      await OrderInventoryService.restoreReservedStockForItems(order.items);
+      order.status = 'cancelled';
+      order.paymentStatus = 'failed';
+      await orderRepo.save(order);
+    }
+  }
+
+  /**
+   * Run `fn` while holding the per-razorpay-order lock used by the webhook handler.
+   * Lets external callers (the reconciler) coordinate with live webhook processing
+   * so they don't race on the same payment row.
+   * Returns { ran: false } if the lock is busy — caller should retry next tick.
+   */
+  static async withPaymentLock<T>(
+    razorpayOrderId: string,
+    fn: () => Promise<T>
+  ): Promise<{ ran: true; result: T } | { ran: false }> {
+    const lockKey = `lock:payment:${razorpayOrderId}`;
+    const lockToken = await acquireLock(lockKey, 30);
+    if (!lockToken) return { ran: false };
+    try {
+      const result = await fn();
+      return { ran: true, result };
+    } finally {
+      await releaseLock(lockKey, lockToken);
+    }
+  }
+
   private static async onPaymentCaptured(payload: Record<string, unknown>): Promise<void> {
     const entity = readPaymentEntity(payload);
     if (!entity) return;
@@ -288,45 +375,11 @@ export class PaymentsV2Service {
         expected: payment.amountPaise,
         received: entity.amount,
       });
-      payment.status = 'failed';
-      payment.failureCode = 'AMOUNT_MISMATCH';
-      payment.rawWebhookJson = payload;
-      await paymentRepo.save(payment);
-      await AppDataSource.getRepository(Order).update(
-        { id: payment.orderId },
-        { paymentStatus: 'failed', status: 'cancelled' }
-      );
-      // Release reserved inventory so the user isn't held up.
-      const order = await AppDataSource.getRepository(Order).findOne({
-        where: { id: payment.orderId },
-        relations: ['items', 'items.product', 'items.variant'],
-      });
-      if (order) await OrderInventoryService.restoreReservedStockForItems(order.items);
+      await this.markPaymentFailed(payment, 'AMOUNT_MISMATCH', payload);
       return;
     }
 
-    if (payment.status === 'paid' || payment.status === 'refunded') return;
-    if (!this.canTransition(payment.status, 'paid')) return;
-
-    payment.status = 'paid';
-    payment.razorpayPaymentId = entity.id ?? payment.razorpayPaymentId;
-    payment.rawWebhookJson = payload;
-    await paymentRepo.save(payment);
-
-    // Confirm the order. Mobile-visible `status` becomes 'accepted' so existing UI lights up;
-    // 'payment_status' carries the fine-grained state for internal flows.
-    const orderRepo = AppDataSource.getRepository(Order);
-    const order = await orderRepo.findOne({ where: { id: payment.orderId } });
-    if (order) {
-      // Only advance if the order is still in a pre-confirmed state.
-      if (order.status === 'pending') {
-        order.status = 'accepted';
-      }
-      order.paymentStatus = 'paid';
-      order.isPaid = true;
-      order.paymentId = entity.id ?? order.paymentId;
-      await orderRepo.save(order);
-    }
+    await this.markPaymentPaid(payment, entity.id ?? null, payload);
   }
 
   private static async onPaymentFailed(payload: Record<string, unknown>): Promise<void> {
@@ -339,24 +392,8 @@ export class PaymentsV2Service {
     });
     if (!payment) return;
 
-    if (!this.canTransition(payment.status, 'failed')) return;
-
-    payment.status = 'failed';
-    payment.failureCode = (entity.error_code as string | undefined) ?? 'PAYMENT_FAILED';
-    payment.rawWebhookJson = payload;
-    await paymentRepo.save(payment);
-
-    const orderRepo = AppDataSource.getRepository(Order);
-    const order = await orderRepo.findOne({
-      where: { id: payment.orderId },
-      relations: ['items', 'items.product', 'items.variant'],
-    });
-    if (order && order.status === 'pending') {
-      await OrderInventoryService.restoreReservedStockForItems(order.items);
-      order.status = 'cancelled';
-      order.paymentStatus = 'failed';
-      await orderRepo.save(order);
-    }
+    const code = (entity.error_code as string | undefined) ?? 'PAYMENT_FAILED';
+    await this.markPaymentFailed(payment, code, payload);
   }
 
   private static async onRefundProcessed(payload: Record<string, unknown>): Promise<void> {

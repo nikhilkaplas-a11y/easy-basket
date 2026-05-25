@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
 import * as util from 'util';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
@@ -53,6 +54,51 @@ function isPermanentFcmTokenFailure(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Resolve the Firebase service account credential.
+ *
+ * Preferred:  FIREBASE_SERVICE_ACCOUNT_PATH=/abs/path/to/service-account.json
+ *             (file should be chmod 0600 and owned by the runtime user)
+ * Legacy:     FIREBASE_SERVICE_ACCOUNT=<inline JSON> — readable by anyone with
+ *             shell access via `pm2 env <id>` or /proc/<pid>/environ. A warning
+ *             is emitted when this path is taken; migrate to the file form.
+ *
+ * Returns null when neither is configured. Throws nothing — all I/O and parse
+ * errors are swallowed and surfaced as a generic warning so the JSON contents
+ * (including the private key) never leak into logs.
+ */
+function loadFirebaseServiceAccount(): admin.ServiceAccount | null {
+  const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
+  if (filePath) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(raw) as admin.ServiceAccount;
+    } catch {
+      console.error(
+        `[FCM] Failed to read or parse service account at FIREBASE_SERVICE_ACCOUNT_PATH. Check file exists, is valid JSON, and is readable by the runtime user.`
+      );
+      return null;
+    }
+  }
+
+  const inline = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+  if (inline) {
+    console.warn(
+      '[FCM] Loading service account from FIREBASE_SERVICE_ACCOUNT env var. ' +
+        'This is readable via `pm2 env <id>` and /proc/<pid>/environ — migrate ' +
+        'to FIREBASE_SERVICE_ACCOUNT_PATH (chmod 0600 file) to keep the key off the env.'
+    );
+    try {
+      return JSON.parse(inline) as admin.ServiceAccount;
+    } catch {
+      console.error('[FCM] FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
+      return null;
+    }
+  }
+
+  return null;
+}
+
 async function clearStoredFcmTokenIfMatches(userId: number, rawToken: string): Promise<void> {
   const userRepository = AppDataSource.getRepository(User);
   const u = await userRepository.findOneBy({ id: userId });
@@ -84,20 +130,27 @@ export class FCMService {
       return;
     }
 
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-      console.warn('Firebase service account not configured. FCM notifications will be disabled.');
+    const serviceAccount = loadFirebaseServiceAccount();
+    if (!serviceAccount) {
+      console.warn(
+        'Firebase service account not configured (set FIREBASE_SERVICE_ACCOUNT_PATH). FCM notifications will be disabled.'
+      );
       return;
     }
 
     try {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
       this.initialized = true;
       console.log('Firebase Admin initialized');
-    } catch (error) {
-      console.error('Firebase initialization error:', error);
+    } catch {
+      // Intentionally swallow error details. The credential object contains the
+      // RSA private key, and firebase-admin's init error messages have leaked
+      // raw key material into stacks before. A generic line is enough for ops.
+      console.error(
+        '[FCM] Firebase Admin initialization failed. Verify FIREBASE_SERVICE_ACCOUNT_PATH points to a valid service-account JSON.'
+      );
     }
   }
 
