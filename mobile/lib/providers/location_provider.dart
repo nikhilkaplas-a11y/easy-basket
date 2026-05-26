@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:location/location.dart' as loc;
 import '../models/partial_address_model.dart';
 
 /// LocationProvider — Manages GPS location and permission state
@@ -129,11 +130,32 @@ class LocationProvider extends ChangeNotifier {
   Future<bool> requestPermission() async {
     try {
       // Check if GPS service is enabled first
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      var serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
       if (!serviceEnabled) {
-        _error = 'Please turn on location in phone settings';
-        notifyListeners();
-        return false;
+        // Try the in-app Google Play Services resolution dialog before sending
+        // the user out to phone settings. On Android with Play Services this
+        // shows a one-tap "OK" overlay that flips the OS toggle without
+        // leaving the app. On iOS / Android-without-Play-Services it returns
+        // false and the caller falls back to openLocationSettings().
+        try {
+          final accepted = await loc.Location().requestService();
+          if (accepted) {
+            serviceEnabled = true;
+            debugPrint('📍 [Location] In-app service dialog: enabled');
+          } else {
+            debugPrint('📍 [Location] In-app service dialog: declined or unavailable');
+          }
+        } catch (e) {
+          debugPrint('⚠️ [Location] requestService threw — falling back: $e');
+        }
+
+        if (!serviceEnabled) {
+          _error = 'Please turn on location in phone settings';
+          debugPrint('⚠️ [Location] Service still disabled — caller will show settings link');
+          notifyListeners();
+          return false;
+        }
       }
 
       // If permanently denied, can't request — need app settings
@@ -145,8 +167,19 @@ class LocationProvider extends ChangeNotifier {
 
       // Request permission — system dialog will appear
       _permissionStatus = await Geolocator.requestPermission();
-      notifyListeners();
+      debugPrint('📍 [Location] requestPermission returned: $_permissionStatus');
 
+      // Some Android devices return `unableToDetermine` or a stale `denied` value
+      // immediately after the user dismisses the dialog. A fresh checkPermission
+      // call gives the OS a moment to settle and returns the actual state.
+      if (_permissionStatus == LocationPermission.unableToDetermine ||
+          _permissionStatus == LocationPermission.denied) {
+        final settled = await Geolocator.checkPermission();
+        debugPrint('📍 [Location] re-check after dialog: $settled');
+        _permissionStatus = settled;
+      }
+
+      notifyListeners();
       return isPermissionGranted;
     } catch (e) {
       _error = 'Failed to request location permission';

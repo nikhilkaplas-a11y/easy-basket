@@ -39,6 +39,10 @@ dependencies:
   # Location
   geolocator: ^11.0.0
   geocoding: ^2.1.1
+  # location: used only for Location.requestService() — shows the in-app
+  # Google Play Services dialog to turn on OS location without leaving the app.
+  # geolocator handles everything else (permissions, GPS reads, accuracy).
+  location: ^8.0.0
   
   # Maps
   google_maps_flutter: ^2.5.0

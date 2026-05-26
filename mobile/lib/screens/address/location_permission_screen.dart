@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -555,20 +556,46 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
     if (!mounted) return;
 
     if (!granted) {
+      // Distinguish three failure modes so the user gets actionable guidance:
+      //   1. OS-level location toggle is OFF        → "Turn on Location" + open device location settings
+      //   2. Permission permanently denied          → open app settings (one-time grant won't work)
+      //   3. Plain denied (or transient plugin)     → user can re-tap "Allow"
+      final serviceOff = !(await Geolocator.isLocationServiceEnabled());
+      if (!mounted) return;
+
       setState(() {
         _isRequestingPermission = false;
-        if (locationProvider.isPermissionPermanentlyDenied) {
+        if (serviceOff) {
+          _errorMessage = 'Location is OFF on your phone. Turn it on to continue.';
+        } else if (locationProvider.isPermissionPermanentlyDenied) {
           _errorMessage = 'Location permanently denied. Tap to open Settings.';
         } else {
           _errorMessage = 'Location permission is needed for delivery';
         }
       });
-      if (locationProvider.isPermissionPermanentlyDenied && mounted) {
+
+      if (serviceOff && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Turn on Location in your phone settings'),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(
+              label: 'Open Settings',
+              textColor: Colors.white,
+              onPressed: () => locationProvider.openLocationSettings(),
+            ),
+          ),
+        );
+      } else if (locationProvider.isPermissionPermanentlyDenied && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Please enable location in phone Settings'),
             backgroundColor: Colors.orange,
-            action: SnackBarAction(label: 'Open Settings', textColor: Colors.white, onPressed: () => locationProvider.openAppSettings()),
+            action: SnackBarAction(
+              label: 'Open Settings',
+              textColor: Colors.white,
+              onPressed: () => locationProvider.openAppSettings(),
+            ),
           ),
         );
       }
