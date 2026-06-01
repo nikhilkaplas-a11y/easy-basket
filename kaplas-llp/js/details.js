@@ -22,7 +22,7 @@ status:
 "LIVE",
 
 image:
-"https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200",
+"assets/DSA.png",
 
 modules:[
 
@@ -62,7 +62,7 @@ status:
 "LIVE",
 
 image:
-"https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200",
+"assets/system-design.png",
 
 modules:[
 
@@ -102,7 +102,7 @@ status:
 "LIVE",
 
 image:
-"https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200",
+"assets/ai.png",
 
 modules:[
 
@@ -142,7 +142,7 @@ status:
 "LIVE",
 
 image:
-"https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=1200",
+"assets/combo.png",
 
 modules:[
 
@@ -177,7 +177,7 @@ duration:"6 Months",
 status:"OPEN",
 
 image:
-"https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200",
+"assets/software-internship.png",
 
 modules:[
 
@@ -212,7 +212,7 @@ duration:"6 Months",
 status:"OPEN",
 
 image:
-"https://images.unsplash.com/photo-1677756119517-756a188d2d94?w=1200",
+"assets/aiml-internship.png",
 
 modules:[
 

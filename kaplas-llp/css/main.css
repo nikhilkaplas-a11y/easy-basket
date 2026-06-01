@@ -2224,23 +2224,13 @@ transition:all .4s ease;
 
 width:100%;     /* add this */
 
-max-width:500px; /* use 600 not 1500 */
+max-width:5000px; /* use 600 not 1500 */
 
 margin:auto;
 
 }
 
-.course-img{
 
-height:220px;
-
-}
-
-.course-img{
-
-height:190px;   /* increased from 170px */
-
-}
 
 .track h3{
 
@@ -2262,7 +2252,7 @@ position:relative;
 
 margin:-32px -32px 20px;
 
-height:220px;
+height:400px;
 
 overflow:hidden;
 
@@ -2282,7 +2272,7 @@ transition:.5s;
 
 .track:hover .course-img img{
 
-transform:scale(1.08);
+transform:scale(1.03);
 
 }
 
@@ -2381,6 +2371,25 @@ transform:
 translateY(-8px);
 
 }
+.live-dot{
+
+width:10px;
+
+height:10px;
+
+min-width:10px;
+
+border-radius:50%;
+
+background:#00ff84;
+
+box-shadow:
+0 0 10px #00ff84;
+
+display:inline-block;
+
+}
+
 .track-head { display: flex; justify-content: space-between; align-items: flex-start; }
 .track h3 { margin-top: 22px; color: #fff; }
 .track p { margin-top: 12px; font-size: 0.95rem; line-height: 1.65; }
@@ -2394,7 +2403,23 @@ translateY(-8px);
   border-bottom: 1px solid var(--border);
 }
 .track-meta-lbl { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em; }
-.track-meta-val { font-size: 0.875rem; font-weight: 500; color: #fff; margin-top: 4px; }
+.track-meta-val{
+
+font-size:1.15rem;
+
+font-weight:600;
+
+display:flex;
+
+align-items:center;
+
+gap:10px;
+
+color:#fff;
+
+white-space:nowrap;
+
+}
 .track-modules {
   margin-top: 18px;
   display: grid;
