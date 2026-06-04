@@ -1866,34 +1866,88 @@ section { position: relative; }
   pointer-events: none;
 }
 .contact-form > * { position: relative; }
-.field { margin-top: 20px; }
-.field:first-of-type { margin-top: 0; }
-.field label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--text-muted);
-  margin-bottom: 10px;
+/* FORM FIELDS */
+
+.field{
+    margin-top:20px;
+    display:flex;
+    flex-direction:column;
 }
-.field input, .field textarea {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.02);
-  color: #fff;
-  font-size: 0.925rem;
-  transition: all 0.2s ease;
+
+.field:first-of-type{
+    margin-top:0;
 }
-.field input:focus, .field textarea:focus {
-  outline: none;
-  border-color: rgba(79,70,229,0.4);
-  background: rgba(79,70,229,0.04);
+
+.field label{
+    display:block;
+    height:18px;              /* keeps labels aligned */
+    margin-bottom:12px;
+
+    font-size:0.75rem;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.18em;
+    color:var(--text-muted);
 }
-.field textarea { min-height: 130px; resize: vertical; }
-.field-row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+
+.field input,
+.field textarea{
+
+    width:100%;
+    box-sizing:border-box;
+
+    padding:14px 16px;
+
+    border-radius:var(--r-md);
+
+    border:1px solid var(--border);
+
+    background:rgba(255,255,255,0.02);
+
+    color:#fff;
+
+    font-size:0.925rem;
+
+    transition:all .2s ease;
+}
+
+.field input{
+    height:62px;   /* equal height for name & email */
+}
+
+.field input:focus,
+.field textarea:focus{
+
+    outline:none;
+
+    border-color:rgba(79,70,229,0.4);
+
+    background:rgba(79,70,229,0.04);
+}
+
+.field textarea{
+    min-height:130px;
+    resize:vertical;
+}
+
+/* NAME + EMAIL ROW */
+
+.field-row{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:20px;
+    align-items:start;
+}
+
+.field-row .field{
+    margin-top:0;
+}
+
+@media(max-width:540px){
+    .field-row{
+        grid-template-columns:1fr;
+    }
+}
 @media (min-width: 540px) { .field-row { grid-template-columns: repeat(2, 1fr); gap: 20px; } }
 .topic-pick {
   display: grid;
@@ -2188,261 +2242,388 @@ section { position: relative; }
 @media (min-width: 768px) { .cs-outcome { padding: 56px; } }
 
 /* --- 24. TRAINING PAGE ----------------------------------- */
+/* ==========================
+   COURSES GRID
+========================== */
+
 .tracks-grid{
-
-display:grid;
-
-grid-template-columns:
-repeat(2,1fr);
-
-gap:28px;
-
-margin-top:60px;
-
-}
-@media (min-width: 1024px) { .tracks-grid { grid-template-columns: repeat(2, 1fr); } }
-.track{
-
-position:relative;
-
-overflow:hidden;
-
-padding:26px;
-
-border-radius:20px;
-
-border:1px solid var(--border);
-
-background:
-linear-gradient(
-135deg,
-rgba(255,255,255,0.04),
-transparent
-);
-
-transition:all .4s ease;
-
-width:100%;     /* add this */
-
-max-width:5000px; /* use 600 not 1500 */
-
-margin:auto;
-
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(380px,1fr));
+    gap:30px;
+    margin-top:60px;
 }
 
-
-
-.track h3{
-
-font-size:1.55rem;
-
-}
-
-.course-btn{
-
-padding:12px;
-
-font-size:15px;
-
-}
-.track:hover { border-color: rgba(79,70,229,0.3); }
-.course-img{
-
-position:relative;
-
-margin:-32px -32px 20px;
-
-height:400px;
-
-overflow:hidden;
-
-}
-
-.course-img img{
-
-width:100%;
-
-height:100%;
-
-object-fit:cover;
-
-transition:.5s;
-
-}
-
-.track:hover .course-img img{
-
-transform:scale(1.03);
-
-}
-
-.course-price{
-
-display:flex;
-
-gap:12px;
-
-align-items:center;
-
-margin:18px 0;
-
-}
-
-.old-price{
-
-text-decoration:line-through;
-
-color:var(--text-dim);
-
-font-size:18px;
-
-}
-
-.new-price{
-
-font-size:28px;
-
-font-weight:700;
-
-background:
-
-linear-gradient(
-135deg,
-#818cf8,
-#06B6D4
-);
-
--webkit-background-clip:text;
-
-color:transparent;
-
-}
-
-.course-btn{
-
-width:100%;
-
-margin-top:24px;
-
-padding:14px;
-
-border:none;
-
-border-radius:14px;
-
-background:
-
-linear-gradient(
-135deg,
-#4F46E5,
-#06B6D4
-);
-
-color:white;
-
-font-weight:600;
-
-cursor:pointer;
-
-transition:.3s;
-
-}
-
-.course-btn:hover{
-
-transform:translateY(-3px);
-
-box-shadow:
-
-0 10px 35px
-rgba(79,70,229,.4);
-
-}
+/* ==========================
+   COURSE CARD
+========================== */
 
 .track{
+    width:100%;
+    max-width:420px;
 
-backdrop-filter:blur(10px);
+    margin:auto;
 
+    padding:20px;
+
+    background:#0a0a0a;
+
+    border-radius:24px;
+
+    border:1px solid rgba(255,255,255,.08);
+
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+
+    height:auto;
 }
 
 .track:hover{
-
-transform:
-translateY(-8px);
-
-}
-.live-dot{
-
-width:10px;
-
-height:10px;
-
-min-width:10px;
-
-border-radius:50%;
-
-background:#00ff84;
-
-box-shadow:
-0 0 10px #00ff84;
-
-display:inline-block;
-
+    transform:translateY(-8px);
+    border-color:rgba(255,255,255,0.15);
 }
 
-.track-head { display: flex; justify-content: space-between; align-items: flex-start; }
-.track h3 { margin-top: 22px; color: #fff; }
-.track p { margin-top: 12px; font-size: 0.95rem; line-height: 1.65; }
-.track-meta {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: 18px;
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+/* ==========================
+   IMAGE
+========================== */
+
+.course-img{
+    width:100%;
+    height:240px;
+    border-radius:18px;
+    overflow:hidden;
+    margin-bottom:18px;
+    background:#111;
 }
-.track-meta-lbl { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em; }
-.track-meta-val{
 
-font-size:1.15rem;
-
-font-weight:600;
-
-display:flex;
-
-align-items:center;
-
-gap:10px;
-
-color:#fff;
-
-white-space:nowrap;
-
+.course-img img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    object-position:center center;
+    display:block;
+    transition:transform .5s ease;
 }
-.track-modules {
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+
+.track:hover .course-img img{
+    transform:scale(1.05);
 }
-@media (min-width: 540px) { .track-modules { grid-template-columns: repeat(2, 1fr); } }
-.track-modules li {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  font-size: 0.825rem;
-  color: var(--text);
+
+/* ==========================
+   TAGS
+========================== */
+
+.course-tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+
+    margin-bottom:18px;
 }
-.track-modules li::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--primary-light);
-  margin-top: 9px;
-  flex-shrink: 0;
+
+.tag{
+    padding:8px 16px;
+
+    border:1px solid rgba(255,255,255,0.15);
+
+    border-radius:999px;
+
+    color:#d1d5db;
+
+    font-size:.85rem;
 }
+
+/* ==========================
+   TITLE
+========================== */
+
+.track h3{
+    color:#fff;
+
+    font-size:1.7rem;
+
+    line-height:1.2;
+
+    font-weight:600;
+
+    margin-bottom:20px;
+}
+
+/* ==========================
+   PRICE SECTION
+========================== */
+
+.course-price{
+    margin-bottom:10px;
+}
+
+.price-label{
+    display:block;
+
+    color:#fff;
+
+    font-size:1.15rem;
+
+    margin-bottom:10px;
+}
+
+.price-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.offer-price{
+    font-size:2.2rem;
+    font-weight:700;
+    color:#ff6b00;
+}
+
+.old-price{
+    text-decoration:line-through;
+    color:#777;
+    font-size:1.1rem;
+}
+
+.discount-badge{
+    background:white;
+    color:black;
+
+    padding:5px 10px;
+
+    border-radius:6px;
+
+    font-size:.8rem;
+    font-weight:600;
+}
+
+/* ==========================
+   BUTTON
+========================== */
+
+.course-btn{
+    margin-top:auto;
+
+    width:190px;
+
+    height:52px;
+
+    border:1px solid rgba(255,255,255,0.15);
+
+    border-radius:16px;
+
+    background:transparent;
+
+    color:white;
+
+    font-size:1rem;
+
+    font-weight:500;
+
+    cursor:pointer;
+
+    transition:.3s;
+}
+
+.course-btn:hover{
+    background:white;
+    color:black;
+}
+
+/* ==========================
+   MOBILE
+========================== */
+
+@media(max-width:768px){
+
+    .tracks-grid{
+        grid-template-columns:1fr;
+    }
+
+    .track{
+        max-width:100%;
+    }
+
+    .track h3{
+        font-size:1.6rem;
+    }
+
+    .offer-price{
+        font-size:1.8rem;
+    }
+}
+
+
+/* intern-grid */
+/* ==========================
+   INTERNSHIP SECTION
+========================== */
+
+.internship-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:24px;
+    margin-top:50px;
+}
+
+.internship-card{
+    position:relative;
+    overflow:hidden;
+
+    padding:22px;
+
+    border-radius:22px;
+
+    border:1px solid rgba(255,255,255,.08);
+
+    background:
+    linear-gradient(
+        135deg,
+        rgba(79,70,229,.15),
+        rgba(6,182,212,.08)
+    );
+
+    backdrop-filter:blur(12px);
+
+    transition:.35s ease;
+
+    min-height:150px;   /* reduced */
+}
+
+.internship-card::before{
+    content:"";
+
+    position:absolute;
+
+    width:180px;
+    height:180px;
+
+    top:-80px;
+    right:-80px;
+
+    background:
+    radial-gradient(
+        circle,
+        rgba(79,70,229,.4),
+        transparent
+    );
+
+    border-radius:50%;
+}
+
+.internship-card::after{
+    content:"";
+
+    position:absolute;
+
+    width:140px;
+    height:140px;
+
+    bottom:-60px;
+    left:-60px;
+
+    background:
+    radial-gradient(
+        circle,
+        rgba(6,182,212,.25),
+        transparent
+    );
+
+    border-radius:50%;
+}
+
+.internship-card:hover{
+    transform:translateY(-6px);
+
+    border-color:rgba(79,70,229,.4);
+
+    box-shadow:
+    0 15px 40px rgba(79,70,229,.18);
+}
+
+.internship-tags{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:15px;
+}
+
+.internship-card h3{
+    color:white;
+
+    font-size:1.6rem;
+
+    margin-bottom:12px;
+
+    line-height:1.2;
+}
+
+.internship-price{
+    font-size:1.8rem;
+
+    font-weight:700;
+
+    margin-bottom:6px;
+
+    background:
+    linear-gradient(
+        135deg,
+        #818cf8,
+        #06B6D4
+    );
+
+    -webkit-background-clip:text;
+    color:transparent;
+}
+
+.internship-duration{
+    color:#9CA3AF;
+    font-size:.95rem;
+    margin-bottom:15px;
+}
+
+.internship-modules{
+    list-style:none;
+    padding:0;
+    margin:0 0 20px;
+}
+
+.internship-modules li{
+    color:#fff;
+    font-size:.9rem;
+    margin-bottom:8px;
+}
+
+.internship-modules li::before{
+    content:"•";
+    color:#06B6D4;
+    margin-right:8px;
+}
+
+.internship-btn{
+    width:170px;
+
+    padding:12px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:
+    linear-gradient(
+        135deg,
+        #4F46E5,
+        #06B6D4
+    );
+
+    color:white;
+
+    font-weight:600;
+
+    cursor:pointer;
+}
+
 
 /* --- 25. REVEAL ANIMATIONS ------------------------------- */
 .reveal {
