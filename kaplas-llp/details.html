@@ -1,589 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0"
-/>
-
-<title>
-Kaplas Academy
-</title>
-
-<link rel="stylesheet" href="css/main.css">
-
-<script src="js/details.js" defer></script>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaplas Academy</title>
 <style>
-
-.details-page{
-
-padding:140px 5% 100px;
-
-min-height:100vh;
-
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:#070B17;color:#fff}
+.hero{max-width:1300px;margin:80px auto 40px;padding:0 5%;
+display:grid;grid-template-columns:1.1fr 1fr;gap:50px;align-items:center}
+.badge{background:#4F46E5;padding:8px 16px;border-radius:30px;font-size:.8rem;display:inline-block}
+.hero-left h1{font-size:clamp(2.5rem,5vw,4.5rem);margin:20px 0}
+.hero-left p{color:#CBD5E1;line-height:1.8}
+.hero-right{border-radius:25px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+.hero-right img{width:100%;display:block}
+.container{max-width:1300px;margin:auto;padding:20px 5%;display:grid;grid-template-columns:2fr 1fr;gap:35px}
+.card,.price-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+backdrop-filter:blur(20px);padding:30px;border-radius:25px;margin-bottom:25px}
+.modules,.features{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
+.module,.feature{padding:18px;background:rgba(255,255,255,.04);border-radius:15px}
+.module:hover{border:1px solid #4F46E5}
+.sidebar{position:sticky;top:20px;height:fit-content}
+.old-price{text-decoration:line-through;color:#94A3B8}
+.new-price{font-size:3rem;font-weight:700;background:linear-gradient(135deg,#4F46E5,#06B6D4);
+-webkit-background-clip:text;color:transparent}
+.btn{display:block;text-align:center;padding:15px;border-radius:15px;text-decoration:none;
+margin-top:15px;font-weight:600}
+.primary{background:linear-gradient(135deg,#4F46E5,#06B6D4);color:#fff}
+.secondary{background:#1E293B;color:#fff}
+@media(max-width:900px){
+.hero,.container{grid-template-columns:1fr}
+.modules,.features{grid-template-columns:1fr}
 }
-
-.details-container{
-
-max-width:1300px;
-
-margin:auto;
-
-display:grid;
-
-grid-template-columns:
-1fr 1fr;
-
-gap:60px;
-
-align-items:center;
-
-}
-
-.details-image{
-
-overflow:hidden;
-
-border-radius:28px;
-
-border:1px solid var(--border);
-
-}
-
-.details-image img{
-
-width:100%;
-
-height:100%;
-
-object-fit:cover;
-
-display:block;
-
-}
-
-.details-content h1{
-
-font-size:clamp(2.8rem,5vw,4.5rem);
-
-margin-top:20px;
-
-}
-
-.details-content p{
-
-margin-top:24px;
-
-line-height:1.9;
-
-font-size:1.05rem;
-
-color:var(--text-muted);
-
-}
-
-.details-price{
-
-display:flex;
-
-gap:18px;
-
-align-items:center;
-
-margin-top:30px;
-
-}
-
-.old-price{
-
-text-decoration:line-through;
-
-font-size:22px;
-
-color:var(--text-dim);
-
-}
-
-.new-price{
-
-font-size:42px;
-
-font-weight:700;
-
-background:
-linear-gradient(
-135deg,
-#818cf8,
-#06B6D4
-);
-
--webkit-background-clip:text;
-
-color:transparent;
-
-}
-
-.details-meta{
-
-display:grid;
-
-grid-template-columns:
-repeat(2,1fr);
-
-gap:20px;
-
-margin-top:35px;
-
-}
-
-.meta-box{
-
-padding:22px;
-
-border-radius:18px;
-
-border:1px solid var(--border);
-
-background:
-rgba(255,255,255,.03);
-
-}
-
-.meta-label{
-
-font-size:.75rem;
-
-text-transform:uppercase;
-
-letter-spacing:.14em;
-
-color:var(--text-dim);
-
-}
-
-.meta-value{
-
-margin-top:10px;
-
-font-size:1.1rem;
-
-font-weight:600;
-
-display:flex;
-
-align-items:center;
-
-gap:10px;
-
-}
-
-.live-dot{
-
-width:12px;
-
-height:12px;
-
-border-radius:50%;
-
-background:#00ff66;
-
-box-shadow:
-0 0 12px #00ff66;
-
-}
-
-.modules{
-
-margin-top:40px;
-
-display:grid;
-
-grid-template-columns:
-repeat(2,1fr);
-
-gap:18px;
-
-}
-
-.module{
-
-padding:18px;
-
-border-radius:16px;
-
-border:1px solid var(--border);
-
-background:
-linear-gradient(
-135deg,
-rgba(255,255,255,0.04),
-transparent
-);
-
-font-weight:500;
-
-transition:.3s;
-
-}
-
-.module:hover{
-
-transform:translateY(-5px);
-
-border-color:
-rgba(79,70,229,.4);
-
-}
-
-.hero-btns{
-
-display:flex;
-
-gap:18px;
-
-margin-top:45px;
-
-flex-wrap:wrap;
-
-}
-
-.apply-btn{
-
-padding:15px 30px;
-
-border:none;
-
-border-radius:14px;
-
-background:
-linear-gradient(
-135deg,
-#4F46E5,
-#06B6D4
-);
-
-color:white;
-
-font-weight:600;
-
-cursor:pointer;
-
-transition:.3s;
-
-}
-
-.apply-btn:hover{
-
-transform:translateY(-3px);
-
-box-shadow:
-0 15px 35px
-rgba(79,70,229,.35);
-
-}
-
-.back-btn{
-
-padding:15px 30px;
-
-border-radius:14px;
-
-border:1px solid var(--border);
-
-background:
-rgba(255,255,255,.04);
-
-color:white;
-
-font-weight:600;
-
-}
-
-@media(max-width:950px){
-
-.details-container{
-
-grid-template-columns:1fr;
-
-}
-
-.modules{
-
-grid-template-columns:1fr;
-
-}
-
-}
-
 </style>
-
 </head>
-
 <body>
 
-<section class="details-page">
-
-<div class="details-container">
-
-<div class="details-image">
-
-<img
-id="course-image"
-src=""
-alt=""
->
-
-</div>
-
-
-<div class="details-content">
-
-<span class="eyebrow">
-KAPLAS ACADEMY
-</span>
-
+<section class="hero">
+<div class="hero-left">
+<span class="badge">KAPLAS ACADEMY</span>
 <h1 id="title"></h1>
-
 <p id="description"></p>
-
-<div class="details-price">
-
-<span
-class="old-price"
-id="oldPrice"
-></span>
-
-<span
-class="new-price"
-id="newPrice"
-></span>
-
+<a href="index.html#contact" class="btn primary">Apply Now</a>
 </div>
-
-
-<div class="details-meta">
-
-<div class="meta-box">
-
-<div class="meta-label">
-Duration
+<div class="hero-right">
+<img id="course-image" src="" alt="Course">
 </div>
-
-<div
-class="meta-value"
-id="duration"
-></div>
-
-</div>
-
-
-<div class="meta-box">
-
-<div class="meta-label">
-Status
-</div>
-
-<div class="meta-value">
-
-<div class="live-dot">
-</div>
-
-<span id="status"></span>
-
-</div>
-
-</div>
-
-</div>
-
-
-<div
-class="modules"
-id="modules"
->
-
-</div>
-
-
-<div class="hero-btns">
-<!-- re-direct to apply -->
-<a href="index.html#contact" class="btn btn-primary btn-lg btn-arrow btn-magnetic">Apply Now
-          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
-
-<a href="training.html">
-
-<button class="back-btn">
-Back
-</button>
-
-</a>
-
-</div>
-
-</div>
-
-</div>
-
 </section>
 
+<div class="container">
+<div>
+<div class="card">
+<h2>Course Overview</h2>
+<p id="overview"></p>
+</div>
 
+<div class="card">
+<h2>Curriculum</h2>
+<div id="modules" class="modules"></div>
+</div>
+
+<div class="card">
+<h2>Why Join Us?</h2>
+<div class="features">
+<div class="feature">✅ Live Classes</div>
+<div class="feature">✅ Recorded Sessions</div>
+<div class="feature">✅ Placement Guidance</div>
+<div class="feature">✅ Real Projects</div>
+<div class="feature">✅ Mock Interviews</div>
+<div class="feature">✅ Industry Mentorship</div>
+</div>
+</div>
+</div>
+
+<div class="sidebar">
+<div class="price-card">
+<h3>Course Price</h3><br>
+<div id="oldPrice" class="old-price"></div>
+<div id="newPrice" class="new-price"></div><br>
+<p><b>Duration:</b> <span id="duration"></span></p><br>
+<p><b>Status:</b> <span id="status"></span></p>
+<a href="index.html#contact" class="btn primary">Apply Now</a>
+<a href="training.html" class="btn secondary">Back</a>
+</div>
+</div>
+</div>
 
 <script>
-
-const data = {
-
-
-dsa:{
-
-title:
-"DSA Mastery Program",
-
-description:
-"Master Data Structures and Algorithms from beginner to advanced level. This program focuses on problem solving, coding interview preparation, competitive programming concepts, and real-world algorithmic thinking. Students will learn optimized coding techniques and build strong logical foundations required for software engineering roles.",
-
-oldPrice:
-"₹5499",
-
-newPrice:
-"₹4499",
-
-duration:
-"2 Months",
-
-status:
-"LIVE",
-
-image:
-"assets/DSA.png",
-
-modules:[
-
-"Arrays & Strings",
-"Linked Lists",
-"Trees & Graphs",
-"Recursion",
-"Dynamic Programming",
-"Sliding Window",
-"Greedy Algorithms",
-"Interview Preparation"
-
-]
-
-},
-
-
-
-systemdesign:{
-
-title:
-"System Design Program",
-
-description:
-"Learn how large-scale systems are designed in modern tech companies. This course covers High Level Design, Low Level Design, databases, caching systems, APIs, load balancing, scalability concepts, and distributed architecture with practical real-world examples.",
-
-oldPrice:
-"₹5499",
-
-newPrice:
-"₹4499",
-
-duration:
-"2 Months",
-
-status:
-"LIVE",
-
-image:
-"assets/system-design.png",
-
-modules:[
-
-"HLD & LLD",
-"Database Design",
-"Caching",
-"Scalability",
-"API Design",
-"Microservices",
-"Load Balancing",
-"Architecture Design"
-
-]
-
-},
-
-
-
-ai:{
-
-title:
-"Artificial Intelligence Program",
-
-description:
-"Explore the world of Artificial Intelligence and Machine Learning with practical implementation. Learn AI models, prompt engineering, neural networks, machine learning basics, AI workflows, and industry tools used in modern AI applications.",
-
-oldPrice:
-"₹5499",
-
-newPrice:
-"₹4499",
-
-duration:
-"2 Months",
-
-status:
-"LIVE",
-
-image:
-"assets/ai.png",
-
-modules:[
-
-"Machine Learning",
-"AI Models",
-"Prompt Engineering",
-"Neural Networks",
+const data={
+dsa:{title:"DSA Mastery Program",description:"Master Data Structures and Algorithms.",oldPrice:"₹5499",newPrice:"₹4499",duration:"2 Months",status:"LIVE",image:"assets/DSA.png",modules:["Arrays","Linked Lists","Trees","Graphs","Dynamic Programming","Recursion","Greedy","Interview Prep"]},
+systemdesign:{title:"System Design Program",description:"Learn scalable system architecture.",oldPrice:"₹5499",newPrice:"₹4499",duration:"2 Months",status:"LIVE",image:"assets/system-design.png",modules:["HLD","LLD","Redis","Kafka","CDN","API Design","Microservices","Load Balancing","AWS EC2","Architectural Patterns"]},
+ai:{title:"Artificial Intelligence Program",description:"Learn AI, ML and Generative AI.",oldPrice:"₹5499",newPrice:"₹4499",duration:"2 Months",status:"LIVE",image:"assets/ai.png",modules:[
+"Python for AI",
 "Data Processing",
-"Generative AI",
+"Machine Learning",
+"Neural Networks",
 "Deep Learning",
-"AI Projects"
-
-]
-
-},
-
-
-
+"Generative AI",
+"Prompt Engineering",
+"Agentic AI",
+"AI Models & LLMs",
+"Real-World AI Projects"
+]},
 mastery:{
-
-title:
-"DSA + System Design + AI",
-
-description:
-"Complete technology mastery program combining DSA, System Design, and Artificial Intelligence into one powerful roadmap. This long-term intensive program prepares students for placements, software engineering interviews, industry-level development, and modern AI workflows.",
-
-oldPrice:
-"₹16499",
-
-newPrice:
-"₹8499",
-
-duration:
-"5-6 Months",
-
-status:
-"LIVE",
-
-image:
-"assets/combo.png",
-
+title:"DSA + System Design + AI",
+description:"Complete technology mastery program combining DSA, System Design, and Artificial Intelligence into one powerful roadmap. This intensive program prepares students for placements, internships, software engineering interviews, and modern AI workflows.",
+oldPrice:"₹16499",
+newPrice:"₹8499",
+duration:"5-6 Months",
+status:"LIVE",
+image:"assets/combo.png",
 modules:[
-
 "Advanced DSA",
 "System Design",
 "Artificial Intelligence",
@@ -592,178 +119,64 @@ modules:[
 "Problem Solving",
 "Production Concepts",
 "Placement Guidance"
-
 ]
-
 },
+software: {
+        title: "Software / Web Development Internship",
+        description: "Gain real-world experience by building frontend, backend, and full-stack applications under industry mentorship.",
+        oldPrice: "",
+        newPrice: "₹6000",
+        duration: "6 Months",
+        status: "OPEN",
+        image: "assets/software-dev-intern.png",
+        modules: [
+            "Frontend Development",
+            "Backend Development",
+            "REST APIs",
+            "Database Design",
+            "Git & GitHub",
+            "Deployment",
+            "Industry Workflow",
+            "Real Projects"
+        ]
+    },
 
-
-
-software:{
-
-title:
-"Software / Web Development Internship",
-
-description:
-"Gain practical industry experience by working on real-world software and web development projects. Learn frontend development, backend systems, APIs, databases, deployment, Git/GitHub workflow, and modern development practices under mentorship.",
-
-oldPrice:"",
-newPrice:"₹6000",
-
-duration:"6 Months",
-
-status:"OPEN",
-
-image:
-"assets/software-dev-intern.png",
-
-modules:[
-
-"Frontend Development",
-"Backend Development",
-"REST APIs",
-"Database Design",
-"Git & GitHub",
-"Deployment",
-"Industry Workflow",
-"Real Projects"
-
-]
-
-},
-
-
-
-aiml:{
-
-title:
-"AI / ML Internship",
-
-description:
-"Work on Artificial Intelligence and Machine Learning projects involving predictive models, data analysis, AI algorithms, neural networks, and industry-level AI applications. Build practical AI experience through project-based learning.",
-
-oldPrice:"",
-newPrice:"₹6000",
-
-duration:"6 Months",
-
-status:"OPEN",
-
-image:
-"assets/aiml-intern.png",
-
-modules:[
-
-"Machine Learning",
-"Predictive Models",
-"Data Analysis",
-"AI Algorithms",
-"Dataset Training",
-"Deep Learning",
-"Python for AI",
-"Industry Projects"
-
-]
-
-}
-
+    aiml: {
+        title: "AI / ML Internship",
+        description: "Work on real AI and Machine Learning projects involving predictive models, neural networks, data analysis, and deep learning.",
+        oldPrice: "",
+        newPrice: "₹6000",
+        duration: "6 Months",
+        status: "OPEN",
+        image: "assets/aiml-intern.png",
+        modules: [
+            "Machine Learning",
+            "Predictive Models",
+            "Data Analysis",
+            "AI Algorithms",
+            "Dataset Training",
+            "Deep Learning",
+            "Python for AI",
+            "Industry Projects"
+        ]
+    }      
 };
 
+const params=new URLSearchParams(window.location.search);
+const course=params.get("course")||"dsa";
+const item=data[course];
 
+if(!item){window.location.href="details.html?course=dsa";}
 
-const params =
-new URLSearchParams(
-window.location.search
-);
-
-const course =
-params.get("course");
-
-const item =
-data[course];
-
-
-
-if(!item){
-
-document.body.innerHTML = `
-
-<h1
-style="
-color:white;
-text-align:center;
-margin-top:100px;
-font-size:50px;
-"
->
-
-Course Not Found
-
-</h1>
-
-`;
-
-throw new Error(
-"Invalid Course"
-);
-
-}
-
-
-
-document.getElementById(
-"title"
-).innerText =
-item.title;
-
-document.getElementById(
-"description"
-).innerText =
-item.description;
-
-document.getElementById(
-"oldPrice"
-).innerText =
-item.oldPrice;
-
-document.getElementById(
-"newPrice"
-).innerText =
-item.newPrice;
-
-document.getElementById(
-"duration"
-).innerText =
-item.duration;
-
-document.getElementById(
-"status"
-).innerText =
-item.status;
-
-document.getElementById(
-"course-image"
-).src =
-item.image;
-
-
-
-document.getElementById(
-"modules"
-).innerHTML =
-
-item.modules.map(
-m=>`
-
-<div class="module">
-${m}
-</div>
-
-`
-).join("");
-
+document.getElementById("title").innerText=item.title;
+document.getElementById("description").innerText=item.description;
+document.getElementById("overview").innerText=item.description;
+document.getElementById("oldPrice").innerText=item.oldPrice;
+document.getElementById("newPrice").innerText=item.newPrice;
+document.getElementById("duration").innerText=item.duration;
+document.getElementById("status").innerText=item.status;
+document.getElementById("course-image").src=item.image;
+document.getElementById("modules").innerHTML=item.modules.map(m=>`<div class="module">${m}</div>`).join("");
 </script>
-
 </body>
-
 </html>
