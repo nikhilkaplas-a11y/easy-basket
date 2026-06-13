@@ -117,8 +117,13 @@ class OrderModel {
   });
 
   /// Convenience: is this a Cash-on-Delivery order?
-  /// Uses the same string the backend stores (`paymentMethod='cash'`).
-  bool get isCod => (paymentMethod?.toLowerCase() == 'cash');
+  /// The backend normalizes COD to `paymentMethod='cod'` (it aliases 'cash' ->
+  /// 'cod' at order creation), so 'cod' is the canonical stored value. 'cash' is
+  /// kept here only for any legacy rows written before that normalization.
+  bool get isCod {
+    final m = paymentMethod?.toLowerCase();
+    return m == 'cod' || m == 'cash';
+  }
 
   /// Amount in paise the rider must collect at the door (or 0 for prepaid).
   int get amountToCollectPaise => isCod && !isPaid ? (totalAmount * 100).round() : 0;

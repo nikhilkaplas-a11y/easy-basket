@@ -169,6 +169,10 @@ p { color: var(--text-muted); }
 
 section { position: relative; }
 .section { padding: var(--section-pad) 0; }
+/* Anchor-jump offset: land the section HEADLINE just under the fixed navbar
+   (cancels the large top padding so there's no blank gap). Mirrors the JS
+   smooth-scroll offset for direct URL-hash loads. */
+.section[id] { scroll-margin-top: calc(88px - var(--section-pad)); }
 
 .grid-bg {
   position: absolute;
@@ -876,27 +880,24 @@ margin-left: 120px; }
   position: relative;
   margin-top: 80px;
 }
-.process-row {
+/* Single-row pipeline: 1-up (mobile) → 2-up (tablet) → 5-up (desktop) */
+.track-cards {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
   position: relative;
   z-index: 2;
 }
-.process-row + .process-row { margin-top: 16px; }
-
-@media (min-width: 900px) {
-  /* Top row: 3 equal cards + a 50px empty column on the right,
-     so the wire vertical drops in real empty space (not inside card 03). */
-  .process-row-top {
-    grid-template-columns: repeat(3, 1fr) 50px;
-  }
-  .process-row-bot {
-    grid-template-columns: repeat(6, 1fr);
-  }
-  .process-row-bot .process-card { grid-column: span 2; }
-  .process-row-bot .process-card:first-child { grid-column: 2 / span 2; }
-  .process-row-bot .process-card:last-child  { grid-column: 4 / span 2; }
+@media (min-width: 640px) {
+  .track-cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1100px) {
+  .track-cards { grid-template-columns: repeat(5, 1fr); gap: 18px; }
+  /* Narrower cards in a 5-up row — tighten padding and the big number */
+  .track-cards .process-card { padding: 22px 20px 20px; }
+  .track-cards .process-num { font-size: 1.6rem; }
+  .track-cards .process-content h3 { font-size: 1.1rem; }
+  .track-cards .process-content p { font-size: 0.84rem; }
 }
 
 /* The card */
@@ -973,6 +974,9 @@ margin-left: 120px; }
   }
 }
 
+.process-content {
+  flex: 1;
+}
 .process-content h3 {
   font-family: var(--font-display);
   font-size: 1.25rem;
@@ -1048,116 +1052,106 @@ margin-left: 120px; }
   }
 }
 
-/* === Continuous wire connector (desktop only) === */
-.process-rows-wrap {
-  position: relative;
-  padding-top: 26px;
-}
-.wire-overlay { display: none; }
+/* === Single-row pipeline rail (desktop only) === */
+.process-track { position: relative; }
 
-.process-arrow {
-  display: none;
-}
-@media (min-width: 900px) {
-  /* Hide the mobile per-card dot — the SVG wire and its nodes replace it */
+/* Rail is desktop-only; on smaller screens cards just stack with their own dot */
+.track-rail { display: none; }
+
+@media (min-width: 1100px) {
+  /* Hide the mobile per-card dot — the rail node replaces it */
   .process-card::before { display: none; }
 
-  /* The wire overlay — ABOVE cards so the wire visibly traverses card tops like a pipeline */
-  .wire-overlay {
-    display: block;
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 5;
-    overflow: visible;
-  }
-  .process-wire {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    filter: drop-shadow(0 0 4px rgba(79, 70, 229, 0.6));
+  /* Rail uses the SAME 5-column grid as the cards, so each node lands
+     dead-centre over its card regardless of viewport width. */
+  .track-rail {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    position: relative;
+    height: 28px;
+    margin-bottom: 16px;
   }
 
-  /* Travelling pulse along the wire — bright dash that loops the full path */
-  .wire-pulse {
-    stroke-dasharray: 40 2300;
-    stroke-dashoffset: 0;
-    opacity: 0.95;
-    animation: wire-pulse-travel 6s linear infinite;
-    filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 3px #A5B4FC);
-  }
-  @keyframes wire-pulse-travel {
-    to { stroke-dashoffset: -2340; }
+  /* The connector line — spans from first node centre (10%) to last (90%),
+     faded to transparent at both ends so it doesn't overshoot. */
+  .track-line {
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    top: 50%;
+    height: 2px;
+    transform: translateY(-50%);
+    border-radius: 2px;
+    background: linear-gradient(90deg,
+      rgba(79, 70, 229, 0) 0%,
+      rgba(79, 70, 229, 0.55) 10%,
+      #A5B4FC 50%,
+      rgba(79, 70, 229, 0.55) 90%,
+      rgba(79, 70, 229, 0) 100%);
+    filter: drop-shadow(0 0 4px rgba(79, 70, 229, 0.5));
   }
 
-  /* Glow nodes — HTML divs so they stay perfectly circular regardless of viewport */
-  .wire-node {
+  /* Travelling light pulse that runs left → right along the line */
+  .track-pulse {
     position: absolute;
-    width: 12px;
-    height: 12px;
+    top: 50%;
+    left: 0;
+    width: 80px;
+    height: 3px;
+    transform: translateY(-50%);
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, #ffffff 50%, transparent);
+    box-shadow:
+      0 0 10px 2px rgba(255, 255, 255, 0.7),
+      0 0 6px 1px #A5B4FC;
+    animation: track-pulse-travel 5s linear infinite;
+    will-change: left, opacity;
+  }
+  @keyframes track-pulse-travel {
+    0%   { left: -80px; opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+  }
+
+  /* Glow nodes — one per grid column, centred and sitting on the line */
+  .track-node {
+    justify-self: center;
+    position: relative;
+    z-index: 2;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: radial-gradient(circle,
       #ffffff 0%,
-      #ffffff 30%,
-      #818cf8 60%,
-      rgba(79, 70, 229, 0) 85%
-    );
+      #ffffff 28%,
+      #818cf8 58%,
+      rgba(79, 70, 229, 0) 82%);
     box-shadow:
-      0 0 10px 2px rgba(79, 70, 229, 0.7),
+      0 0 12px 2px rgba(79, 70, 229, 0.75),
       0 0 3px 1px rgba(255, 255, 255, 0.6);
-    animation: wire-node-pulse 2.8s ease-in-out infinite;
+    animation: track-node-pulse 2.8s ease-in-out infinite;
     will-change: transform, box-shadow;
   }
-  .wire-node-sm { width: 8px; height: 8px; }
-  .wire-node-end {
-    width: 16px;
-    height: 16px;
-    background: radial-gradient(circle,
-      #ffffff 0%,
-      #ffffff 25%,
-      #A5B4FC 50%,
-      #4F46E5 70%,
-      rgba(79, 70, 229, 0) 90%
-    );
-    box-shadow:
-      0 0 18px 4px rgba(79, 70, 229, 0.9),
-      0 0 6px 2px rgba(165, 180, 252, 0.8),
-      0 0 2px 1px rgba(255, 255, 255, 0.8);
-  }
-  .wire-node:nth-child(2n+1) { animation-delay: 0.8s; }
-  .wire-node:nth-child(3n+1) { animation-delay: 1.5s; }
-
-  /* Arrow continuation on the right side */
-  .process-arrow {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding-right: 8px;
-    position: relative;
-  }
-  .process-arrow svg {
-    width: 28px;
-    height: 28px;
-    color: var(--primary-light);
-    filter: drop-shadow(0 0 5px rgba(79, 70, 229, 0.6));
-  }
+  /* Stagger the breathing (child 1 is .track-line, so nodes are children 2–6) */
+  .track-node:nth-child(3) { animation-delay: 0.5s; }
+  .track-node:nth-child(4) { animation-delay: 1s; }
+  .track-node:nth-child(5) { animation-delay: 1.5s; }
+  .track-node:nth-child(6) { animation-delay: 2s; }
 }
 
-@keyframes wire-node-pulse {
+@keyframes track-node-pulse {
   0%, 100% {
-    transform: scale(1) translate(-50%, -50%);
-    transform-origin: 0 0;
+    transform: scale(1);
     box-shadow:
-      0 0 10px 2px rgba(79, 70, 229, 0.7),
+      0 0 12px 2px rgba(79, 70, 229, 0.7),
       0 0 3px 1px rgba(255, 255, 255, 0.6);
   }
   50% {
-    transform: scale(1.25) translate(-50%, -50%);
-    transform-origin: 0 0;
+    transform: scale(1.3);
     box-shadow:
-      0 0 16px 3px rgba(79, 70, 229, 0.95),
+      0 0 18px 3px rgba(79, 70, 229, 0.95),
       0 0 5px 1.5px rgba(255, 255, 255, 0.85);
   }
 }

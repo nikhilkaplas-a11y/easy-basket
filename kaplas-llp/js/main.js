@@ -48,8 +48,12 @@
       const target = document.querySelector(href);
       if (!target) return;
       e.preventDefault();
-      const top = target.getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo({ top, behavior: 'smooth' });
+      // Scroll to the section's HEADLINE (not its padded top), so it lands
+      // just under the fixed navbar instead of below a big blank gap.
+      const NAV_OFFSET = 88; // 64px navbar + 24px breathing room
+      const focus = target.querySelector('.section-head') || target;
+      const top = focus.getBoundingClientRect().top + window.scrollY - NAV_OFFSET;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     });
   }
 
@@ -93,7 +97,13 @@
       });
     });
     const msg = form.querySelector('.form-msg');
-    form.addEventListener('submit', (e) => {
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitLabel = submitBtn ? submitBtn.innerHTML : '';
+
+    const ICON_ERROR = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ';
+    const ICON_OK = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ';
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = new FormData(form);
       const name = (data.get('name') || '').trim();
@@ -103,14 +113,42 @@
 
       if (!name || !email || !message) {
         msg.className = 'form-msg error';
-        msg.innerHTML = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Please fill all fields before sending.';
+        msg.innerHTML = ICON_ERROR + 'Please fill all fields before sending.';
         return;
       }
-      const subject = encodeURIComponent(`[${topic}] ${name} via kaplas.tech`);
-      const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nTopic: ${topic}\n\n${message}\n\n— sent from kaplas-llp contact form`);
-      window.location.href = `mailto:nikhil.kaplas@gmail.com?subject=${subject}&body=${body}`;
-      msg.className = 'form-msg success';
-      msg.innerHTML = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Opening your email client — finish sending from there.';
+
+      // A readable subject + reply-to name for the email that lands in the inbox.
+      data.set('subject', `[${topic}] ${name} via kaplas.tech`);
+      data.set('from_name', `${name} (kaplas.tech)`);
+
+      // Sending state
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = 'Sending…'; }
+      msg.className = 'form-msg';
+      msg.textContent = 'Sending your message…';
+
+      try {
+        const res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          body: data,
+        });
+        const result = await res.json();
+        if (res.ok && result.success) {
+          msg.className = 'form-msg success';
+          msg.innerHTML = ICON_OK + "Message sent — we'll get back to you within 24 hours.";
+          form.reset();
+          // Restore the default topic selection after reset
+          opts.forEach((o, i) => o.classList.toggle('active', i === 0));
+          if (hidden) hidden.value = 'project';
+        } else {
+          throw new Error(result.message || 'Submission failed');
+        }
+      } catch (err) {
+        msg.className = 'form-msg error';
+        msg.innerHTML = ICON_ERROR + 'Something went wrong. Please email us directly at kaplastechnologies@gmail.com.';
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = submitLabel; }
+      }
     });
   }
 

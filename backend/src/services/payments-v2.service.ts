@@ -225,9 +225,19 @@ export class PaymentsV2Service {
       await eventRepo.save(ev);
     } catch (err: unknown) {
       if (isDuplicateKeyError(err)) {
-        return { processed: false, reason: 'duplicate_event' };
+        // A row for this event already exists. If it finished (processedAt set),
+        // this is a genuine duplicate → skip. If processedAt is still null, a prior
+        // attempt inserted the row but crashed before completing; fall through and
+        // re-run the processing below. All transitions are idempotent, so replaying
+        // is safe and lets Razorpay's retry actually recover the stuck event.
+        const existing = await eventRepo.findOne({ where: { eventId: params.eventId } });
+        if (existing?.processedAt != null) {
+          return { processed: false, reason: 'duplicate_event' };
+        }
+        // else: fall through to lock + processing
+      } else {
+        throw err;
       }
-      throw err;
     }
 
     // Best-effort cross-process lock so verify doesn't race us mid-transition.
@@ -282,23 +292,26 @@ export class PaymentsV2Service {
     if (payment.status === 'paid' || payment.status === 'refunded') return;
     if (!this.canTransition(payment.status, 'paid')) return;
 
-    const paymentRepo = AppDataSource.getRepository(Payment);
-    payment.status = 'paid';
-    if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
-    if (rawPayload) payment.rawWebhookJson = rawPayload;
-    await paymentRepo.save(payment);
+    // Atomic: payment + order move to paid together, or neither does. Without the
+    // transaction, an order-save failure after the payment-save would leave payment
+    // 'paid' (terminal, so the reconciler ignores it) while the order stays pending.
+    await AppDataSource.transaction(async (mgr) => {
+      payment.status = 'paid';
+      if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
+      if (rawPayload) payment.rawWebhookJson = rawPayload;
+      await mgr.getRepository(Payment).save(payment);
 
-    const orderRepo = AppDataSource.getRepository(Order);
-    const order = await orderRepo.findOne({ where: { id: payment.orderId } });
-    if (order) {
-      if (order.status === 'pending') {
-        order.status = 'accepted';
+      const order = await mgr.getRepository(Order).findOne({ where: { id: payment.orderId } });
+      if (order) {
+        if (order.status === 'pending') {
+          order.status = 'accepted';
+        }
+        order.paymentStatus = 'paid';
+        order.isPaid = true;
+        if (razorpayPaymentId) order.paymentId = razorpayPaymentId;
+        await mgr.getRepository(Order).save(order);
       }
-      order.paymentStatus = 'paid';
-      order.isPaid = true;
-      if (razorpayPaymentId) order.paymentId = razorpayPaymentId;
-      await orderRepo.save(order);
-    }
+    });
   }
 
   /**
@@ -315,23 +328,27 @@ export class PaymentsV2Service {
     if (payment.status === 'failed' || payment.status === 'refunded') return;
     if (!this.canTransition(payment.status, 'failed')) return;
 
-    const paymentRepo = AppDataSource.getRepository(Payment);
-    payment.status = 'failed';
-    payment.failureCode = code;
-    if (rawPayload) payment.rawWebhookJson = rawPayload;
-    await paymentRepo.save(payment);
+    // Atomic: marking the payment failed, restoring reserved stock, and cancelling
+    // the order all commit together. Otherwise a crash after the payment-save would
+    // leave payment 'failed' (terminal → reconciler skips it) with stock still
+    // reserved and the order stuck pending.
+    await AppDataSource.transaction(async (mgr) => {
+      payment.status = 'failed';
+      payment.failureCode = code;
+      if (rawPayload) payment.rawWebhookJson = rawPayload;
+      await mgr.getRepository(Payment).save(payment);
 
-    const orderRepo = AppDataSource.getRepository(Order);
-    const order = await orderRepo.findOne({
-      where: { id: payment.orderId },
-      relations: ['items', 'items.product', 'items.variant'],
+      const order = await mgr.getRepository(Order).findOne({
+        where: { id: payment.orderId },
+        relations: ['items', 'items.product', 'items.variant'],
+      });
+      if (order && order.status === 'pending') {
+        await OrderInventoryService.restoreReservedStockForItems(order.items, mgr);
+        order.status = 'cancelled';
+        order.paymentStatus = 'failed';
+        await mgr.getRepository(Order).save(order);
+      }
     });
-    if (order && order.status === 'pending') {
-      await OrderInventoryService.restoreReservedStockForItems(order.items);
-      order.status = 'cancelled';
-      order.paymentStatus = 'failed';
-      await orderRepo.save(order);
-    }
   }
 
   /**
@@ -428,15 +445,20 @@ export class PaymentsV2Service {
     if (payment.status === 'refunded') return;
     if (!this.canTransition(payment.status, 'refunded')) return;
 
-    payment.status = 'refunded';
-    await paymentRepo.save(payment);
+    // Atomic: payment + order move to refunded together. If only the payment save
+    // landed and the order update threw, the payment would be terminal (reconciler
+    // skips it) while the order still shows the old paymentStatus.
+    await AppDataSource.transaction(async (mgr) => {
+      payment.status = 'refunded';
+      await mgr.getRepository(Payment).save(payment);
+      await mgr.getRepository(Order).update(
+        { id: payment.orderId },
+        { paymentStatus: 'refunded' }
+      );
+    });
 
-    await AppDataSource.getRepository(Order).update(
-      { id: payment.orderId },
-      { paymentStatus: 'refunded' }
-    );
-
-    // Notify the customer their refund has completed.
+    // Notify the customer their refund has completed. Enqueued AFTER the commit so a
+    // rolled-back transaction can never fire a "refund completed" notification.
     const order = await AppDataSource.getRepository(Order).findOne({
       where: { id: payment.orderId },
       relations: ['user'],

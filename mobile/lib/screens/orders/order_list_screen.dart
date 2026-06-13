@@ -86,7 +86,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   String _getPaymentStatusText(OrderModel order) {
-    if (order.paymentMethod?.toLowerCase() == 'cash') {
+    if (order.isCod) {
       return 'Cash on Delivery';
     }
     if (order.isPaid) {
@@ -471,7 +471,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 Row(
                   children: [
                     Icon(
-                      order.paymentMethod?.toLowerCase() == 'cash'
+                      order.isCod
                           ? Icons.money_rounded
                           : Icons.payment_rounded,
                       size: 14,

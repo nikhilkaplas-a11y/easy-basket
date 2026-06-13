@@ -54,7 +54,7 @@ export class OrderController {
       if (!normalizedPaymentMethod) {
         res
           .status(400)
-          .json({ message: 'Invalid paymentMethod. Allowed: upi, cod (aliases: cash).' });
+          .json({ message: 'Invalid paymentMethod. Allowed: upi, cod (aliases: cash, razorpay).' });
         return;
       }
 

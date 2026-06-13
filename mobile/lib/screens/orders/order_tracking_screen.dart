@@ -909,7 +909,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
   // ═══════════════════════════════════════
 
   Widget _buildPaymentCard(OrderModel order, NumberFormat fmt) {
-    final isCash = order.paymentMethod?.toLowerCase() == 'cash';
+    final isCash = order.isCod;
     final isPaid = order.isPaid;
     final payLabel =
         isCash ? 'Cash on Delivery' : (isPaid ? 'Paid Online' : 'Pending');

@@ -231,8 +231,9 @@ export class DeliveryStateService {
     if (!result.ok) return result;
 
     // SMS dispatch lives outside the DB transaction — Twilio call is best-effort
-    // from the rider's POV. Bypass code (DELIVERY_OTP_BYPASS_CODE) still works
-    // at verify-time even if Twilio is offline, so dev/QA isn't blocked.
+    // from the rider's POV. In test mode (DELIVERY_USE_TEST_OTP) or when Twilio
+    // isn't configured, the fixed test OTP (123456) is accepted at verify-time
+    // even if no SMS goes out, so dev/QA isn't blocked.
     DeliveryOtpService.generateForOrder(orderId).catch((err) =>
       console.error(`[delivery] SMS OTP send failed for order ${orderId}`, err)
     );

@@ -10,6 +10,7 @@ const ALIASES: Record<string, PaymentMethod> = {
   upi: 'upi',
   cod: 'cod',
   cash: 'cod',
+  razorpay: 'upi', // mobile sends 'razorpay' for the online-payment tile
 };
 
 /**
