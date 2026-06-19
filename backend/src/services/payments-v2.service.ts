@@ -8,6 +8,7 @@ import { RazorpayService } from './razorpay.service';
 import { RedisService } from './redis.service';
 import { OrderInventoryService } from './order-inventory.service';
 import { FCMService } from './fcm.service';
+import { enqueuePaymentCheck } from './queue/payment-queue';
 
 /**
  * Payment orchestration.
@@ -113,6 +114,13 @@ export class PaymentsV2Service {
     await AppDataSource.getRepository(Order).update(
       { id: params.orderId },
       { paymentStatus: 'initiated' }
+    );
+
+    // Schedule a fast, restart-proof fallback check. Best-effort: if the enqueue
+    // fails, the order is still created and the 30-min reconciler still catches it.
+    // The webhook remains the primary confirmation path.
+    enqueuePaymentCheck(String(payment.id), rzpOrder.id).catch((e) =>
+      console.error('[payment] enqueue reconcile job failed', e)
     );
 
     return {

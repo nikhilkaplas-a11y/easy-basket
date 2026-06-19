@@ -5,6 +5,8 @@ import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
 import { OrderAutoCancelService } from './services/order-auto-cancel.service';
 import { PaymentsReconcilerService } from './services/payments-reconciler.service';
+import { startPaymentWorker } from './services/queue/payment-reconcile.worker';
+import { paymentQueue } from './services/queue/payment-queue';
 import { RedisService } from './services/redis.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
@@ -145,8 +147,26 @@ AppDataSource.initialize()
     // Auto-cancel: pending orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
     OrderAutoCancelService.start();
 
-    // Payments reconciler: reconcile stale payments / pending refunds with Razorpay.
+    // Payments reconciler: coarse 30-min safety net for stale payments / pending refunds.
     PaymentsReconcilerService.start();
+
+    // Payment reconcile worker: fast, restart-proof fallback when a webhook is missed.
+    const paymentWorker = startPaymentWorker();
+
+    // Graceful shutdown — let in-flight jobs finish and close Redis connections cleanly.
+    const shutdown = async (signal: string) => {
+      console.log(`[shutdown] ${signal} received — closing payment queue/worker`);
+      try {
+        await paymentWorker.close();
+        await paymentQueue.close();
+      } catch (err) {
+        console.error('[shutdown] error closing queue/worker', err);
+      } finally {
+        process.exit(0);
+      }
+    };
+    process.on('SIGTERM', () => void shutdown('SIGTERM'));
+    process.on('SIGINT', () => void shutdown('SIGINT'));
 
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);

@@ -6,14 +6,20 @@ import { RazorpayService } from './razorpay.service';
 import { PaymentsV2Service } from './payments-v2.service';
 
 /**
- * Reconciliation worker.
+ * Reconciliation worker — the final coarse safety net.
  *
- * Runs every 5 minutes, scanning for payments that might have drifted from Razorpay's
+ * Runs every 30 minutes, scanning for payments that might have drifted from Razorpay's
  * view of the world — e.g. webhook got lost, verify never called, refund never reached
  * terminal state. For each drift, we apply the same state-machine transition the webhook
  * would have, so the fix is idempotent and race-safe.
  *
- * Interval is configurable via RECONCILER_INTERVAL_MINUTES (default 5).
+ * The fast path is now the BullMQ payment-reconcile queue (per-payment checks with
+ * backoff, ~20s when a webhook is missed). This sweep only catches the rare cases the
+ * queue never saw — e.g. a crash between saving the payment and enqueuing its job, or a
+ * job that exhausted its retries — and it survives a total Redis/queue outage because it
+ * depends only on the DB + Razorpay. Hence the relaxed 30-min cadence.
+ *
+ * Interval is configurable via RECONCILER_INTERVAL_MINUTES (default 30).
  */
 export class PaymentsReconcilerService {
   private static intervalId: NodeJS.Timeout | null = null;
@@ -21,8 +27,8 @@ export class PaymentsReconcilerService {
   static start(): void {
     if (this.intervalId) return;
     const raw = process.env.RECONCILER_INTERVAL_MINUTES;
-    const minutes = raw ? Number(raw) : 5;
-    const safeMins = Number.isFinite(minutes) && minutes > 0 ? minutes : 5;
+    const minutes = raw ? Number(raw) : 30;
+    const safeMins = Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
     const intervalMs = safeMins * 60 * 1000;
 
     console.log(`[Reconciler] starting — every ${safeMins} min`);
@@ -77,7 +83,12 @@ export class PaymentsReconcilerService {
     }
   }
 
-  private static async reconcileOnePayment(p: Payment): Promise<void> {
+  /**
+   * Reconcile a single payment against Razorpay's authoritative state.
+   * Public so the BullMQ worker can reuse the exact same logic — one source of
+   * truth for "ask Razorpay, then apply the transition."
+   */
+  static async reconcileOnePayment(p: Payment): Promise<void> {
     const rzp = (await RazorpayService.fetchPaymentsForOrder(p.razorpayOrderId)) as unknown as {
       items?: Array<Record<string, unknown>>;
     };
