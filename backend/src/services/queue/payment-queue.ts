@@ -35,7 +35,7 @@ export async function enqueuePaymentCheck(
     'reconcile',
     { paymentId, razorpayOrderId },
     {
-      jobId: `reconcile:${paymentId}`,
+      jobId: `reconcile-${paymentId}`,
       delay: FIRST_DELAY_MS,
       attempts: ATTEMPTS,
       backoff: { type: 'exponential', delay: FIRST_DELAY_MS },
