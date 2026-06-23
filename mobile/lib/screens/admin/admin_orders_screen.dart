@@ -164,7 +164,12 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
     return showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Assign Delivery Agent'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Assign Delivery Agent',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: adminProvider.isLoading
@@ -182,7 +187,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                         const SizedBox(height: 16),
                         const Text(
                           'No delivery agents available',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         const SizedBox(height: 8),
                         if (adminProvider.error != null)
@@ -190,49 +195,89 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Text(
                               'Error: ${adminProvider.error}',
-                              style: TextStyle(color: Colors.red, fontSize: 12),
+                              style: const TextStyle(color: Colors.red, fontSize: 12),
                               textAlign: TextAlign.center,
                             ),
                           ),
                         const Text(
                           'You can accept the order without assignment. Delivery agents can accept it later from available orders.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: AppTheme.grey),
                         ),
                       ],
                     )
                   : ListView.builder(
                       shrinkWrap: true,
-                      itemCount: adminProvider.deliveryAgents.length + 1, // +1 for "Skip" option
+                      itemCount: adminProvider.deliveryAgents.length + 1,
                       itemBuilder: (context, index) {
                         if (index == 0) {
-                          // "Skip assignment" option
-                          return ListTile(
-                            leading: const Icon(Icons.skip_next, color: AppTheme.primaryGreen),
-                            title: const Text('Skip Assignment'),
-                            subtitle: const Text('Delivery agents can accept later'),
-                            onTap: () => Navigator.pop(context, null),
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppTheme.primaryGreen.withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.skip_next,
+                                color: AppTheme.primaryGreen,
+                                size: 22,
+                              ),
+                              title: const Text(
+                                'Skip Assignment',
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                              subtitle: const Text(
+                                'Delivery agents can accept later',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                              onTap: () => Navigator.pop(context, null),
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
                           );
                         }
                         final agent = adminProvider.deliveryAgents[index - 1];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: AppTheme.primaryGreen.withOpacity(0.2),
-                            child: Icon(Icons.person, color: AppTheme.primaryGreen),
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade200, width: 1),
                           ),
-                          title: Text(agent.name ?? 'Unknown'),
-                          subtitle: Text(agent.phoneNumber ?? ''),
-                          onTap: () => Navigator.pop(context, agent.id),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppTheme.primaryGreen.withOpacity(0.15),
+                              child: Icon(Icons.person, color: AppTheme.primaryGreen, size: 20),
+                            ),
+                            title: Text(
+                              agent.name ?? 'Unknown',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            subtitle: Text(
+                              agent.phoneNumber ?? '',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            onTap: () => Navigator.pop(context, agent.id),
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
                         );
                       },
                     ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, -1), // -1 means cancelled
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, -1),
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ),
         ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }
@@ -253,7 +298,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
         children: [
           // Status Filter
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -261,42 +310,47 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                 children: [
                   _StatusChip(
                     label: 'All',
+                    icon: Icons.list,
                     isSelected: _selectedStatus == 'all',
                     onTap: () {
                       setState(() => _selectedStatus = 'all');
                       _loadOrders();
                     },
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   _StatusChip(
                     label: 'Pending',
+                    icon: Icons.schedule,
                     isSelected: _selectedStatus == 'pending',
                     onTap: () {
                       setState(() => _selectedStatus = 'pending');
                       _loadOrders();
                     },
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   _StatusChip(
                     label: 'Accepted',
+                    icon: Icons.check_circle_outline,
                     isSelected: _selectedStatus == 'accepted',
                     onTap: () {
                       setState(() => _selectedStatus = 'accepted');
                       _loadOrders();
                     },
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   _StatusChip(
                     label: 'Out for Delivery',
+                    icon: Icons.local_shipping,
                     isSelected: _selectedStatus == 'out_for_delivery',
                     onTap: () {
                       setState(() => _selectedStatus = 'out_for_delivery');
                       _loadOrders();
                     },
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   _StatusChip(
                     label: 'Delivered',
+                    icon: Icons.check_circle,
                     isSelected: _selectedStatus == 'delivered',
                     onTap: () {
                       setState(() => _selectedStatus = 'delivered');
@@ -324,6 +378,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                               style: TextStyle(
                                 fontSize: 18,
                                 color: AppTheme.grey,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -335,7 +390,6 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                         itemCount: adminProvider.orders.length + (adminProvider.hasMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == adminProvider.orders.length) {
-                            // Load more indicator
                             if (adminProvider.isLoadingMore) {
                               return const Padding(
                                 padding: EdgeInsets.all(16.0),
@@ -365,11 +419,13 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
 
 class _StatusChip extends StatelessWidget {
   final String label;
+  final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _StatusChip({
     required this.label,
+    required this.icon,
     required this.isSelected,
     required this.onTap,
   });
@@ -377,15 +433,32 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilterChip(
-      label: Text(label),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? AppTheme.white : AppTheme.grey,
+          ),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
       selected: isSelected,
       onSelected: (_) => onTap(),
       selectedColor: AppTheme.primaryGreen,
-      checkmarkColor: AppTheme.white,
+      checkmarkColor: Colors.transparent,
       labelStyle: TextStyle(
         color: isSelected ? AppTheme.white : AppTheme.black,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        fontSize: 12,
       ),
+      side: BorderSide(
+        color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300,
+        width: isSelected ? 0 : 1,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     );
   }
 }
@@ -404,113 +477,184 @@ class _OrderCard extends StatelessWidget {
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
       child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: _getStatusColor(order.status).withOpacity(0.2),
-          child: Text(
-            '#${order.id}',
-            style: TextStyle(
-              color: _getStatusColor(order.status),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        tilePadding: const EdgeInsets.all(0),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200),
         ),
-        title: Text(
-          'Order #${order.id}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Customer: ${order.user.name ?? order.user.phoneNumber}'),
-            if (order.deliveryBoy != null)
-              Text(
-                'Delivery: ${order.deliveryBoy.name ?? order.deliveryBoy.phoneNumber}',
-                style: TextStyle(fontSize: 11, color: AppTheme.primaryGreen),
+        leading: null,
+        title: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order ID Circle
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          _getStatusColor(order.status).withOpacity(0.2),
+                          _getStatusColor(order.status).withOpacity(0.05),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '#${order.id}',
+                        style: TextStyle(
+                          color: _getStatusColor(order.status),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Order Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Order #${order.id}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          order.user.name ?? order.user.phoneNumber,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              order.paymentMethod == 'upi'
+                                  ? Icons.check_circle
+                                  : Icons.payment,
+                              size: 14,
+                              color: order.paymentMethod == 'upi'
+                                  ? Colors.green.shade600
+                                  : Colors.orange.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              order.paymentMethod == 'upi' ? 'PAID' : 'COD',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: order.paymentMethod == 'upi'
+                                    ? Colors.green.shade600
+                                    : Colors.orange.shade600,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              currencyFormat.format(order.totalAmount),
+                              style: const TextStyle(
+                                color: AppTheme.primaryGreen,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Status Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(order.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _getStatusColor(order.status).withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      order.statusText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _getStatusColor(order.status),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            Text(
-              currencyFormat.format(order.totalAmount),
-              style: const TextStyle(
-                color: AppTheme.primaryGreen,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: _getStatusColor(order.status).withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            order.statusText,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _getStatusColor(order.status),
-            ),
+            ],
           ),
         ),
+        subtitle: const SizedBox.shrink(),
+        trailing: const SizedBox(width: 8),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Container(
+            color: Colors.grey.shade50,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Order Items
-                const Text(
-                  'Items:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
-                ...order.items.asMap().entries.map((entry) {
-                  final item = entry.value;
-                  final hasVariant = item.variant != null;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: hasVariant 
-                          ? AppTheme.primaryGreen.withOpacity(0.05)
-                          : AppTheme.lightGrey.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(8),
-                      border: hasVariant
-                          ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.3))
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.product.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Delivery Agent Section
+                      if (order.deliveryBoy != null)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.person_pin,
+                                  size: 18,
+                                  color: AppTheme.primaryGreen,
                                 ),
-                              ),
-                              if (hasVariant) ...[
-                                const SizedBox(height: 4),
-                                Row(
+                                const SizedBox(width: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      Icons.inventory_2,
-                                      size: 12,
-                                      color: AppTheme.primaryGreen,
-                                    ),
-                                    const SizedBox(width: 4),
                                     Text(
-                                      item.displayLabel ?? item.variant!.label,
+                                      'Delivery Agent',
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 11,
+                                        color: AppTheme.grey,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      order.deliveryBoy.name ??
+                                          order.deliveryBoy.phoneNumber,
+                                      style: TextStyle(
+                                        fontSize: 13,
                                         color: AppTheme.primaryGreen,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -518,97 +662,203 @@ class _OrderCard extends StatelessWidget {
                                   ],
                                 ),
                               ],
-                              const SizedBox(height: 4),
+                            ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+                            const SizedBox(height: 12),
+                          ],
+                        ),
+                      // Order Items
+                      Text(
+                        'Order Items',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...order.items.map((item) {
+                        final hasVariant = item.variant != null;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: hasVariant
+                                ? AppTheme.primaryGreen.withOpacity(0.08)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: hasVariant
+                                  ? AppTheme.primaryGreen.withOpacity(0.2)
+                                  : Colors.grey.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.product.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if (hasVariant) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.inventory_2,
+                                            size: 12,
+                                            color: AppTheme.primaryGreen,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            item.displayLabel ??
+                                                item.variant!.label,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.primaryGreen,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Qty: ${item.quantity}${item.unit != null ? " • ${item.unit}" : ""}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.grey,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               Text(
-                                'Qty: ${item.quantity}${item.unit != null ? " • ${item.unit}" : ""}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.grey,
+                                currencyFormat.format(item.total),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primaryGreen,
+                                  fontSize: 13,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        Text(
-                          currencyFormat.format(item.total),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 12),
+                      // Delivery Address
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 18,
                             color: AppTheme.primaryGreen,
-                            fontSize: 14,
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
-                // Address
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on, size: 16),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        order.deliveryAddress.fullAddress,
-                        style: TextStyle(fontSize: 12, color: AppTheme.grey),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Delivery Address',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.grey,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  order.deliveryAddress.fullAddress,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Status Update Buttons
-                if (order.status != 'delivered' && order.status != 'cancelled')
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (order.status == 'pending')
-                        ElevatedButton(
-                          onPressed: () => onStatusUpdate(order.id, 'accepted'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: const Text('Accept', style: TextStyle(fontSize: 12)),
-                        ),
-                      if (order.status == 'accepted')
-                        ElevatedButton(
-                          onPressed: () => onStatusUpdate(order.id, 'preparing'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: const Text('Preparing', style: TextStyle(fontSize: 12)),
-                        ),
-                      if (order.status == 'preparing')
-                        ElevatedButton(
-                          onPressed: () => onStatusUpdate(order.id, 'out_for_delivery'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: const Text('Out for Delivery', style: TextStyle(fontSize: 12)),
-                        ),
-                      if (order.status == 'out_for_delivery')
-                        ElevatedButton(
-                          onPressed: () => onStatusUpdate(order.id, 'delivered'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: const Text('Delivered', style: TextStyle(fontSize: 12)),
-                        ),
-                      if (order.status != 'delivered')
-                        OutlinedButton(
-                          onPressed: () => onStatusUpdate(order.id, 'cancelled'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                      const SizedBox(height: 16),
+                      // Status Update Buttons
+                      if (order.status != 'delivered' &&
+                          order.status != 'cancelled')
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Update Status',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.grey,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  if (order.status == 'pending')
+                                    _StatusButton(
+                                      icon: Icons.check,
+                                      label: 'Accept',
+                                      color: Colors.blue,
+                                      onPressed: () =>
+                                          onStatusUpdate(order.id, 'accepted'),
+                                    ),
+                                  if (order.status == 'accepted')
+                                    _StatusButton(
+                                      icon: Icons.local_dining,
+                                      label: 'Preparing',
+                                      color: Colors.orange,
+                                      onPressed: () =>
+                                          onStatusUpdate(order.id, 'preparing'),
+                                    ),
+                                  if (order.status == 'preparing')
+                                    _StatusButton(
+                                      icon: Icons.local_shipping,
+                                      label: 'Out for Delivery',
+                                      color: Colors.purple,
+                                      onPressed: () => onStatusUpdate(
+                                          order.id, 'out_for_delivery'),
+                                    ),
+                                  if (order.status == 'out_for_delivery')
+                                    _StatusButton(
+                                      icon: Icons.check_circle,
+                                      label: 'Delivered',
+                                      color: Colors.green,
+                                      onPressed: () =>
+                                          onStatusUpdate(order.id, 'delivered'),
+                                    ),
+                                  _StatusButton(
+                                    icon: Icons.close,
+                                    label: 'Cancel',
+                                    color: Colors.red,
+                                    isOutlined: true,
+                                    onPressed: () =>
+                                        onStatusUpdate(order.id, 'cancelled'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),
+                ),
               ],
             ),
           ),
@@ -634,6 +884,62 @@ class _OrderCard extends StatelessWidget {
       default:
         return AppTheme.primaryGreen;
     }
+  }
+}
+
+class _StatusButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+  final bool isOutlined;
+
+  const _StatusButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onPressed,
+    this.isOutlined = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isOutlined) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: OutlinedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 16),
+          label: Text(label),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
   }
 }
 
