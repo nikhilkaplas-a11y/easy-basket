@@ -972,6 +972,142 @@ export class AdminController {
   }
 
   /**
+   * POST /api/admin/orders/:id/approve-cancellation
+   * Approve a customer's cancellation request → cancel the order, restore stock,
+   * and initiate a full refund (if prepaid). Mirrors the admin-cancel hooks.
+   */
+  static async approveCancellation(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOne({
+        where: { id: Number(id) },
+        relations: ['user', 'items', 'items.product', 'items.variant'],
+      });
+
+      if (!order) {
+        res.status(404).json({ message: 'Order not found' });
+        return;
+      }
+      if (order.cancelRequestStatus !== 'requested') {
+        res.status(400).json({ message: 'No pending cancellation request for this order' });
+        return;
+      }
+      if (order.status === 'cancelled' || order.status === 'delivered') {
+        res.status(400).json({ message: `Cannot cancel order with status: ${order.status}` });
+        return;
+      }
+
+      try {
+        await OrderInventoryService.restoreReservedStockForItems(order.items);
+      } catch (invErr) {
+        console.error(`[approve-cancel] inventory restore failed for order #${order.id}`, invErr);
+      }
+
+      let refundInitiated = false;
+      if (order.paymentStatus === 'paid') {
+        try {
+          const result = await PaymentsV2Service.createRefund({
+            orderId: order.id,
+            userId: order.user.id,
+            actorUserId: req.user?.id ?? order.user.id,
+            reason: 'customer_cancel_approved',
+            idempotencyKey: `cust-cancel-${order.id}`,
+          });
+          refundInitiated = result.ok;
+          if (!result.ok) {
+            console.warn(
+              `[approve-cancel] refund not initiated for order #${order.id}: ${result.reason}`
+            );
+          }
+        } catch (refErr) {
+          console.error(`[approve-cancel] refund call failed for order #${order.id}`, refErr);
+        }
+      }
+
+      order.status = 'cancelled';
+      order.cancelRequestStatus = 'none';
+      await orderRepository.save(order);
+
+      if (order.user.fcmToken) {
+        const token = order.user.fcmToken;
+        const oid = order.id;
+        const customerId = order.user.id;
+        const body = refundInitiated
+          ? `Your cancellation for order #${oid} is approved. Refund is being processed — the amount will reach your account in 2–7 working days. 🙏`
+          : `Your cancellation for order #${oid} is approved. 🙏`;
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotification(
+              token,
+              '✅ Cancellation Approved',
+              body,
+              { orderId: oid.toString(), type: 'refund_approved' },
+              `refund approved order=#${oid} customerId=${customerId}`,
+              customerId
+            ),
+          `notify customer refund approved #${oid}`
+        );
+      }
+
+      res.json({ message: 'Cancellation approved', refundInitiated, order });
+    } catch (error) {
+      console.error('[admin] approveCancellation error', error);
+      res.status(500).json({ message: 'Error approving cancellation' });
+    }
+  }
+
+  /**
+   * POST /api/admin/orders/:id/reject-cancellation
+   * Decline a customer's cancellation request — the order stays active.
+   */
+  static async rejectCancellation(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOne({
+        where: { id: Number(id) },
+        relations: ['user'],
+      });
+
+      if (!order) {
+        res.status(404).json({ message: 'Order not found' });
+        return;
+      }
+      if (order.cancelRequestStatus !== 'requested') {
+        res.status(400).json({ message: 'No pending cancellation request for this order' });
+        return;
+      }
+
+      order.cancelRequestStatus = 'rejected';
+      await orderRepository.save(order);
+
+      if (order.user.fcmToken) {
+        const token = order.user.fcmToken;
+        const oid = order.id;
+        const customerId = order.user.id;
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotification(
+              token,
+              'Cancellation Declined',
+              `Your cancellation request for order #${oid} was declined. Your order is still on its way.`,
+              { orderId: oid.toString(), type: 'refund_declined' },
+              `refund declined order=#${oid} customerId=${customerId}`,
+              customerId
+            ),
+          `notify customer refund declined #${oid}`
+        );
+      }
+
+      res.json({ message: 'Cancellation request declined', order });
+    } catch (error) {
+      console.error('[admin] rejectCancellation error', error);
+      res.status(500).json({ message: 'Error rejecting cancellation' });
+    }
+  }
+
+  /**
    * POST /api/admin/orders/:id/complete-rto
    * After the rider physically returns stock to the hub. Restores inventory and
    * initiates refund if the order was prepaid.

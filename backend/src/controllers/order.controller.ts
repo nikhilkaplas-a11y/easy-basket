@@ -474,7 +474,19 @@ export class OrderController {
         return;
       }
 
-      if (order.status === 'delivered' || order.status === 'cancelled') {
+      // Direct cancel is ONLY for orders already being prepared or out for
+      // delivery — and it carries NO refund (resources already committed).
+      // Orders still in pending/accepted must go through request-cancellation
+      // (admin-approved full refund). delivered/cancelled are terminal.
+      if (order.status === 'pending' || order.status === 'accepted') {
+        res.status(400).json({
+          message:
+            'Order not yet packed — use request-cancellation to cancel with a refund.',
+          code: 'USE_REQUEST_CANCELLATION',
+        });
+        return;
+      }
+      if (order.status !== 'preparing' && order.status !== 'out_for_delivery') {
         res.status(400).json({ message: `Cannot cancel order with status: ${order.status}` });
         return;
       }
@@ -489,7 +501,7 @@ export class OrderController {
           FCMService.sendNotificationToRole(
             'admin',
             '😔 Order Cancelled',
-            `Order #${order.id} has been cancelled by customer`,
+            `Order #${order.id} cancelled by customer after packing (no refund due)`,
             { orderId: order.id.toString(), type: 'order_cancelled' }
           ),
         `notify admins customer cancelled #${order.id}`
@@ -499,6 +511,72 @@ export class OrderController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error cancelling order' });
+    }
+  }
+
+  /**
+   * Customer raises a cancellation/refund REQUEST. Allowed only before the order
+   * is packed (status pending/accepted). Does NOT cancel — sets the request to
+   * 'requested' and notifies admin, who approves (→ cancel + full refund) or
+   * rejects. After packing, customers use cancelOrder directly (no refund).
+   */
+  static async requestCancellation(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const { id } = req.params;
+      const { reason } = req.body as { reason?: string };
+
+      if (!userId) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+
+      const orderRepository = AppDataSource.getRepository(Order);
+      const order = await orderRepository.findOne({
+        where: { id: Number(id), user: { id: userId } },
+      });
+
+      if (!order) {
+        res.status(404).json({ message: 'Order not found' });
+        return;
+      }
+
+      // Refund-eligible window only: before packing begins.
+      if (order.status !== 'pending' && order.status !== 'accepted') {
+        res.status(400).json({
+          message:
+            'Order is already being prepared. You can cancel it, but no refund will be given.',
+          code: 'ALREADY_PACKED',
+        });
+        return;
+      }
+
+      // Idempotent: re-requesting while one is pending is a no-op.
+      if (order.cancelRequestStatus === 'requested') {
+        res.json({ message: 'Cancellation request already pending', order });
+        return;
+      }
+
+      order.cancelRequestStatus = 'requested';
+      order.cancellationReason = (reason ?? '').trim().slice(0, 255) || null;
+      order.cancellationRequestedAt = new Date();
+      await orderRepository.save(order);
+
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToRole(
+            'admin',
+            '↩️ Refund Requested',
+            `Order #${order.id}: customer requested cancellation & refund`,
+            { orderId: order.id.toString(), type: 'refund_requested' }
+          ),
+        `notify admins refund requested #${order.id}`
+      );
+
+      res.json({ message: 'Cancellation request submitted', order });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error requesting cancellation' });
     }
   }
 }

@@ -247,6 +247,38 @@ class OrderProvider with ChangeNotifier {
     }
   }
 
+  /// Raise a cancellation/refund request (only valid before packing). On success
+  /// the order moves to cancelRequestStatus='requested' awaiting admin approval.
+  Future<bool> requestCancellation(int orderId, String token, {String? reason}) async {
+    try {
+      await apiService.post(
+        '/orders/$orderId/request-cancellation',
+        {if (reason != null && reason.isNotEmpty) 'reason': reason},
+        token: token,
+      );
+      await fetchOrderById(orderId, token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Cancel an order directly (after packing — NO refund). For pending/accepted
+  /// orders the backend rejects this and directs to requestCancellation.
+  Future<bool> cancelOrder(int orderId, String token) async {
+    try {
+      await apiService.put('/orders/$orderId/cancel', {}, token: token);
+      await fetchOrderById(orderId, token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<OrderModel?> createOrder({
     required String token,
     required List<Map<String, dynamic>> items,

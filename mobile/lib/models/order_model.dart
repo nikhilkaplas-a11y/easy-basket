@@ -92,6 +92,10 @@ class OrderModel {
   final DateTime? deliveryArrivedAt;
   final DateTime? deliveryCompletedAt;
 
+  /// Customer cancellation/refund request state: 'none' | 'requested' | 'rejected'.
+  final String cancelRequestStatus;
+  final String? cancellationReason;
+
   OrderModel({
     required this.id,
     required this.user,
@@ -114,7 +118,19 @@ class OrderModel {
     this.deliveryPickedAt,
     this.deliveryArrivedAt,
     this.deliveryCompletedAt,
+    this.cancelRequestStatus = 'none',
+    this.cancellationReason,
   });
+
+  /// Refund-eligible window: customer can request cancellation WITH a refund only
+  /// before packing begins (status pending/accepted). Matches the backend guard.
+  bool get isRefundEligible => status == 'pending' || status == 'accepted';
+
+  /// After packing: customer can still cancel, but NO refund is given.
+  bool get canCancelNoRefund => status == 'preparing' || status == 'out_for_delivery';
+
+  bool get hasPendingCancelRequest => cancelRequestStatus == 'requested';
+  bool get cancelRequestRejected => cancelRequestStatus == 'rejected';
 
   /// Convenience: is this a Cash-on-Delivery order?
   /// The backend normalizes COD to `paymentMethod='cod'` (it aliases 'cash' ->
@@ -198,6 +214,10 @@ class OrderModel {
       deliveryPickedAt: parseNullableDateTime(json['deliveryPickedAt'] ?? json['delivery_picked_at']),
       deliveryArrivedAt: parseNullableDateTime(json['deliveryArrivedAt'] ?? json['delivery_arrived_at']),
       deliveryCompletedAt: parseNullableDateTime(json['deliveryCompletedAt'] ?? json['delivery_completed_at']),
+      cancelRequestStatus:
+          (json['cancelRequestStatus'] ?? json['cancel_request_status']) as String? ?? 'none',
+      cancellationReason:
+          (json['cancellationReason'] ?? json['cancellation_reason']) as String?,
     );
   }
 

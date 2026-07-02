@@ -14,5 +14,6 @@ router.post('/', idempotency('order-create', 60), OrderController.createOrder);
 router.get('/', OrderController.getUserOrders);
 router.get('/:id', OrderController.getOrderById);
 router.put('/:id/cancel', OrderController.cancelOrder);
+router.post('/:id/request-cancellation', OrderController.requestCancellation);
 
 export default router;

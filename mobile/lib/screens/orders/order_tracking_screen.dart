@@ -270,6 +270,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                     _buildPaymentCard(order, fmt),
                     const SizedBox(height: 20),
 
+                    // Cancellation / refund-request actions
+                    _buildCancellationSection(order),
+
                     // Need Help button
                     _buildNeedHelpButton(),
                   ],
@@ -911,10 +914,22 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
   Widget _buildPaymentCard(OrderModel order, NumberFormat fmt) {
     final isCash = order.isCod;
     final isPaid = order.isPaid;
-    final payLabel =
-        isCash ? 'Cash on Delivery' : (isPaid ? 'Paid Online' : 'Pending');
-    final payColor =
-        isCash ? Colors.orange : (isPaid ? const Color(0xFF2E7D32) : Colors.orange);
+    final ps = order.paymentStatus;
+    String payLabel;
+    Color payColor;
+    if (ps == 'refunded') {
+      payLabel = 'Refunded';
+      payColor = const Color(0xFF2E7D32);
+    } else if (ps == 'refund_pending') {
+      payLabel = 'Refund in progress';
+      payColor = Colors.orange;
+    } else if (isCash) {
+      payLabel = 'Cash on Delivery';
+      payColor = Colors.orange;
+    } else {
+      payLabel = isPaid ? 'Paid Online' : 'Pending';
+      payColor = isPaid ? const Color(0xFF2E7D32) : Colors.orange;
+    }
 
     return _accentCard(
       title: 'Payment',
@@ -955,6 +970,199 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 color: Color(0xFF2E7D32)),
           ),
         ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════
+  // CANCELLATION / REFUND REQUEST
+  // ═══════════════════════════════════════
+
+  Widget _buildCancellationSection(OrderModel order) {
+    // A request is already pending admin decision.
+    if (order.hasPendingCancelRequest) {
+      final reason = order.cancellationReason;
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.hourglass_top, color: Colors.orange, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Cancellation requested',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, color: Colors.black87)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Awaiting approval. If approved, your full amount will be refunded to your original payment method in 2–7 working days.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+                if (reason != null && reason.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('Reason: $reason',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
+    // Before packing → can request a refund (admin-approved).
+    if (order.isRefundEligible) {
+      return Column(
+        children: [
+          if (order.cancelRequestRejected)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('Your previous cancellation request was declined.',
+                  style: TextStyle(fontSize: 12, color: Colors.red.shade400)),
+            ),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () => _onRequestCancellation(order),
+              icon: const Icon(Icons.replay, size: 18),
+              label: const Text('Cancel & Request Refund',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD32F2F),
+                side: const BorderSide(color: Color(0xFFD32F2F)),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
+    // After packing → can cancel, but NO refund.
+    if (order.canCancelNoRefund) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () => _onCancelNoRefund(order),
+              icon: const Icon(Icons.close, size: 18),
+              label: const Text('Cancel Order',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD32F2F),
+                side: const BorderSide(color: Color(0xFFD32F2F)),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _onRequestCancellation(OrderModel order) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final op = Provider.of<OrderProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+    final reason = await _pickCancellationReason();
+    if (reason == null) return; // dismissed
+    if (auth.accessToken == null) return;
+    final ok =
+        await op.requestCancellation(order.id, auth.accessToken!, reason: reason);
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Refund request submitted — awaiting approval.'
+          : (op.error ?? 'Could not submit request')),
+    ));
+  }
+
+  Future<void> _onCancelNoRefund(OrderModel order) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final op = Provider.of<OrderProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel order?'),
+        content: const Text(
+            'Your order is already packed. Cancelling now will NOT refund your payment. Do you want to continue?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep order')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel anyway',
+                style: TextStyle(color: Color(0xFFD32F2F))),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (auth.accessToken == null) return;
+    final ok = await op.cancelOrder(order.id, auth.accessToken!);
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content:
+          Text(ok ? 'Order cancelled' : (op.error ?? 'Could not cancel order')),
+    ));
+  }
+
+  /// Bottom sheet of preset reasons. Returns the chosen reason, or null if dismissed.
+  Future<String?> _pickCancellationReason() {
+    const reasons = [
+      'Ordered by mistake',
+      'Found a better price',
+      'Delivery taking too long',
+      'Changed my mind',
+      'Other',
+    ];
+    return showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Why are you cancelling?',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            for (final r in reasons)
+              ListTile(
+                title: Text(r),
+                onTap: () => Navigator.pop(ctx, r),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

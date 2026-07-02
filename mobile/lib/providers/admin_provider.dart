@@ -826,6 +826,29 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
+  /// Approve a customer's cancellation request → cancels the order and initiates
+  /// a full refund if it was prepaid.
+  Future<bool> approveCancellation({required String token, required int orderId}) async {
+    try {
+      await apiService.post('/admin/orders/$orderId/approve-cancellation', {}, token: token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    }
+  }
+
+  /// Decline a customer's cancellation request — the order stays active.
+  Future<bool> rejectCancellation({required String token, required int orderId}) async {
+    try {
+      await apiService.post('/admin/orders/$orderId/reject-cancellation', {}, token: token);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    }
+  }
+
   /// Pulls the chronological audit log for an order — every state transition
   /// with actor, timestamp, and event payload. Read-only.
   Future<List<Map<String, dynamic>>> fetchOrderEvents({

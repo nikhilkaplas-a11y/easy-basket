@@ -38,6 +38,8 @@ router.get('/riders/:id/wallet', AdminController.getRiderWallet);
 router.post('/riders/:id/deposit', AdminController.recordRiderDeposit);
 router.post('/orders/:id/assign-rider', AdminController.assignRiderToOrder);
 router.post('/orders/:id/complete-rto', AdminController.completeRto);
+router.post('/orders/:id/approve-cancellation', AdminController.approveCancellation);
+router.post('/orders/:id/reject-cancellation', AdminController.rejectCancellation);
 router.get('/orders/:id/events', AdminController.getOrderEvents);
 
 export default router;

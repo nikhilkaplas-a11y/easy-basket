@@ -204,7 +204,11 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
             
             // Payment Information
             _buildPaymentCard(order, currencyFormat),
-            
+
+            // Customer cancellation/refund request — approve or reject
+            if (order.cancelRequestStatus == 'requested')
+              _buildCancellationRequestCard(order),
+
             // Action Buttons
             if (order.status != 'delivered' && order.status != 'cancelled')
               _buildActionButtons(context, order, adminProvider, authProvider),
@@ -1164,6 +1168,94 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
           backgroundColor: Colors.red.shade700,
         ),
       );
+    }
+  }
+
+  Widget _buildCancellationRequestCard(OrderModel order) {
+    final reason = order.cancellationReason;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.report_problem_outlined, color: Colors.orange, size: 20),
+              SizedBox(width: 8),
+              Text('Cancellation requested',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (reason != null && reason.isNotEmpty) ...[
+            Text('Reason: $reason',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade800)),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            'Approving cancels the order and initiates a full refund (if prepaid).',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleCancellationDecision(order, false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.grey.shade800,
+                    side: BorderSide(color: Colors.grey.shade400),
+                  ),
+                  child: const Text('Reject'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _handleCancellationDecision(order, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD32F2F),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Approve & Refund'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleCancellationDecision(OrderModel order, bool approve) async {
+    final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
+    if (token == null) return;
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = approve
+        ? await adminProvider.approveCancellation(token: token, orderId: order.id)
+        : await adminProvider.rejectCancellation(token: token, orderId: order.id);
+    if (!mounted) return;
+    if (ok) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(approve
+            ? 'Cancellation approved — refund initiated if prepaid.'
+            : 'Cancellation request declined.'),
+        backgroundColor: const Color(0xFF2E7D32),
+      ));
+      await _loadOrder();
+    } else {
+      messenger.showSnackBar(SnackBar(
+        content: Text(adminProvider.error ?? 'Action failed'),
+        backgroundColor: Colors.red.shade700,
+      ));
     }
   }
 }

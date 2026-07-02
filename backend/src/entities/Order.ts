@@ -113,6 +113,24 @@ export class Order {
   @Column({ default: false })
   isPaid!: boolean;
 
+  // Customer cancellation/refund request (pre-'preparing' only). 'requested' =
+  // awaiting admin decision; admin approve → order cancelled + refund; reject →
+  // 'rejected', order stays active. After 'preparing', customers cancel directly
+  // with no refund (no request needed).
+  @Column({
+    name: 'cancel_request_status',
+    type: 'enum',
+    enum: ['none', 'requested', 'rejected'],
+    default: 'none',
+  })
+  cancelRequestStatus!: 'none' | 'requested' | 'rejected';
+
+  @Column({ name: 'cancellation_reason', type: 'varchar', length: 255, nullable: true })
+  cancellationReason!: string | null;
+
+  @Column({ name: 'cancellation_requested_at', type: 'datetime', precision: 3, nullable: true })
+  cancellationRequestedAt!: Date | null;
+
   @Column({ nullable: true })
   notes!: string;
 
