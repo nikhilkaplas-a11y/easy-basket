@@ -475,7 +475,8 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
-
+    final screenWidth = MediaQuery.of(context).size.width;
+   
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 0,
@@ -527,86 +528,110 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // Order Details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Order #${order.id}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          order.user.name ?? order.user.phoneNumber,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.grey,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(
-                              order.paymentMethod == 'upi'
-                                  ? Icons.check_circle
-                                  : Icons.payment,
-                              size: 14,
-                              color: order.paymentMethod == 'upi'
-                                  ? Colors.green.shade600
-                                  : Colors.orange.shade600,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              order.paymentMethod == 'upi' ? 'PAID' : 'COD',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: order.paymentMethod == 'upi'
-                                    ? Colors.green.shade600
-                                    : Colors.orange.shade600,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              currencyFormat.format(order.totalAmount),
-                              style: const TextStyle(
-                                color: AppTheme.primaryGreen,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Status Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(order.status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _getStatusColor(order.status).withOpacity(0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Text(
-                      order.statusText,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _getStatusColor(order.status),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(width: 10),
+
+Expanded(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Order #${order.id}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+        ),
+      ),
+      const SizedBox(height: 4),
+
+      Text(
+        (order.user.name != null &&
+                order.user.name.toString().trim().isNotEmpty)
+            ? order.user.name
+            : order.user.phoneNumber,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 13,
+          color: AppTheme.grey,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+
+      const SizedBox(height: 6),
+
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Icon(
+            order.paymentMethod == 'upi'
+                ? Icons.check_circle
+                : Icons.payment,
+            size: 14,
+            color: order.paymentMethod == 'upi'
+                ? Colors.green.shade600
+                : Colors.orange.shade600,
+          ),
+          Text(
+            order.paymentMethod == 'upi' ? 'PAID' : 'COD',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: order.paymentMethod == 'upi'
+                  ? Colors.green.shade600
+                  : Colors.orange.shade600,
+            ),
+          ),
+          Text(
+            currencyFormat.format(order.totalAmount),
+            style: const TextStyle(
+              color: AppTheme.primaryGreen,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+      
+    ],
+  ),
+),
+
+const SizedBox(width: 6),
+
+ConstrainedBox(
+  constraints: const BoxConstraints(
+    maxWidth: 90,
+  ),
+  child: Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: 8,
+      vertical: 6,
+    ),
+    decoration: BoxDecoration(
+      color: _getStatusColor(order.status).withOpacity(0.1),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: _getStatusColor(order.status).withOpacity(0.3),
+        width: 1.5,
+      ),
+    ),
+    child: Text(
+      order.statusText,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        color: _getStatusColor(order.status),
+      ),
+    ),
+  ),
+),
                 ],
               ),
             ],
