@@ -9,6 +9,14 @@ import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 
+import '../../widgets/dashboard/dashboard_header.dart';
+import '../../widgets/dashboard/dashboard_stat_tile.dart';
+import '../../widgets/dashboard/revenue_card.dart';
+import '../../widgets/dashboard/quick_action_card.dart';
+import '../../widgets/dashboard/section_title.dart';
+import '../../widgets/dashboard/dashboard_theme.dart';
+import '../../widgets/dashboard/pending_orders_card.dart';
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -53,50 +61,105 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
     }
   }
 
-  void _loadInitialData() {
-    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    if (authProvider.token != null) {
-      adminProvider.fetchStats(token: authProvider.token);
-      _lastRefreshTime = DateTime.now();
-    }
-  }
+void _loadInitialData() {
+  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-  void _startAutoRefresh() {
-    // Cancel existing timer
-    _refreshTimer?.cancel();
-    
-    // Start new timer - refresh every 30 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (_isScreenActive && mounted) {
-        final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        
-        if (authProvider.token != null) {
-          // Silent refresh - no loading indicator
-          adminProvider.fetchStats(token: authProvider.token);
-          _lastRefreshTime = DateTime.now();
-        }
+  if (authProvider.token != null) {
+    Future.wait([
+      adminProvider.fetchStats(
+        token: authProvider.token,
+      ),
+
+      adminProvider.fetchOrders(
+        token: authProvider.token, // Removed status: "pending"
+      ),
+    ]);
+
+    _lastRefreshTime = DateTime.now();
+  }
+}
+
+void _startAutoRefresh() {
+  _refreshTimer?.cancel();
+
+  // Refresh every 10 seconds
+  _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    if (_isScreenActive && mounted) {
+      final adminProvider =
+          Provider.of<AdminProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<AuthProvider>(context, listen: false);
+
+      if (authProvider.token != null) {
+        await Future.wait([
+          adminProvider.fetchStats(
+            token: authProvider.token,
+          ),
+
+          adminProvider.fetchOrders(
+            token: authProvider.token, // Removed status: "pending"
+          ),
+        ]);
+
+        _lastRefreshTime = DateTime.now();
       }
-    });
-  }
-
+    }
+  });
+}
   @override
   Widget build(BuildContext context) {
     final adminProvider = Provider.of<AdminProvider>(context);
+    final actionRequiredOrders = adminProvider.orders.where((order) {
+  final status = order.status.toLowerCase();
+
+  return status == 'pending' ||
+      status == 'accepted' ||
+      status == 'preparing';
+}).toList();
     final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+                  
+     final screenWidth = MediaQuery.of(context).size.width;
+
+  final isDesktop = screenWidth >= 1100;
+
+  final isTablet =
+      screenWidth >= 700 && screenWidth < 1100;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+       backgroundColor: DashboardTheme.background,
+
+       appBar: AppBar(
+         elevation: 0,
+         backgroundColor: Colors.white,
+         surfaceTintColor: Colors.white,
+         title: const Text(
+            'Easy Basket Admin',
+             style: TextStyle(
+             fontWeight: FontWeight.bold,
+             color: DashboardTheme.title,
+         ),
+  ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              adminProvider.fetchStats(token: authProvider.token);
-            },
+            onPressed: () async {
+  final authProvider =
+      Provider.of<AuthProvider>(context, listen: false);
+
+  await Future.wait([
+    adminProvider.fetchStats(
+      token: authProvider.token,
+    ),
+    adminProvider.fetchOrders(
+      token: authProvider.token,
+    ),
+  ]);
+
+  setState(() {
+    _lastRefreshTime = DateTime.now();
+  });
+},
           ),
           PopupMenuButton<String>(
             onSelected: (value) async {
@@ -106,6 +169,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
                 try {
                   final authProvider = Provider.of<AuthProvider>(context, listen: false);
                   final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+
+                  
                   
                   // Initialize or refresh notification service
                   await NotificationService().initialize(
@@ -204,123 +269,117 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
             children: [
               // Stats Overview
               if (adminProvider.stats != null)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Overview',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          // Last refresh indicator
-                          if (_lastRefreshTime != null)
-                            Text(
-                              'Updated ${_formatLastRefresh(_lastRefreshTime!)}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.grey.withOpacity(0.7),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.15,
-                        children: [
-                          _StatCard(
-                            title: 'Total Orders',
-                            value: '${adminProvider.stats!['orders']?['total'] ?? 0}',
-                            icon: Icons.shopping_bag,
-                            color: AppTheme.primaryGreen,
-                          ),
-                          _StatCard(
-                            title: 'Pending Orders',
-                            value: '${adminProvider.stats!['orders']?['pending'] ?? 0}',
-                            icon: Icons.pending,
-                            color: Colors.orange,
-                          ),
-                          _StatCard(
-                            title: "Today's Orders",
-                            value: '${adminProvider.stats!['orders']?['today'] ?? 0}',
-                            icon: Icons.today,
-                            color: Colors.blue,
-                          ),
-                          _StatCard(
-                            title: 'Total Users',
-                            value: '${adminProvider.stats!['users']?['total'] ?? 0}',
-                            icon: Icons.people,
-                            color: Colors.purple,
-                          ),
-                          _StatCard(
-                            title: 'Total Products',
-                            value: '${adminProvider.stats!['products']?['total'] ?? 0}',
-                            icon: Icons.inventory,
-                            color: Colors.teal,
-                          ),
-                          _StatCard(
-                            title: 'Low Stock',
-                            value: '${adminProvider.stats!['products']?['lowStock'] ?? 0}',
-                            icon: Icons.warning,
-                            color: Colors.red,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Revenue Card
-                      Card(
-                        color: AppTheme.primaryGreen,
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Today's Revenue",
-                                    style: TextStyle(
-                                      color: AppTheme.white,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    currencyFormat.format(
-                                      (adminProvider.stats!['revenue']?['today'] ?? 0).toDouble(),
-                                    ),
-                                    style: const TextStyle(
-                                      color: AppTheme.white,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Icon(
-                                Icons.currency_rupee,
-                                color: AppTheme.white,
-                                size: 48,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+  Padding(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        //removed dashboard heading //--------//
+
+        // DashboardHeader(
+        //   updatedText: _lastRefreshTime == null
+        //       ? "Loading..."
+        //       : "Updated ${_formatLastRefresh(_lastRefreshTime!)}",
+        // ),
+
+        // const SizedBox(height: 24),
+        
+        //added pending orders//
+       const SectionTitle(
+  title: "Orders Requiring Action",
+),
+const SizedBox(height: 16),
+
+        actionRequiredOrders.isEmpty
+    ? Container(
+        padding: const EdgeInsets.all(20),
+        decoration: DashboardTheme.cardDecoration,
+        child: const Center(
+  child: Text("No Orders Requiring Action"),
+),
+      )
+    : Column(
+        children: actionRequiredOrders
+    .take(5)
+            .map(
+              (order) => PendingOrdersCard(
+                order: order,
+              ),
+            )
+            .toList(),
+      ),
+
+const SizedBox(height: 24),
+        
+
+        const SectionTitle(
+          title: "Performance Summary",
+        ),
+
+        // RevenueCard(
+        //   amount: currencyFormat.format(
+        //     (adminProvider.stats!['revenue']?['today'] ?? 0).toDouble(),
+        //   ),
+        // ),
+
+        // const SizedBox(height: 24),
+
+        Container(
+          decoration: DashboardTheme.cardDecoration,
+          child: Column(
+            children: [
+
+              _summaryTile(
+                Icons.shopping_bag_outlined,
+                "Total Orders",
+                "${adminProvider.stats!['orders']['total']}",
+                DashboardTheme.primary,
+              ),
+
+              _summaryTile(
+  Icons.pending_actions,
+  "Action Required",
+  "${actionRequiredOrders.length}",
+  Colors.orange,
+),
+
+              _summaryTile(
+                Icons.today_outlined,
+                "Today's Orders",
+                "${adminProvider.stats!['orders']['today']}",
+                Colors.blue,
+              ),
+
+              _summaryTile(
+                Icons.people_outline,
+                "Users",
+                "${adminProvider.stats!['users']['total']}",
+                Colors.purple,
+              ),
+
+              _summaryTile(
+                Icons.inventory_2_outlined,
+                "Products",
+                "${adminProvider.stats!['products']['total']}",
+                Colors.teal,
+              ),
+
+              _summaryTile(
+                Icons.warning_amber_rounded,
+                "Low Stock",
+                "${adminProvider.stats!['products']['lowStock']}",
+                Colors.red,
+              ),
+
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+      ],
+    ),
+  ),
 
               // Quick Actions
               Padding(
@@ -336,65 +395,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
                       ),
                     ),
                     const SizedBox(height: 12),
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.5,
-                      children: [
-                        _ActionCard(
-                          title: 'Orders',
-                          icon: Icons.shopping_bag,
-                          color: AppTheme.primaryGreen,
-                          onTap: () => context.push('/admin/orders'),
-                        ),
-                        _ActionCard(
-                          title: 'Users',
-                          icon: Icons.people,
-                          color: Colors.blue,
-                          onTap: () => context.push('/admin/users'),
-                        ),
-                        // Phase 3: rider management — list, wallet, deposits.
-                        _ActionCard(
-                          title: 'Riders',
-                          icon: Icons.delivery_dining,
-                          color: Colors.indigo,
-                          onTap: () => context.push('/admin/riders'),
-                        ),
-                        _ActionCard(
-                          title: 'Products',
-                          icon: Icons.inventory,
-                          color: Colors.orange,
-                          onTap: () => context.push('/admin/products'),
-                        ),
-                        _ActionCard(
-                          title: 'Categories',
-                          icon: Icons.category,
-                          color: Colors.purple,
-                          onTap: () => context.push('/admin/categories'),
-                        ),
-                        _ActionCard(
-                          title: 'Category Order',
-                          icon: Icons.sort,
-                          color: Colors.teal,
-                          onTap: () => context.push('/admin/categories/order'),
-                        ),
-                        _ActionCard(
-                          title: 'Campaigns',
-                          icon: Icons.campaign,
-                          color: Colors.deepOrange,
-                          onTap: () => context.push('/admin/campaigns'),
-                        ),
-                        _ActionCard(
-                          title: 'Push Notify',
-                          icon: Icons.notifications_active,
-                          color: Colors.red,
-                          onTap: () => context.push('/admin/notifications'),
-                        ),
-                      ],
-                    ),
+                    Column(
+  children: [
+
+    ActionTile(
+      title: "Orders",
+      subtitle: "Manage customer orders",
+      icon: Icons.shopping_bag_outlined,
+      onTap: () => context.push('/admin/orders'),
+    ),
+
+    ActionTile(
+      title: "Users",
+      subtitle: "Manage registered users",
+      icon: Icons.people_outline,
+      onTap: () => context.push('/admin/users'),
+    ),
+
+    ActionTile(
+      title: "Riders",
+      subtitle: "Manage delivery partners",
+      icon: Icons.delivery_dining_outlined,
+      onTap: () => context.push('/admin/riders'),
+    ),
+
+    ActionTile(
+      title: "Products",
+      subtitle: "Inventory management",
+      icon: Icons.inventory_2_outlined,
+      onTap: () => context.push('/admin/products'),
+    ),
+
+    ActionTile(
+      title: "Categories",
+      subtitle: "Manage categories",
+      icon: Icons.category_outlined,
+      onTap: () => context.push('/admin/categories'),
+    ),
+
+    ActionTile(
+      title: "Category Order",
+      subtitle: "Sort categories",
+      icon: Icons.sort,
+      onTap: () => context.push('/admin/categories/order'),
+    ),
+
+    ActionTile(
+      title: "Campaigns",
+      subtitle: "Offers & promotions",
+      icon: Icons.campaign_outlined,
+      onTap: () => context.push('/admin/campaigns'),
+    ),
+
+    ActionTile(
+      title: "Push Notifications",
+      subtitle: "Send notifications",
+      icon: Icons.notifications_active_outlined,
+      onTap: () => context.push('/admin/notifications'),
+    ),
+
+  ],
+),
                   ],
                 ),
               ),
@@ -419,6 +480,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Widget
       return '${difference.inHours}h ago';
     }
   }
+}
+
+Widget _summaryTile(
+  IconData icon,
+  String title,
+  String value,
+  Color color,
+) {
+  return ListTile(
+    leading: CircleAvatar(
+      radius: 20,
+      backgroundColor: color.withOpacity(.12),
+      child: Icon(icon, color: color, size: 20),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    trailing: Text(
+      value,
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
 }
 
 class _StatCard extends StatelessWidget {
@@ -479,50 +568,99 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
+class ActionTile extends StatelessWidget {
+
   final String title;
+  final String subtitle;
   final IconData icon;
-  final Color color;
   final VoidCallback onTap;
 
-  const _ActionCard({
+  const ActionTile({
+    super.key,
     required this.title,
+    required this.subtitle,
     required this.icon,
-    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min, // Use min to prevent overflow
-            children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+
+    return Container(
+
+      margin: const EdgeInsets.only(bottom: 12),
+
+      child: Material(
+
+        borderRadius: BorderRadius.circular(16),
+
+        color: Colors.white,
+
+        child: InkWell(
+
+          borderRadius: BorderRadius.circular(16),
+
+          onTap: onTap,
+
+          child: Padding(
+
+            padding: const EdgeInsets.all(16),
+
+            child: Row(
+
+              children: [
+
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: DashboardTheme.primary.withOpacity(.12),
+                  child: Icon(
+                    icon,
+                    color: DashboardTheme.primary,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+
+                const SizedBox(width: 16),
+
+                Expanded(
+
+                  child: Column(
+
+                    crossAxisAlignment: CrossAxisAlignment.start,
+
+                    children: [
+
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                        ),
+                      ),
+
+                    ],
+                  ),
+                ),
+
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 18,
+                ),
+
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
