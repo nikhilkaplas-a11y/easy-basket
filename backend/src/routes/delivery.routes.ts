@@ -12,7 +12,10 @@ router.get('/orders', DeliveryController.getAssignedOrders);
 router.get('/orders/available', DeliveryController.getAvailableOrders);
 router.post('/orders/:id/accept', DeliveryController.acceptOrder);
 router.get('/orders/:id', DeliveryController.getOrderDetails);
-router.put('/orders/:id/status', DeliveryController.updateOrderStatus);
+// REMOVED: PUT /orders/:id/status — legacy free-form status setter that bypassed the
+// delivery state machine (could mark 'delivered' with no OTP, no wallet debit → cash
+// theft vector). Riders must use the state-machine endpoints below (start-delivery →
+// arrived → collect-cash / mark-prepaid-delivered), which gate on OTP + wallet.
 router.get('/stats', DeliveryController.getDeliveryStats);
 router.get('/earnings', DeliveryController.getEarnings);
 

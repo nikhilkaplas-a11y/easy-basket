@@ -58,7 +58,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
     if (authProvider.token == null) return;
 
-    final success = await adminProvider.updateUser(
+    final success = await adminProvider.changeUserRole(
       token: authProvider.token!,
       userId: userId,
       role: newRole,

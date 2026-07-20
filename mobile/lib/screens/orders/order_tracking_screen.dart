@@ -1008,7 +1008,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Awaiting approval. If approved, your full amount will be refunded to your original payment method in 2–7 working days.',
+                  order.isPaid
+                      ? 'Awaiting approval. If approved, your full amount will be refunded to your original payment method in 2–7 working days.'
+                      : 'Awaiting approval. Your order will be cancelled once approved.',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
                 if (reason != null && reason.isNotEmpty) ...[
@@ -1040,8 +1042,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             child: OutlinedButton.icon(
               onPressed: () => _onRequestCancellation(order),
               icon: const Icon(Icons.replay, size: 18),
-              label: const Text('Cancel & Request Refund',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              label: Text(order.isPaid ? 'Cancel & Request Refund' : 'Request Cancellation',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFFD32F2F),
                 side: const BorderSide(color: Color(0xFFD32F2F)),

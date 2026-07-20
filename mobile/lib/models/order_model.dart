@@ -144,6 +144,11 @@ class OrderModel {
   /// Amount in paise the rider must collect at the door (or 0 for prepaid).
   int get amountToCollectPaise => isCod && !isPaid ? (totalAmount * 100).round() : 0;
 
+  /// True only when cash must physically be collected. A COD order that was paid
+  /// online at the door (rider "Switch to UPI") is COD by method but already paid,
+  /// so it closes via the OTP/mark-delivered path, NOT collect-cash.
+  bool get needsCashCollection => isCod && !isPaid;
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     // Helper to parse numeric values (handles both string and num from MySQL DECIMAL)
     double parseDouble(dynamic value) {

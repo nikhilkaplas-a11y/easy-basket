@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +34,12 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
   DateTime? _paymentStartTime;
   int? _currentOrderId; // Store the order ID we're processing
 
+  // Stable idempotency key for THIS checkout attempt. Reused on retry (timeout,
+  // double-tap) so the backend returns the same order instead of creating a
+  // duplicate + double-decrementing stock.
+  late final String _checkoutKey =
+      'ord-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(0x7fffffff)}';
+
   @override
   void initState() {
     super.initState();
@@ -52,14 +59,18 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     
     // When app comes back to foreground after payment
     if (state == AppLifecycleState.resumed && _isProcessingPayment) {
-      // Check if we've been processing for more than 5 seconds
-      if (_paymentStartTime != null) {
-        final duration = DateTime.now().difference(_paymentStartTime!);
-        if (duration.inSeconds > 5) {
-          // App returned but callback didn't fire - check orders
+      // On resume, the Razorpay success/error callback usually fires a moment later
+      // and races with this fallback. Wait a short grace period so it can resolve the
+      // payment first (it sets _isProcessingPayment=false); only if it truly didn't
+      // fire — and checkout has been open a while — fall back to the "pending" screen.
+      // The old 5s threshold pre-empted successful payers and skipped client-verify.
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!mounted || !_isProcessingPayment) return; // callback already handled it
+        final started = _paymentStartTime;
+        if (started != null && DateTime.now().difference(started).inSeconds > 15) {
           _checkPaymentStatus();
         }
-      }
+      });
     }
   }
   
@@ -353,6 +364,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       addressId: addressId,
       paymentMethod: _selectedPaymentMethod,
       notes: _notesController.text.isEmpty ? null : _notesController.text,
+      idempotencyKey: _checkoutKey,
     );
 
     if (order == null) {

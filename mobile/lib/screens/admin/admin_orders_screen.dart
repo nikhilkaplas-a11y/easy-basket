@@ -567,22 +567,19 @@ Expanded(
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Icon(
-            order.paymentMethod == 'upi'
-                ? Icons.check_circle
-                : Icons.payment,
+            order.isPaid ? Icons.check_circle : Icons.payment,
             size: 14,
-            color: order.paymentMethod == 'upi'
-                ? Colors.green.shade600
-                : Colors.orange.shade600,
+            color: order.isPaid ? Colors.green.shade600 : Colors.orange.shade600,
           ),
           Text(
-            order.paymentMethod == 'upi' ? 'PAID' : 'COD',
+            // Reflect actual payment state, not payment method. A UPI order is
+            // 'pending' until payment confirms, so keying off method showed a false
+            // "PAID" for unpaid/abandoned online orders.
+            order.isPaid ? 'PAID' : (order.isCod ? 'COD' : 'UNPAID'),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: order.paymentMethod == 'upi'
-                  ? Colors.green.shade600
-                  : Colors.orange.shade600,
+              color: order.isPaid ? Colors.green.shade600 : Colors.orange.shade600,
             ),
           ),
           Text(

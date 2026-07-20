@@ -725,7 +725,7 @@ class _DeliveryOrderDetailScreenState extends State<DeliveryOrderDetailScreen> {
             ),
           ),
         if (ds == 'arrived' || ds == 'payment_pending') ...[
-          if (order.isCod)
+          if (order.needsCashCollection)
             bigButton(
               label: 'Collect Cash ₹${order.totalAmount.toStringAsFixed(0)}',
               icon: Icons.payments_outlined,

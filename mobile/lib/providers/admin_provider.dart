@@ -236,6 +236,23 @@
       }
     }
 
+    /// Change a user's role via the dedicated, audited endpoint. NOTE: the generic
+    /// updateUser (PUT /users/:id) does NOT persist role — role changes must use
+    /// this POST /users/:id/role endpoint or they silently no-op.
+    Future<bool> changeUserRole({
+      required String token,
+      required int userId,
+      required String role,
+    }) async {
+      try {
+        await apiService.post('/admin/users/$userId/role', {'role': role}, token: token);
+        return true;
+      } catch (e) {
+        _error = e.toString().replaceAll('Exception: ', '');
+        return false;
+      }
+    }
+
     Future<ProductModel?> fetchProductById({required String token, required int productId}) async {
       _isLoading = true;
       _error = null;

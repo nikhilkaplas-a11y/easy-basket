@@ -285,6 +285,7 @@ class OrderProvider with ChangeNotifier {
     required int addressId,
     required String paymentMethod,
     String? notes,
+    String? idempotencyKey,
   }) async {
     _isLoading = true;
     _error = null;
@@ -300,6 +301,11 @@ class OrderProvider with ChangeNotifier {
           if (notes != null) 'notes': notes,
         },
         token: token,
+        // Idempotency-Key makes a retry (timeout, double-tap) reuse the same order
+        // instead of creating a duplicate + double-decrementing stock. Stable per
+        // checkout attempt — the caller passes one key and reuses it on retry.
+        extraHeaders:
+            idempotencyKey != null ? {'Idempotency-Key': idempotencyKey} : null,
       );
       // Backend returns { order: {...}, paymentOrder: {...} }
       // Extract the order from the response

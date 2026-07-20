@@ -406,7 +406,11 @@ export class DeliveryStateService {
     if (!expectedOrder.deliveryBoy || expectedOrder.deliveryBoy.id !== params.riderId) {
       return err(403, 'Order not assigned to you');
     }
-    if (expectedOrder.paymentMethod === 'cod') {
+    // A COD order that is NOT yet paid must go through collect-cash. But a COD
+    // order that became paid at the door (rider used "Switch to UPI" → customer
+    // paid online) has isPaid=true and CANNOT be closed via collect-cash (that
+    // 409s on "already paid"). Such orders finish here, OTP-gated, like prepaid.
+    if (expectedOrder.paymentMethod === 'cod' && !expectedOrder.isPaid) {
       return err(400, 'COD orders must use collect-cash');
     }
     if (!expectedOrder.isPaid) {
@@ -543,6 +547,13 @@ export class DeliveryStateService {
       if (order.deliveryBoy?.id !== params.riderId) return err(403, 'Order not assigned to you');
 
       const from = (order.deliveryStatus ?? null) as DeliveryStatus | null;
+
+      // S7: don't let an issue report drive a terminal order into RTO. Without this,
+      // a delivered order could be forced to rto_pending → completeRto would restore
+      // stock again and refund an already-delivered order.
+      if (from === 'delivered' || from === 'rto_completed') {
+        return err(409, `Cannot report an issue on a '${from}' order`);
+      }
 
       order.deliveryAttempts = (order.deliveryAttempts ?? 0) + 1;
 

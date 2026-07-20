@@ -310,33 +310,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                   ),
                 ],
               ),
-              if (order.paymentMethod != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: order.isPaid ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        order.isPaid ? Icons.check_circle : Icons.pending,
-                        size: 16,
-                        color: order.isPaid ? Colors.green : Colors.orange,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        order.isPaid ? 'Paid' : 'Pending',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: order.isPaid ? Colors.green : Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              if (order.paymentMethod != null) _paymentStateChip(order),
             ],
           ),
         ],
@@ -828,21 +802,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                     color: AppTheme.grey,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: order.isPaid ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    order.isPaid ? 'Paid' : 'Pending',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: order.isPaid ? Colors.green : Colors.orange,
-                    ),
-                  ),
-                ),
+                _paymentStateChip(order),
               ],
             ),
           ],
@@ -1257,6 +1217,50 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
         backgroundColor: Colors.red.shade700,
       ));
     }
+  }
+
+  /// Payment badge that reflects the real payment state — including refund states —
+  /// instead of only `isPaid` (which stays true after a refund).
+  Widget _paymentStateChip(OrderModel order) {
+    final ps = order.paymentStatus;
+    final String label;
+    final Color color;
+    final IconData icon;
+    if (ps == 'refunded') {
+      label = 'Refunded';
+      color = Colors.grey.shade600;
+      icon = Icons.undo;
+    } else if (ps == 'refund_pending') {
+      label = 'Refund in progress';
+      color = Colors.orange.shade700;
+      icon = Icons.undo;
+    } else if (order.isPaid) {
+      label = 'Paid';
+      color = Colors.green;
+      icon = Icons.check_circle;
+    } else {
+      label = 'Pending';
+      color = Colors.orange;
+      icon = Icons.pending;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+          ),
+        ],
+      ),
+    );
   }
 }
 

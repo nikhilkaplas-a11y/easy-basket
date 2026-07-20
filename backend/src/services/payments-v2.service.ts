@@ -303,6 +303,7 @@ export class PaymentsV2Service {
     // Atomic: payment + order move to paid together, or neither does. Without the
     // transaction, an order-save failure after the payment-save would leave payment
     // 'paid' (terminal, so the reconciler ignores it) while the order stays pending.
+    let paidOnCancelledOrder = false;
     await AppDataSource.transaction(async (mgr) => {
       payment.status = 'paid';
       if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
@@ -314,12 +315,36 @@ export class PaymentsV2Service {
         if (order.status === 'pending') {
           order.status = 'accepted';
         }
+        // Payment landed AFTER the order was already cancelled (classic case: the
+        // 30-min auto-cancel fired, then the customer completed a slow UPI payment).
+        // Goods are gone/stock released — record the payment truthfully, then refund.
+        if (order.status === 'cancelled') {
+          paidOnCancelledOrder = true;
+        }
         order.paymentStatus = 'paid';
         order.isPaid = true;
         if (razorpayPaymentId) order.paymentId = razorpayPaymentId;
         await mgr.getRepository(Order).save(order);
       }
     });
+
+    // Outside the transaction (createRefund has its own lock/transaction): auto-refund
+    // a payment that confirmed on an order we can no longer fulfil. Idempotent via the
+    // fixed key, so webhook + reconciler both landing here can't double-refund.
+    if (paidOnCancelledOrder) {
+      try {
+        await this.createRefund({
+          orderId: payment.orderId,
+          userId: payment.userId,
+          actorUserId: payment.userId,
+          reason: 'late_payment_on_cancelled_order',
+          idempotencyKey: `late-cancel-${payment.orderId}`,
+        });
+        console.log(`[payment] auto-refund issued for late payment on cancelled order #${payment.orderId}`);
+      } catch (e) {
+        console.error(`[payment] auto-refund failed for cancelled order #${payment.orderId}`, e);
+      }
+    }
   }
 
   /**

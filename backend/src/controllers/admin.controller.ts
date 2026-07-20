@@ -123,6 +123,19 @@ export class AdminController {
         return;
       }
 
+      // Guard (S4): never transition OUT of a terminal state. Moving a cancelled
+      // order (stock already restored, refund already issued) to delivered/preparing,
+      // or a delivered order back to pending, silently desyncs inventory + refunds.
+      if (
+        (order.status === 'cancelled' || order.status === 'delivered') &&
+        status !== order.status
+      ) {
+        res
+          .status(400)
+          .json({ message: `Cannot change a '${order.status}' order to '${status}'.` });
+        return;
+      }
+
       // Admin-cancel hooks: restore inventory + refund any paid amount.
       // Runs only on the transition INTO 'cancelled', and only once per order
       // (idempotent via status guard + UNIQUE(payment_id, idempotency_key) on refunds).
@@ -230,6 +243,16 @@ export class AdminController {
         if (fwd === 'delivered') order.deliveryCompletedAt = new Date();
       }
       order.deliveryStatus = newDeliveryState;
+
+      // createRefund (admin-cancel path above) already persisted
+      // paymentStatus='refund_pending'; mirror it so this save() doesn't
+      // overwrite it back to the stale in-memory 'paid'.
+      if (refundInitiated) order.paymentStatus = 'refund_pending';
+
+      // S1: an admin status change supersedes any pending customer cancellation
+      // request — clear it so the customer/admin UIs don't show a stale "awaiting
+      // approval" banner/card on an order that's already been advanced or cancelled.
+      if (order.cancelRequestStatus === 'requested') order.cancelRequestStatus = 'none';
 
       await orderRepository.save(order);
 
@@ -993,8 +1016,13 @@ export class AdminController {
         res.status(400).json({ message: 'No pending cancellation request for this order' });
         return;
       }
-      if (order.status === 'cancelled' || order.status === 'delivered') {
-        res.status(400).json({ message: `Cannot cancel order with status: ${order.status}` });
+      // Policy: refund-on-cancel is only for orders NOT yet packed. If the admin
+      // advanced the order past 'accepted', approving here would refund a packed
+      // order (violates the "after packing, no refund" rule).
+      if (order.status !== 'pending' && order.status !== 'accepted') {
+        res.status(400).json({
+          message: `Cannot approve refund — order is already '${order.status}'. Refunds are only allowed before packing.`,
+        });
         return;
       }
 
@@ -1027,6 +1055,9 @@ export class AdminController {
 
       order.status = 'cancelled';
       order.cancelRequestStatus = 'none';
+      // createRefund already persisted paymentStatus='refund_pending'; mirror it
+      // on the in-memory entity so this save() doesn't clobber it back to 'paid'.
+      if (refundInitiated) order.paymentStatus = 'refund_pending';
       await orderRepository.save(order);
 
       if (order.user.fcmToken) {

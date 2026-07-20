@@ -110,9 +110,10 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
 
     setState(() => _isSubmitting = true);
     try {
-      // Branch on payment method: COD goes through collect-cash (verifies amount,
-      // credits wallet); prepaid goes through mark-prepaid-delivered (just OTP gate).
-      if (order.isCod) {
+      // Branch on whether cash must still be collected: unpaid COD goes through
+      // collect-cash (verifies amount, credits wallet); prepaid AND already-paid-COD
+      // (paid online at the door) go through mark-prepaid-delivered (just OTP gate).
+      if (order.needsCashCollection) {
         await Provider.of<DeliveryProvider>(context, listen: false).collectCash(
           token: token,
           orderId: order.id,
@@ -299,8 +300,9 @@ class _DeliveryCodCollectScreenState extends State<DeliveryCodCollectScreen>
     }
 
     final amountStr = NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(order.totalAmount);
-    // Theme: red for COD (collect cash), green for prepaid (just verify).
-    final bool isCod = order.isCod;
+    // Theme: red when cash must be collected, green for verify-only (prepaid or
+    // COD already paid online at the door).
+    final bool isCod = order.needsCashCollection;
     final accent = isCod ? const Color(0xFFD32F2F) : const Color(0xFF2E7D32);
     final accentTint = isCod ? const Color(0xFFFFF5F5) : const Color(0xFFF1F8E9);
     final accentLight = isCod ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9);
