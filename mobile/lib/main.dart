@@ -70,6 +70,8 @@ class MyApp extends StatelessWidget {
       apiService.onTokenExpired = () async {
         return await authProvider.refreshAccessToken();
       };
+      // So retries after a refresh pick up the fresh token (all verbs).
+      apiService.getCurrentToken = () => authProvider.token;
       return apiService;
     }
     
@@ -99,6 +101,7 @@ class MyApp extends StatelessWidget {
               previous.apiService.onTokenExpired = () async {
                 return await authProvider.refreshAccessToken();
               };
+              previous.apiService.getCurrentToken = () => authProvider.token;
               return previous;
             }
             return ProductProvider(apiService: createApiService(authProvider));
@@ -112,6 +115,7 @@ class MyApp extends StatelessWidget {
               previous.apiService.onTokenExpired = () async {
                 return await authProvider.refreshAccessToken();
               };
+              previous.apiService.getCurrentToken = () => authProvider.token;
               return previous;
             }
             return OrderProvider(apiService: createApiService(authProvider));
@@ -125,6 +129,7 @@ class MyApp extends StatelessWidget {
               previous.apiService.onTokenExpired = () async {
                 return await authProvider.refreshAccessToken();
               };
+              previous.apiService.getCurrentToken = () => authProvider.token;
               return previous;
             }
             return DeliveryProvider(apiService: createApiService(authProvider));
@@ -138,6 +143,7 @@ class MyApp extends StatelessWidget {
               previous.apiService.onTokenExpired = () async {
                 return await authProvider.refreshAccessToken();
               };
+              previous.apiService.getCurrentToken = () => authProvider.token;
               return previous;
             }
             return AdminProvider(apiService: createApiService(authProvider));

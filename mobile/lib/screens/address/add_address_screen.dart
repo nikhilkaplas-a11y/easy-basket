@@ -583,10 +583,17 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
 
-    // Service area check
+    // Service area check — prefer GPS coordinates (radius check); pincode fallback.
+    final svcLat = double.tryParse(_latitude ?? '');
+    final svcLng = double.tryParse(_longitude ?? '');
     final pincode = _pincodeController.text.trim().replaceAll(' ', '');
-    if (pincode.isNotEmpty) {
-      final isAvailable = await serviceAreaProvider.checkServiceAvailability(pincode: pincode, country: 'India');
+    if ((svcLat != null && svcLng != null) || pincode.isNotEmpty) {
+      final isAvailable = await serviceAreaProvider.checkServiceAvailability(
+        latitude: svcLat,
+        longitude: svcLng,
+        pincode: pincode,
+        country: 'India',
+      );
       if (!isAvailable) {
         setState(() => _isSaving = false);
         if (mounted) {

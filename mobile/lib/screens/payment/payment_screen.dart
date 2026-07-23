@@ -234,7 +234,11 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
           // Navigate to payment status page FIRST (before clearing cart to avoid showing zero)
           context.go('/payment/status', extra: {
             'status': PaymentStatus.success,
-            'message': 'Payment successful! Your order has been placed.',
+            // Client 'verify' only advances to success_unverified — the webhook is
+            // the authority. Don't claim a definitive "successful/placed" that a
+            // later webhook could contradict; reassure without overstating.
+            'message':
+                'Payment received — we\'re confirming your order. It\'ll appear in your Orders shortly.',
             'orderId': orderId,
           });
           

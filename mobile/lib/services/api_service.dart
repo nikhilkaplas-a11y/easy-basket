@@ -4,84 +4,39 @@ import '../config/app_config.dart';
 
 class ApiService {
   static String get baseUrl => AppConfig.apiBaseUrl;
-  
-  // Callback to refresh token when it expires
+
+  // Callback to refresh the token when the server reports it expired (401).
   Future<bool> Function()? onTokenExpired;
-  
-  // Prevent multiple simultaneous refresh attempts
+
+  // Returns the CURRENT valid token after a refresh, so retries pick up the new
+  // one without every caller having to pass `getUpdatedToken`. Wired in main.dart.
+  String? Function()? getCurrentToken;
+
+  // Prevent multiple simultaneous refresh attempts.
   bool _isRefreshing = false;
-  
-  ApiService({this.onTokenExpired});
 
-  Future<dynamic> get(String endpoint, {String? token, bool retryOnExpired = true, String? Function()? getUpdatedToken}) async {
-    try {
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-      
-      String? currentToken = token ?? getUpdatedToken?.call();
-      if (currentToken != null) {
-        headers['Authorization'] = 'Bearer $currentToken';
-      }
+  ApiService({this.onTokenExpired, this.getCurrentToken});
 
-      // Debug: Log the full GET URL for troubleshooting
-      // ignore: avoid_print
-      print('[API][GET] $baseUrl$endpoint');
+  static const _timeout = Duration(seconds: 30);
 
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-      ).timeout(
-        const Duration(seconds: 30), // 30 second timeout for API calls
-        onTimeout: () {
-          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
-        },
-      );
+  // ---------------------------------------------------------------------------
+  // Public verbs — thin wrappers over the shared _send (which now does the
+  // refresh-and-retry-on-401 for EVERY verb, not just GET).
+  // ---------------------------------------------------------------------------
 
-      return _handleResponse(response);
-    } on TokenExpiredException catch (e) {
-      // Try to refresh token and retry once
-      if (retryOnExpired && await _handleTokenExpiration()) {
-        // Get updated token and retry
-        final newToken = getUpdatedToken?.call();
-        if (newToken != null && newToken != token) {
-          final headers = <String, String>{
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $newToken',
-          };
-          final response = await http.get(
-            Uri.parse('$baseUrl$endpoint'),
-            headers: headers,
-          ).timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw Exception('Request timeout: Server took too long to respond.');
-            },
-          );
-          return _handleResponse(response);
-        }
-      }
-      rethrow;
-    } catch (e) {
-      // Re-throw if it's already a TokenExpiredException
-      if (e is TokenExpiredException) rethrow;
-      // Provide more detailed error information
-      final errorString = e.toString().toLowerCase();
-      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
-        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
-      }
-      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
-        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
-      }
-      if (errorString.contains('timeout')) {
-        throw Exception('Request timeout: Server took too long to respond');
-      }
-      if (errorString.contains('certificate') || errorString.contains('ssl') || errorString.contains('tls')) {
-        throw Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
-      }
-      // Otherwise wrap in generic exception with more context
-      throw Exception('Network error: $e');
-    }
+  Future<dynamic> get(
+    String endpoint, {
+    String? token,
+    bool retryOnExpired = true,
+    String? Function()? getUpdatedToken,
+  }) {
+    return _send(
+      method: 'GET',
+      endpoint: endpoint,
+      token: token,
+      retryOnExpired: retryOnExpired,
+      getUpdatedToken: getUpdatedToken,
+    );
   }
 
   Future<dynamic> post(
@@ -89,142 +44,127 @@ class ApiService {
     Map<String, dynamic> data, {
     String? token,
     Map<String, String>? extraHeaders,
-  }) async {
-    try {
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-
-      // Optional caller-provided headers (e.g. Idempotency-Key for non-replayable POSTs).
-      if (extraHeaders != null) {
-        headers.addAll(extraHeaders);
-      }
-
-      print('[API][POST] $baseUrl$endpoint');
-      final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-        body: jsonEncode(data),
-      ).timeout(
-        const Duration(seconds: 30), // 30 second timeout for API calls
-        onTimeout: () {
-          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
-        },
-      );
-
-      return _handleResponse(response);
-    } catch (e) {
-      // Re-throw if it's already a TokenExpiredException
-      if (e is TokenExpiredException) rethrow;
-      // Provide more detailed error information
-      final errorString = e.toString().toLowerCase();
-      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
-        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
-      }
-      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
-        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
-      }
-      if (errorString.contains('timeout')) {
-        throw Exception('Request timeout: Server took too long to respond');
-      }
-      // Otherwise wrap in generic exception with more context
-      throw Exception('Network error: $e');
-    }
+    bool retryOnExpired = true,
+  }) {
+    return _send(
+      method: 'POST',
+      endpoint: endpoint,
+      token: token,
+      body: data,
+      extraHeaders: extraHeaders,
+      retryOnExpired: retryOnExpired,
+    );
   }
 
   Future<dynamic> put(
     String endpoint,
     Map<String, dynamic> data, {
     String? token,
+    bool retryOnExpired = true,
+  }) {
+    return _send(
+      method: 'PUT',
+      endpoint: endpoint,
+      token: token,
+      body: data,
+      retryOnExpired: retryOnExpired,
+    );
+  }
+
+  Future<dynamic> delete(
+    String endpoint, {
+    String? token,
+    bool retryOnExpired = true,
+  }) {
+    return _send(
+      method: 'DELETE',
+      endpoint: endpoint,
+      token: token,
+      retryOnExpired: retryOnExpired,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shared request path with refresh-and-retry.
+  // ---------------------------------------------------------------------------
+
+  Future<dynamic> _send({
+    required String method,
+    required String endpoint,
+    String? token,
+    Map<String, dynamic>? body,
+    Map<String, String>? extraHeaders,
+    bool retryOnExpired = true,
+    String? Function()? getUpdatedToken,
   }) async {
+    Future<http.Response> dispatch(String? authToken) {
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (authToken != null) headers['Authorization'] = 'Bearer $authToken';
+      if (extraHeaders != null) headers.addAll(extraHeaders);
+
+      // ignore: avoid_print
+      print('[API][$method] $baseUrl$endpoint');
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final encoded = body != null ? jsonEncode(body) : null;
+
+      switch (method) {
+        case 'GET':
+          return http.get(uri, headers: headers).timeout(_timeout, onTimeout: _onTimeout);
+        case 'POST':
+          return http.post(uri, headers: headers, body: encoded).timeout(_timeout, onTimeout: _onTimeout);
+        case 'PUT':
+          return http.put(uri, headers: headers, body: encoded).timeout(_timeout, onTimeout: _onTimeout);
+        case 'DELETE':
+          return http.delete(uri, headers: headers).timeout(_timeout, onTimeout: _onTimeout);
+        default:
+          throw Exception('Unsupported method: $method');
+      }
+    }
+
+    final initialToken = token ?? getUpdatedToken?.call() ?? getCurrentToken?.call();
+
     try {
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-      
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
+      return _handleResponse(await dispatch(initialToken));
+    } on TokenExpiredException {
+      // Standard behaviour for EVERY verb: refresh once, then retry with the new
+      // token. Previously only GET retried, and only when the caller passed
+      // getUpdatedToken — so writes (place order, profile, address) failed after
+      // the 15-min access-token expiry.
+      if (retryOnExpired && await _handleTokenExpiration()) {
+        final newToken =
+            getUpdatedToken?.call() ?? getCurrentToken?.call() ?? initialToken;
+        return _handleResponse(await dispatch(newToken));
       }
-
-      print('[API][PUT] $baseUrl$endpoint');
-      final response = await http.put(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-        body: jsonEncode(data),
-      ).timeout(
-        const Duration(seconds: 30), // 30 second timeout for API calls
-        onTimeout: () {
-          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
-        },
-      );
-
-      return _handleResponse(response);
+      rethrow;
     } catch (e) {
-      // Re-throw if it's already a TokenExpiredException
       if (e is TokenExpiredException) rethrow;
-      // Provide more detailed error information
-      final errorString = e.toString().toLowerCase();
-      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
-        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
-      }
-      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
-        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
-      }
-      if (errorString.contains('timeout')) {
-        throw Exception('Request timeout: Server took too long to respond');
-      }
-      if (errorString.contains('certificate') || errorString.contains('ssl') || errorString.contains('tls')) {
-        throw Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
-      }
-      throw Exception('Network error: $e');
+      throw _mapNetworkError(e);
     }
   }
 
-  Future<dynamic> delete(String endpoint, {String? token}) async {
-    try {
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-      
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
+  static Never _onTimeout() {
+    throw Exception(
+      'Request timeout: Server took too long to respond. Please check if backend is running and database is connected.',
+    );
+  }
 
-      print('[API][DELETE] $baseUrl$endpoint');
-      final response = await http.delete(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-      ).timeout(
-        const Duration(seconds: 30), // 30 second timeout for API calls
-        onTimeout: () {
-          throw Exception('Request timeout: Server took too long to respond. Please check if backend is running and database is connected.');
-        },
-      );
-
-      return _handleResponse(response);
-    } catch (e) {
-      // Re-throw if it's already a TokenExpiredException
-      if (e is TokenExpiredException) rethrow;
-      // Provide more detailed error information
-      final errorString = e.toString().toLowerCase();
-      if (errorString.contains('failed host lookup') || errorString.contains('connection refused')) {
-        throw Exception('Cannot connect to server. Check if backend is running at $baseUrl');
-      }
-      if (errorString.contains('failed to fetch') || errorString.contains('networkerror')) {
-        throw Exception('Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection');
-      }
-      if (errorString.contains('timeout')) {
-        throw Exception('Request timeout: Server took too long to respond');
-      }
-      if (errorString.contains('certificate') || errorString.contains('ssl') || errorString.contains('tls')) {
-        throw Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
-      }
-      throw Exception('Network error: $e');
+  Exception _mapNetworkError(Object e) {
+    final s = e.toString().toLowerCase();
+    if (s.contains('failed host lookup') || s.contains('connection refused')) {
+      return Exception('Cannot connect to server. Check if backend is running at $baseUrl');
     }
+    if (s.contains('failed to fetch') || s.contains('networkerror')) {
+      return Exception(
+        'Network error: Cannot reach server at $baseUrl. Check:\n1. Backend is running\n2. CORS is enabled\n3. No firewall blocking connection',
+      );
+    }
+    if (s.contains('timeout')) {
+      return Exception('Request timeout: Server took too long to respond');
+    }
+    if (s.contains('certificate') || s.contains('ssl') || s.contains('tls')) {
+      return Exception('SSL certificate error. Please check if HTTPS is properly configured on the server.');
+    }
+    return Exception('Network error: $e');
   }
 
   dynamic _handleResponse(http.Response response) {
@@ -233,10 +173,7 @@ class ApiService {
         return [];
       }
       try {
-        final decoded = jsonDecode(response.body);
-        // Backend returns arrays directly (products, categories, orders, addresses)
-        // or objects (single product, order, etc.)
-        return decoded;
+        return jsonDecode(response.body);
       } catch (e) {
         throw Exception('Invalid JSON response: $e');
       }
@@ -258,24 +195,25 @@ class ApiService {
       }
     }
   }
-  
-  /// Handle token expiration with automatic refresh
+
+  /// Handle token expiration with automatic refresh (single-flight).
   Future<bool> _handleTokenExpiration() async {
-    // Prevent multiple simultaneous refresh attempts
+    // A refresh is already running — wait briefly for it to finish, then assume
+    // success if it cleared. (Best-effort coordination.)
     if (_isRefreshing) {
-      // Wait a bit and check if refresh completed
-      await Future.delayed(const Duration(milliseconds: 500));
-      return !_isRefreshing; // Return true if refresh completed
+      for (var i = 0; i < 20 && _isRefreshing; i++) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      return !_isRefreshing;
     }
-    
+
     if (onTokenExpired == null) {
       return false;
     }
-    
+
     _isRefreshing = true;
     try {
-      final success = await onTokenExpired!();
-      return success;
+      return await onTokenExpired!();
     } finally {
       _isRefreshing = false;
     }
@@ -286,7 +224,7 @@ class ApiService {
 class TokenExpiredException implements Exception {
   final String message;
   TokenExpiredException(this.message);
-  
+
   @override
   String toString() => message;
 }

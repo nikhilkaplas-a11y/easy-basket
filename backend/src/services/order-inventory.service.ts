@@ -21,19 +21,16 @@ export class OrderInventoryService {
     const productRepository = db.getRepository(Product);
     const variantRepository = db.getRepository(ProductVariant);
 
+    // Atomic increments (SET stock = stock + qty) instead of read-modify-write —
+    // two concurrent restores can't lose each other's update. (Callers still guard
+    // against double-INVOCATION via an atomic status claim before calling this.)
     for (const line of items) {
+      const qty = Number(line.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
       if (line.variant?.id != null) {
-        const variant = await variantRepository.findOneBy({ id: line.variant.id });
-        if (variant) {
-          variant.stock += Number(line.quantity);
-          await variantRepository.save(variant);
-        }
-      } else {
-        const product = await productRepository.findOneBy({ id: line.product.id });
-        if (product) {
-          product.stock += Number(line.quantity);
-          await productRepository.save(product);
-        }
+        await variantRepository.increment({ id: line.variant.id }, 'stock', qty);
+      } else if (line.product?.id != null) {
+        await productRepository.increment({ id: line.product.id }, 'stock', qty);
       }
     }
 

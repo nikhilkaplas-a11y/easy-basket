@@ -14,9 +14,16 @@ class ServiceAreaProvider with ChangeNotifier {
   String? get error => _error;
   Map<String, dynamic>? get serviceAreaInfo => _serviceAreaInfo;
 
-  /// Check if service is available for a given pincode
+  /// Check if service is available for a location.
+  ///
+  /// Prefers GPS coordinates (latitude/longitude) — the backend decides via a
+  /// distance-from-store radius check. Falls back to `pincode` when coordinates
+  /// aren't provided (e.g. GPS denied). Callers that already have address/GPS
+  /// coordinates should pass them for an accurate, radius-based result.
   Future<bool> checkServiceAvailability({
-    required String pincode,
+    String? pincode,
+    double? latitude,
+    double? longitude,
     String country = 'India',
   }) async {
     // CRITICAL: Always reset state before checking to prevent stale results
@@ -27,14 +34,21 @@ class ServiceAreaProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Build query string manually
-      final cleanPincode = pincode.trim().replaceAll(' ', '');
-      
-      if (kDebugMode) {
-        print('🌐 [API CALL] Checking service for pincode: $cleanPincode, country: $country');
+      final hasCoords = latitude != null && longitude != null;
+      final String queryString;
+      if (hasCoords) {
+        queryString = '?lat=$latitude&lng=$longitude';
+        if (kDebugMode) {
+          print('🌐 [API CALL] Checking service for coords: $latitude,$longitude');
+        }
+      } else {
+        final cleanPincode = (pincode ?? '').trim().replaceAll(' ', '');
+        queryString = '?pincode=$cleanPincode&country=${Uri.encodeComponent(country)}';
+        if (kDebugMode) {
+          print('🌐 [API CALL] Checking service for pincode: $cleanPincode, country: $country');
+        }
       }
-      
-      final queryString = '?pincode=$cleanPincode&country=${Uri.encodeComponent(country)}';
+
       final response = await apiService.get(
         '/service-area/check$queryString',
       );
@@ -48,7 +62,10 @@ class ServiceAreaProvider with ChangeNotifier {
       notifyListeners();
       
       if (kDebugMode) {
-        print('🌐 [API RESULT] Pincode $cleanPincode: ${(_isServiceAvailable == true) ? "AVAILABLE" : "NOT AVAILABLE"}');
+        final where = (latitude != null && longitude != null)
+            ? '$latitude,$longitude'
+            : (pincode ?? '');
+        print('🌐 [API RESULT] $where: ${(_isServiceAvailable == true) ? "AVAILABLE" : "NOT AVAILABLE"}');
       }
       
       return _isServiceAvailable ?? false;

@@ -7,7 +7,7 @@ import { Order } from '../entities/Order';
 import { Product } from '../entities/Product';
 import { Response } from 'express';
 import { User } from '../entities/User';
-import { Brackets } from 'typeorm';
+import { Brackets, In, Not } from 'typeorm';
 import { ProductController } from './product.controller';
 import { mapOrderPublic, mapProductPublic, normalizeMediaForStorage } from '../utils/media-url.util';
 import { OrderInventoryService } from '../services/order-inventory.service';
@@ -140,30 +140,39 @@ export class AdminController {
       // Runs only on the transition INTO 'cancelled', and only once per order
       // (idempotent via status guard + UNIQUE(payment_id, idempotency_key) on refunds).
       let refundInitiated = false;
-      if (status === 'cancelled' && order.status !== 'cancelled') {
-        try {
-          await OrderInventoryService.restoreReservedStockForItems(order.items);
-        } catch (invErr) {
-          console.error(`[admin-cancel] inventory restore failed for order #${order.id}`, invErr);
-        }
-
-        if (order.paymentStatus === 'paid') {
+      if (status === 'cancelled') {
+        // Atomic claim: only the request that actually flips the order out of a
+        // non-cancelled state runs the restore + refund, so concurrent cancels
+        // (admin double-click / customer-approve race) can't double-restore stock.
+        const claim = await orderRepository.update(
+          { id: order.id, status: Not('cancelled') },
+          { status: 'cancelled' }
+        );
+        if (claim.affected === 1) {
           try {
-            const result = await PaymentsV2Service.createRefund({
-              orderId: order.id,
-              userId: order.user.id,
-              actorUserId: req.user?.id ?? order.user.id,
-              reason: 'admin_cancelled',
-              idempotencyKey: `admin-cancel-${order.id}`,
-            });
-            refundInitiated = result.ok;
-            if (!result.ok) {
-              console.warn(
-                `[admin-cancel] refund not initiated for order #${order.id}: ${result.reason}`
-              );
+            await OrderInventoryService.restoreReservedStockForItems(order.items);
+          } catch (invErr) {
+            console.error(`[admin-cancel] inventory restore failed for order #${order.id}`, invErr);
+          }
+
+          if (order.paymentStatus === 'paid') {
+            try {
+              const result = await PaymentsV2Service.createRefund({
+                orderId: order.id,
+                userId: order.user.id,
+                actorUserId: req.user?.id ?? order.user.id,
+                reason: 'admin_cancelled',
+                idempotencyKey: `admin-cancel-${order.id}`,
+              });
+              refundInitiated = result.ok;
+              if (!result.ok) {
+                console.warn(
+                  `[admin-cancel] refund not initiated for order #${order.id}: ${result.reason}`
+                );
+              }
+            } catch (refErr) {
+              console.error(`[admin-cancel] refund call failed for order #${order.id}`, refErr);
             }
-          } catch (refErr) {
-            console.error(`[admin-cancel] refund call failed for order #${order.id}`, refErr);
           }
         }
       }
@@ -1023,6 +1032,17 @@ export class AdminController {
         res.status(400).json({
           message: `Cannot approve refund — order is already '${order.status}'. Refunds are only allowed before packing.`,
         });
+        return;
+      }
+
+      // Atomic claim: only ONE concurrent approve flips the request + status, so a
+      // race (e.g. admin double-tap) can't restore stock / refund twice.
+      const claim = await orderRepository.update(
+        { id: order.id, cancelRequestStatus: 'requested', status: In(['pending', 'accepted']) },
+        { cancelRequestStatus: 'none', status: 'cancelled' }
+      );
+      if (claim.affected !== 1) {
+        res.status(409).json({ message: 'Cancellation already processed' });
         return;
       }
 

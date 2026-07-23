@@ -5,6 +5,7 @@ import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
 import { OrderAutoCancelService } from './services/order-auto-cancel.service';
 import { PaymentsReconcilerService } from './services/payments-reconciler.service';
+import { ServiceabilityService } from './services/serviceability.service';
 import { startPaymentWorker } from './services/queue/payment-reconcile.worker';
 import { paymentQueue } from './services/queue/payment-queue';
 import { RedisService } from './services/redis.service';
@@ -143,6 +144,18 @@ AppDataSource.initialize()
       console.log('   AWS_REGION=ap-south-1 (Mumbai, India - optional, default)');
     }
     console.log('');
+
+    // Serviceability config visibility — GPS radius check falls back to pincode
+    // when this isn't set, so make the mode obvious at boot.
+    if (ServiceabilityService.isConfigured()) {
+      console.log(
+        `✅ Serviceability: GPS radius mode — store (${process.env.STORE_LAT}, ${process.env.STORE_LNG}), radius ${ServiceabilityService.radiusKm} km`
+      );
+    } else {
+      console.warn(
+        '⚠️  Serviceability: GPS radius NOT configured (STORE_LAT/STORE_LNG/DELIVERY_RADIUS_KM) — falling back to pincode checks.'
+      );
+    }
 
     // Auto-cancel: pending orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
     OrderAutoCancelService.start();

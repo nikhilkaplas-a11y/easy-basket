@@ -43,6 +43,10 @@ export class RazorpayService {
       currency: params.currency ?? 'INR',
       receipt: params.receipt,
       notes: params.notes,
+      // Force auto-capture so a payment can't settle as 'authorized' but never
+      // 'captured' (which would leave the order unconfirmed until it auto-cancels).
+      // Belt-and-suspenders alongside the account-level auto-capture setting.
+      payment_capture: true,
     });
   }
 

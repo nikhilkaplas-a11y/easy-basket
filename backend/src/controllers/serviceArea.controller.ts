@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { ServiceArea } from '../entities/ServiceArea';
 import { RedisService } from '../services/redis.service';
+import { ServiceabilityService, isValidLat, isValidLng } from '../services/serviceability.service';
 
 const serviceAreaRepository = AppDataSource.getRepository(ServiceArea);
 
@@ -50,12 +51,36 @@ export class ServiceAreaController {
 
   static async checkAvailability(req: Request, res: Response): Promise<void> {
     try {
-      const { pincode, country = 'India' } = req.query;
+      const { pincode, country = 'India', lat, lng } = req.query;
+
+      // Preferred path: GPS radius check against the single store. Falls back to
+      // the pincode lookup when coordinates aren't supplied or the store radius
+      // isn't configured (so no-GPS clients still work).
+      const latNum = lat != null ? Number(lat) : NaN;
+      const lngNum = lng != null ? Number(lng) : NaN;
+      if (isValidLat(latNum) && isValidLng(lngNum)) {
+        if (ServiceabilityService.isConfigured()) {
+          const result = ServiceabilityService.check(latNum, lngNum);
+          res.json({
+            success: true,
+            available: result.available,
+            distanceKm: result.distanceKm,
+            radiusKm: result.radiusKm,
+            ...(result.available
+              ? {}
+              : { message: "We don't deliver to your location yet" }),
+          });
+          return;
+        }
+        console.warn(
+          '[service-area] coordinates supplied but STORE_LAT/STORE_LNG/DELIVERY_RADIUS_KM not configured — falling back to pincode'
+        );
+      }
 
       if (!pincode || typeof pincode !== 'string') {
         res.status(400).json({
           success: false,
-          message: 'Pincode is required',
+          message: 'Pincode or coordinates (lat, lng) are required',
         });
         return;
       }

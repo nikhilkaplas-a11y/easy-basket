@@ -34,12 +34,12 @@
 | S2 — admin list "PAID" badge accuracy | ✅ Fixed |
 | S3 — admin detail refund badge | ✅ Fixed |
 | S4 — block transitions out of terminal states | ✅ Fixed |
-| S5/S6 — 401 auto-refresh on writes | ⏳ Needs decision (auth refactor) |
+| S5/S6 — 401 auto-refresh on writes | ✅ Fixed (unified refresh-retry across all verbs + token-getter) |
 | S7 — `reportIssue` transition guard | ✅ Fixed |
-| S8 — payment success shown too early | ⚠️ Partial (raised 5s→grace+15s; success-wording on `success_unverified` still open) |
-| S9 — GPS anti-fraud | ⏳ Needs decision (implement vs drop claim) |
-| S10 — Razorpay `payment_capture` | ⏳ Config check (not code) |
-| S11 — stock-restore concurrency | ⏳ Open (SUSPECTED, concurrency-only) |
+| S8 — payment success shown too early | ✅ Fixed (5s→grace+15s; success copy softened to "confirming") |
+| S9 — GPS anti-fraud | ⏳ **Deferred — under discussion** |
+| S10 — Razorpay `payment_capture` | ✅ Fixed (set `payment_capture: true` explicitly) |
+| S11 — stock-restore concurrency | ✅ Fixed (atomic increments + atomic status claims on all cancel paths) |
 | S12 — refund wording for unpaid orders | ✅ Fixed |
 
 🟡 Lower priority items are **not yet addressed**.

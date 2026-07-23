@@ -817,12 +817,18 @@ class _AddressListScreenState extends State<AddressListScreen> {
   /// Check service availability for an address
   /// Quick service check — no delays, no redirects, just true/false
   Future<bool> _checkServiceAvailability(AddressModel address) async {
+    // Prefer GPS coordinates (radius check); fall back to pincode for legacy
+    // coord-less addresses.
+    final lat = double.tryParse(address.latitude ?? '');
+    final lng = double.tryParse(address.longitude ?? '');
     final pincode = address.pincode.trim().replaceAll(' ', '');
-    if (pincode.isEmpty) return true; // No pincode = allow
+    if (lat == null && lng == null && pincode.isEmpty) return true; // nothing to check
 
     try {
       final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
       final isAvailable = await serviceAreaProvider.checkServiceAvailability(
+        latitude: lat,
+        longitude: lng,
         pincode: pincode,
         country: 'India',
       );

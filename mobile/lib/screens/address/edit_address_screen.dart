@@ -370,10 +370,17 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
       return;
     }
 
-    // Check service availability
+    // Check service availability — prefer GPS coordinates (radius); pincode fallback.
+    final svcLat = double.tryParse(_latitude ?? '');
+    final svcLng = double.tryParse(_longitude ?? '');
     final pincode = _pincodeController.text.trim();
-    if (pincode.isNotEmpty) {
-      final ok = await serviceAreaProvider.checkServiceAvailability(pincode: pincode, country: 'India');
+    if ((svcLat != null && svcLng != null) || pincode.isNotEmpty) {
+      final ok = await serviceAreaProvider.checkServiceAvailability(
+        latitude: svcLat,
+        longitude: svcLng,
+        pincode: pincode,
+        country: 'India',
+      );
       if (!ok && mounted) {
         setState(() {
           _isSaving = false;

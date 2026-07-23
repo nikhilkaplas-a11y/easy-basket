@@ -12,8 +12,9 @@ import { normalizePaymentMethod } from '../constants/payment-method';
 import { PaymentService } from '../services/payment.service';
 import { FCMService } from '../services/fcm.service';
 import { OrderInventoryService } from '../services/order-inventory.service';
+import { ServiceabilityService, isValidLat, isValidLng } from '../services/serviceability.service';
 import { ProductController } from './product.controller';
-import { QueryFailedError } from 'typeorm';
+import { QueryFailedError, In } from 'typeorm';
 
 /**
  * Thrown inside the order-creation transaction when a stock UPDATE finds
@@ -74,6 +75,26 @@ export class OrderController {
       if (!address) {
         res.status(404).json({ message: 'Address not found' });
         return;
+      }
+
+      // Enforce serviceability server-side — never trust the client's UX check.
+      // Only when the store radius is configured AND the address has coordinates;
+      // legacy coord-less addresses fall through so existing users aren't blocked.
+      if (ServiceabilityService.isConfigured() && address.latitude && address.longitude) {
+        const aLat = Number(address.latitude);
+        const aLng = Number(address.longitude);
+        if (isValidLat(aLat) && isValidLng(aLng)) {
+          const svc = ServiceabilityService.check(aLat, aLng);
+          if (!svc.available) {
+            res.status(400).json({
+              message: 'Delivery address is outside our service area',
+              code: 'OUT_OF_SERVICE_AREA',
+              distanceKm: svc.distanceKm,
+              radiusKm: svc.radiusKm,
+            });
+            return;
+          }
+        }
       }
 
       // Validate quantities up front — these values are later inlined into
@@ -491,10 +512,19 @@ export class OrderController {
         return;
       }
 
-      await OrderInventoryService.restoreReservedStockForItems(order.items);
+      // Atomic claim: only ONE concurrent cancel flips the order → restores stock,
+      // so a double-tap/race can't restore reserved stock twice.
+      const claim = await orderRepository.update(
+        { id: order.id, status: In(['preparing', 'out_for_delivery']) },
+        { status: 'cancelled' }
+      );
+      if (claim.affected !== 1) {
+        res.status(409).json({ message: 'Order already cancelled or its status changed.' });
+        return;
+      }
 
+      await OrderInventoryService.restoreReservedStockForItems(order.items);
       order.status = 'cancelled';
-      await orderRepository.save(order);
 
       FCMService.enqueue(
         () =>
