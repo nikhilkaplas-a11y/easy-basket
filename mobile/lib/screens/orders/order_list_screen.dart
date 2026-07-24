@@ -367,11 +367,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 // Top row — Order ID + Status badge
                 Row(
                   children: [
-                    Text(
-                      'Order #${order.id}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black),
+                    Expanded(
+                      child: Text(
+                        'Order #${order.id}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black),
+                      ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -383,9 +387,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         children: [
                           Icon(statusIcon, size: 12, color: statusColor),
                           const SizedBox(width: 4),
-                          Text(
-                            order.statusText,
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor),
+                          Flexible(
+                            child: Text(
+                              order.statusText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor),
+                            ),
                           ),
                         ],
                       ),

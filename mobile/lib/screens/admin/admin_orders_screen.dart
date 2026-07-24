@@ -62,8 +62,9 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
     // Cancel existing timer
     _refreshTimer?.cancel();
     
-    // Start new timer - refresh every 20 seconds (more frequent for orders page)
-    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (timer) {
+    // Start new timer - refresh every 15 seconds (keeps the orders list current
+    // for incoming orders / cancellation requests without hammering the API)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (_isScreenActive && mounted) {
         final adminProvider = Provider.of<AdminProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -660,7 +661,8 @@ ConstrainedBox(
                                   color: AppTheme.primaryGreen,
                                 ),
                                 const SizedBox(width: 8),
-                                Column(
+                                Expanded(
+                                  child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
@@ -675,6 +677,8 @@ ConstrainedBox(
                                     Text(
                                       order.deliveryBoy.name ??
                                           order.deliveryBoy.phoneNumber,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: AppTheme.primaryGreen,
@@ -682,6 +686,7 @@ ConstrainedBox(
                                       ),
                                     ),
                                   ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -739,13 +744,17 @@ ConstrainedBox(
                                             color: AppTheme.primaryGreen,
                                           ),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            item.displayLabel ??
-                                                item.variant!.label,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppTheme.primaryGreen,
-                                              fontWeight: FontWeight.w600,
+                                          Flexible(
+                                            child: Text(
+                                              item.displayLabel ??
+                                                  item.variant!.label,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: AppTheme.primaryGreen,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
                                           ),
                                         ],

@@ -88,6 +88,12 @@ class ProximityProvider extends ChangeNotifier {
   /// The decision result — contains everything UI needs
   ProximityResult? _result;
 
+  /// GPS partial address seeded directly from [LocationProvider], for flows that
+  /// never run a full proximity check (guests, pre-login). Lets every consumer
+  /// read [partialAddress] uniformly instead of each call site falling back to
+  /// LocationProvider itself. A real proximity [_result] always takes precedence.
+  PartialAddress? _seededPartial;
+
   /// Is proximity check in progress?
   bool _isChecking = false;
 
@@ -122,8 +128,19 @@ class ProximityProvider extends ChangeNotifier {
   /// Quick access: Warning text for banner
   String get warningText => _result?.warningText ?? '';
 
-  /// Quick access: Detected partial address
-  PartialAddress? get partialAddress => _result?.partialAddress;
+  /// Quick access: Detected partial address.
+  /// Prefers a real proximity result; falls back to the GPS partial seeded via
+  /// [seedPartial] so guest / pre-login flows expose the detected location too.
+  PartialAddress? get partialAddress => _result?.partialAddress ?? _seededPartial;
+
+  /// Seed the GPS partial address from [LocationProvider] for flows that don't
+  /// run [checkProximity] (e.g. guests). Idempotent-ish: only notifies when the
+  /// value actually changes, and never clears an existing partial with null.
+  void seedPartial(PartialAddress? partial) {
+    if (partial == null || partial == _seededPartial) return;
+    _seededPartial = partial;
+    notifyListeners();
+  }
 
   /// Quick access: Nearest saved address
   AddressModel? get nearestAddress => _result?.nearestAddress;

@@ -274,7 +274,12 @@ class AppRouter {
       GoRoute(
         path: '/payment',
         builder: (context, state) {
-          final addressId = state.extra as int?;
+          // Accept either a plain int addressId or a {'addressId': int} map, so a
+          // caller passing the wrong shape never hard-crashes the screen.
+          final extra = state.extra;
+          final addressId = extra is Map
+              ? extra['addressId'] as int?
+              : extra as int?;
           return PaymentScreen(addressId: addressId);
         },
       ),

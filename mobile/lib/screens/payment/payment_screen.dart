@@ -314,32 +314,37 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       return;
     }
 
-    // Check if address completion is needed (new location, partial address only)
-    final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
-    if (proximityProvider.needsAddressCompletion && proximityProvider.partialAddress != null) {
-      // Show address completion bottom sheet
-      final partial = proximityProvider.partialAddress!;
-      AddressCompletionSheet.show(
-        context: context,
-        preFilledData: {
-          'city': partial.city ?? '',
-          'state': partial.state ?? '',
-          'pincode': partial.pincode ?? '',
-          'latitude': partial.latitude.toString(),
-          'longitude': partial.longitude.toString(),
-          'area': partial.area ?? '',
-        },
-        onSaved: () {
-          _placeOrder();
-        },
-      );
-      return;
-    }
-
-    // Use widget.addressId OR fallback to AddressProvider's selected address
+    // Resolve the address to use FIRST. If we arrived with a concrete address
+    // (just added, passed from the address list) or one is selected, the user
+    // HAS an address — proceed, don't re-prompt.
     final addressProvider = Provider.of<AddressProvider>(context, listen: false);
     final addressId = widget.addressId ?? addressProvider.selectedAddress?.id;
+
     if (addressId == null) {
+      // No usable address. Only now consider a GPS partial + address completion.
+      // (Checking proximity.needsAddressCompletion first would re-open the sheet
+      // even after an address was added, because that result is stale — adding an
+      // address doesn't re-run the proximity check.)
+      final proximityProvider = Provider.of<ProximityProvider>(context, listen: false);
+      if (proximityProvider.needsAddressCompletion && proximityProvider.partialAddress != null) {
+        final partial = proximityProvider.partialAddress!;
+        AddressCompletionSheet.show(
+          context: context,
+          preFilledData: {
+            'city': partial.city ?? '',
+            'state': partial.state ?? '',
+            'pincode': partial.pincode ?? '',
+            'latitude': partial.latitude.toString(),
+            'longitude': partial.longitude.toString(),
+            'area': partial.area ?? '',
+          },
+          onSaved: () {
+            _placeOrder();
+          },
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an address')),
       );

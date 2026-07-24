@@ -6,9 +6,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/address_provider.dart';
-import '../../providers/location_provider.dart';
 import '../../providers/proximity_provider.dart';
-import '../../providers/address_provider.dart';
 import '../../widgets/address_completion_sheet.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
@@ -426,11 +424,12 @@ class CartScreen extends StatelessWidget {
                           duration: Duration(seconds: 3),
                         ),
                       );
-                      // Check if GPS detected partial address available
+                      // GPS partial (populated for guests via ProximityProvider
+                      // .seedPartial on home) → prefilled address sheet.
                       final proximityProv = Provider.of<ProximityProvider>(context, listen: false);
-                      if (proximityProv.partialAddress != null) {
+                      final partial = proximityProv.partialAddress;
+                      if (partial != null) {
                         // Show bottom sheet — quick address completion (Blinkit style)
-                        final partial = proximityProv.partialAddress!;
                         AddressCompletionSheet.show(
                           context: context,
                           preFilledData: {
@@ -449,7 +448,10 @@ class CartScreen extends StatelessWidget {
                               addrProv.fetchAddresses(authProv.token!).then((_) {
                                 final selectedId = addrProv.selectedAddress?.id ?? addrProv.defaultAddress?.id;
                                 if (selectedId != null && context.mounted) {
-                                  context.push('/payment', extra: {'addressId': selectedId});
+                                  // The /payment route expects the addressId as a
+                                  // plain int (same as the address list passes) —
+                                  // NOT a map, which would crash on `extra as int?`.
+                                  context.push('/payment', extra: selectedId);
                                 }
                               });
                             }

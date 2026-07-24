@@ -263,8 +263,15 @@ class _LoginScreenState extends State<LoginScreen>
                   bottom: false,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
+                    // Scale the whole brand block down when vertical space is
+                    // tight (short devices / keyboard open) so it never
+                    // overflows. At normal size scaleDown renders identically.
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         // Logo circle
                         Container(
@@ -312,6 +319,7 @@ class _LoginScreenState extends State<LoginScreen>
                         // Trust row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             _TrustBadge(icon: Icons.bolt_rounded, label: 'Fast'),
                             _dividerDot(),
@@ -321,6 +329,8 @@ class _LoginScreenState extends State<LoginScreen>
                           ],
                         ),
                       ],
+                        ),
+                      ),
                     ),
                   ),
                 ),

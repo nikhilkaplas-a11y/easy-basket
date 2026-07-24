@@ -23,11 +23,44 @@ class LocationPermissionScreen extends StatefulWidget {
   State<LocationPermissionScreen> createState() => _LocationPermissionScreenState();
 }
 
-class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
+class _LocationPermissionScreenState extends State<LocationPermissionScreen>
+    with WidgetsBindingObserver {
   bool _isLoadingLocation = false;
   /// True while waiting on system permission / [LocationProvider.requestPermission] — avoids double-tap and shows inline progress.
   bool _isRequestingPermission = false;
+  /// True after we send the user to system location settings because their GPS
+  /// toggle is off — so when the app resumes we can auto-retry detection.
+  bool _awaitingLocationEnable = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// When the user returns from the system location settings, re-check the GPS
+  /// toggle. If it's now on, auto-retry the whole allow flow so they don't have
+  /// to tap "Allow location" a second time.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingLocationEnable) {
+      _awaitingLocationEnable = false;
+      _retryAfterLocationEnabled();
+    }
+  }
+
+  Future<void> _retryAfterLocationEnabled() async {
+    final enabled = await Geolocator.isLocationServiceEnabled();
+    if (!mounted || !enabled) return;
+    _handleAllowLocation();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -575,17 +608,9 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
       });
 
       if (serviceOff && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Turn on Location in your phone settings'),
-            backgroundColor: Colors.orange,
-            action: SnackBarAction(
-              label: 'Open Settings',
-              textColor: Colors.white,
-              onPressed: () => locationProvider.openLocationSettings(),
-            ),
-          ),
-        );
+        // Device GPS toggle is off — block with a dialog and send them to turn
+        // it on. On return, [didChangeAppLifecycleState] auto-retries detection.
+        await _showLocationOffDialog(locationProvider);
       } else if (locationProvider.isPermissionPermanentlyDenied && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -652,6 +677,72 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
     }
 
     context.go('/home');
+  }
+
+  /// Blocking dialog shown when the phone's location (GPS) toggle is off.
+  /// Not dismissible by tapping outside — the user must either turn location on
+  /// or explicitly choose "Not now". "Turn on Location" opens system location
+  /// settings; [didChangeAppLifecycleState] retries detection when they return.
+  Future<void> _showLocationOffDialog(LocationProvider locationProvider) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.location_off_rounded,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Location is off',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          "Turn on your phone's location to detect your delivery area. "
+          'You can browse without it, but we need it to check if we deliver to you.',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.grey),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              // Flag so the app auto-retries detection when we come back.
+              _awaitingLocationEnable = true;
+              locationProvider.openLocationSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Turn on Location'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

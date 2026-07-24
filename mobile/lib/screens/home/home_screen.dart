@@ -137,6 +137,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final addressProvider = Provider.of<AddressProvider>(context, listen: false);
         await locationProvider.detectLocation(force: true);
         if (mounted) {
+          // Guests never run the proximity flow, so publish the GPS partial into
+          // ProximityProvider — the single source every consumer (header, cart,
+          // checkout) reads — instead of each call site reaching into LocationProvider.
+          Provider.of<ProximityProvider>(context, listen: false)
+              .seedPartial(locationProvider.detectedAddress);
           await _softServiceAreaCheck(addressProvider, locationProvider);
         }
       }
@@ -943,6 +948,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       builder: (context, addressProvider, proximityProvider, _) {
                         // Decide what address text to show
                         final selectedAddr = addressProvider.selectedAddress;
+                        // Single source: ProximityProvider exposes the GPS partial
+                        // for both logged-in (via checkProximity) and guest (via
+                        // seedPartial) flows, so guests see "CURRENT LOCATION" too.
                         final partial = proximityProvider.partialAddress;
                         final proximityRes = proximityProvider.result;
 

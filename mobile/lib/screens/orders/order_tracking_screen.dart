@@ -24,8 +24,18 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     with SingleTickerProviderStateMixin {
   bool _hasFetched = false;
+  /// True once a fetch attempt for this order has actually completed (success or
+  /// fail). Until then we show "please wait" instead of "Order not found" — the
+  /// global [OrderProvider.isLoading] flag is false before the post-frame fetch
+  /// starts, which otherwise flashes "not found" on cold-start from a notification.
+  bool _fetchCompleted = false;
+  /// Guards against overlapping fetches (post-frame, poll, and auth-ready retry
+  /// can all fire close together).
+  bool _isFetching = false;
   Timer? _pollingTimer;
   late AnimationController _pulseController;
+  /// Held so we can detach the listener in dispose.
+  AuthProvider? _authProvider;
 
   @override
   void initState() {
@@ -35,6 +45,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // On cold-start from a notification the auth token is restored from storage
+      // asynchronously. Listen so we can fetch the moment it lands instead of
+      // waiting for the 15s poll.
+      _authProvider = Provider.of<AuthProvider>(context, listen: false);
+      _authProvider!.addListener(_onAuthChanged);
       _fetchOrder();
       _startPolling();
     });
@@ -42,17 +57,36 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
 
   @override
   void dispose() {
+    _authProvider?.removeListener(_onAuthChanged);
     _pollingTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
 
-  void _fetchOrder() {
+  /// Retry the initial fetch as soon as the token becomes available (e.g. after
+  /// storage restore on cold-start), so the user never sits on "please wait".
+  void _onAuthChanged() {
+    if (!mounted || _fetchCompleted) return;
+    if (_authProvider?.accessToken != null) {
+      _fetchOrder();
+    }
+  }
+
+  Future<void> _fetchOrder() async {
+    if (_isFetching) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final orderProvider = Provider.of<OrderProvider>(context, listen: false);
-    if (authProvider.accessToken != null) {
-      orderProvider.fetchOrderById(widget.orderId, authProvider.accessToken!);
+    if (authProvider.accessToken == null) return;
+
+    _isFetching = true;
+    try {
+      await orderProvider.fetchOrderById(widget.orderId, authProvider.accessToken!);
+    } finally {
+      _isFetching = false;
     }
+    // Mark the attempt complete so the UI can distinguish "still loading" from
+    // "genuinely not found".
+    if (mounted) setState(() => _fetchCompleted = true);
   }
 
   void _startPolling() {
@@ -204,19 +238,35 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             centerTitle: true,
           ),
           body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation(Color(0xFF2E7D32))),
-                const SizedBox(height: 16),
-                Text(
-                  orderProvider.isLoading
-                      ? 'Loading order details...'
-                      : 'Order not found',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Still loading if the global flag says so OR we simply haven't
+                  // finished the first fetch attempt yet (post-frame gap). Only a
+                  // completed fetch with no result is a genuine "not found".
+                  if (orderProvider.isLoading || !_fetchCompleted) ...[
+                    const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(Color(0xFF2E7D32))),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Please wait while we fetch your order details',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    ),
+                  ] else ...[
+                    Icon(Icons.receipt_long_outlined,
+                        size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Order not found',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
