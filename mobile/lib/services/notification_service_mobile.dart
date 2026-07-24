@@ -98,14 +98,25 @@ class NotificationService {
 
   // ── 1. Permission maango ──
   // Kyun: Android 13+ mein bina permission ke notification nahi dikhegi
-  /// Request notification permission — call after first order
-  Future<void> requestNotificationPermission() async {
+  /// Request notification permission — call after an order.
+  /// Returns true if granted (authorized or provisional).
+  Future<bool> requestNotificationPermission() async {
     final settings = await _messaging.requestPermission(
       alert: true,    // notification dikhao
       badge: true,    // app icon pe badge dikhao
       sound: true,    // sound bajao
     );
     debugPrint('📋 [FCM] Permission status: ${settings.authorizationStatus}');
+    return settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
+  }
+
+  /// Whether notifications are already granted — checked (does NOT prompt) so we
+  /// can skip re-asking once the user has enabled them.
+  Future<bool> areNotificationsEnabled() async {
+    final settings = await _messaging.getNotificationSettings();
+    return settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
   // ── 2. Local notifications setup ──
@@ -240,6 +251,8 @@ class NotificationService {
     final status = data?['status'] as String? ?? '';
     final isAdmin = _authProvider?.user?.role == 'admin';
     final isAdminOrderAction = isAdmin && type == 'new_order';
+    // Customer raised a cancellation/refund request → urgent admin action banner.
+    final isCancelRequest = isAdmin && type == 'refund_requested';
 
     final overlay = Overlay.of(_context!);
     late OverlayEntry entry;
@@ -269,6 +282,44 @@ class NotificationService {
                 orderId: int.parse(orderId),
                 status: 'cancelled',
                 notes: 'Rejected by admin',
+              );
+            }
+          },
+          onDismiss: () => entry.remove(),
+          onTap: () {
+            entry.remove();
+            if (data != null) _navigateFromNotification(data);
+          },
+        ),
+      );
+      overlay.insert(entry);
+    } else if (isCancelRequest) {
+      entry = OverlayEntry(
+        builder: (context) => _AdminActionBanner(
+          title: title,
+          body: body,
+          icon: Icons.report_gmailerrorred_rounded,
+          iconBg: const Color(0xFFFFEBEE),
+          iconColor: Colors.red,
+          acceptLabel: 'Approve',
+          rejectLabel: 'Reject',
+          onAccept: () async {
+            entry.remove();
+            final orderId = data?['orderId'] as String?;
+            if (orderId != null && _adminProvider != null && _authProvider?.token != null) {
+              await _adminProvider!.approveCancellation(
+                token: _authProvider!.token!,
+                orderId: int.parse(orderId),
+              );
+            }
+          },
+          onReject: () async {
+            entry.remove();
+            final orderId = data?['orderId'] as String?;
+            if (orderId != null && _adminProvider != null && _authProvider?.token != null) {
+              await _adminProvider!.rejectCancellation(
+                token: _authProvider!.token!,
+                orderId: int.parse(orderId),
               );
             }
           },
@@ -486,6 +537,13 @@ class _AdminActionBanner extends StatefulWidget {
   final VoidCallback onReject;
   final VoidCallback onDismiss;
   final VoidCallback onTap;
+  // Customisable so the same banner serves new orders (Accept/Reject, bag icon)
+  // and cancellation requests (Approve/Reject, warning icon).
+  final String acceptLabel;
+  final String rejectLabel;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
 
   const _AdminActionBanner({
     required this.title,
@@ -494,6 +552,11 @@ class _AdminActionBanner extends StatefulWidget {
     required this.onReject,
     required this.onDismiss,
     required this.onTap,
+    this.acceptLabel = 'Accept',
+    this.rejectLabel = 'Reject',
+    this.icon = Icons.shopping_bag_rounded,
+    this.iconBg = const Color(0xFFFFF3E0),
+    this.iconColor = const Color(0xFFFF9800),
   });
 
   @override
@@ -559,10 +622,10 @@ class _AdminActionBannerState extends State<_AdminActionBanner>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
+                      color: widget.iconBg,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.shopping_bag_rounded, color: Color(0xFFFF9800), size: 22),
+                    child: Icon(widget.icon, color: widget.iconColor, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -618,10 +681,10 @@ class _AdminActionBannerState extends State<_AdminActionBanner>
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              'Reject',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.red),
+                              widget.rejectLabel,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.red),
                             ),
                           ),
                         ),
@@ -647,15 +710,15 @@ class _AdminActionBannerState extends State<_AdminActionBanner>
                             ),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                                SizedBox(width: 6),
+                                const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'Accept',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                                  widget.acceptLabel,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
                                 ),
                               ],
                             ),

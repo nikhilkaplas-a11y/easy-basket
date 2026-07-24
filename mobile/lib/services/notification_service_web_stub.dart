@@ -30,7 +30,11 @@ class NotificationService {
   }
 
   /// Request notification permission — no-op on web
-  Future<void> requestNotificationPermission() async {}
+  Future<bool> requestNotificationPermission() async => true;
+
+  /// Web is never prompted (kIsWeb guards the caller); report enabled so the
+  /// "ask until granted" flow treats web as already handled.
+  Future<bool> areNotificationsEnabled() async => true;
 
   String? get currentSubscribedPincode => null;
   Future<void> switchPincodeTopic(String newPincode) async {}
