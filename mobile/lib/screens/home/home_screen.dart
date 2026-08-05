@@ -15,6 +15,7 @@ import '../../providers/service_area_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/proximity_provider.dart';
+import '../../providers/store_status_provider.dart';
 import '../../models/proximity_result.dart';
 import '../../services/location_onboarding_service.dart';
 import '../../utils/theme.dart';
@@ -27,6 +28,7 @@ import '../../services/notification_service.dart';
 import '../../services/api_service.dart';
 import '../../widgets/hero_banner_carousel.dart';
 import '../../widgets/promo_banner_widget.dart';
+import '../../widgets/store_closed_banner.dart';
 import '../../models/campaign_model.dart';
 import '../../models/category_model.dart';
 
@@ -277,16 +279,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final partial = locationProvider.detectedAddress;
     final selected = addressProvider.selectedAddress;
 
-    // Determine which pincode to check
+    // Determine which pincode to check, and the coordinates that go with it.
+    // Coordinates matter: the backend does the GPS radius check first and only
+    // consults the pincode table when the radius isn't configured. Sending the
+    // pincode alone forced the pincode path, so a location comfortably inside
+    // the delivery radius was still reported as unserviceable.
     String? pinToCheck;
     String? cityForDisplay;
+    double? latToCheck;
+    double? lngToCheck;
 
     if (selected != null) {
       pinToCheck = selected.pincode;
       cityForDisplay = selected.city;
+      // Legacy saved addresses may have no coordinates — tryParse yields null
+      // and the check falls back to the pincode, as before.
+      latToCheck = double.tryParse(selected.latitude ?? '');
+      lngToCheck = double.tryParse(selected.longitude ?? '');
     } else if (partial?.pincode != null && partial!.pincode!.isNotEmpty) {
       pinToCheck = partial.pincode;
       cityForDisplay = partial.city;
+      latToCheck = partial.latitude;
+      lngToCheck = partial.longitude;
     }
 
     if (pinToCheck == null || pinToCheck.isEmpty) {
@@ -296,6 +310,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     try {
       final isServiceable = await serviceAreaProvider.checkServiceAvailability(
+        latitude: latToCheck,
+        longitude: lngToCheck,
         pincode: pinToCheck,
         country: 'India',
       );
@@ -888,6 +904,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onRefresh: () async {
               final productProvider = Provider.of<ProductProvider>(context, listen: false);
               final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+              // Pull-to-refresh is how a user checks "are they open yet?" —
+              // force past the throttle so the answer is current.
+              await Provider.of<StoreStatusProvider>(context, listen: false)
+                  .refresh(force: true);
               await productProvider.fetchCategories();
               await productProvider.fetchProducts();
               if (authProvider.token != null) {
@@ -1337,6 +1357,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
                 ),
               ),
+              ),
+              // Store closed panel — sits directly under the search bar so it
+              // lands in the top half of the first screen, above the promo and
+              // categories. Not dismissible: the user must understand why the
+              // Place Order button is dead before they reach it. Everything
+              // below stays visible and scrollable — browsing is encouraged.
+              Consumer<StoreStatusProvider>(
+                builder: (context, storeStatus, _) {
+                  if (storeStatus.isOpen) return const SizedBox.shrink();
+                  return StoreClosedBanner(status: storeStatus.status);
+                },
               ),
               // Promo Banner with text overlay bottom-right
               Stack(

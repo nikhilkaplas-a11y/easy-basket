@@ -144,7 +144,10 @@ class LocationOnboardingService {
           : (city ?? 'Your Location');
 
       // Check service availability
+      // Coordinates first — radius check decides; pincode stays a fallback.
       final isAvailable = await serviceAreaProvider.checkServiceAvailability(
+        latitude: position.latitude,
+        longitude: position.longitude,
         pincode: pincode,
         country: 'India',
       );

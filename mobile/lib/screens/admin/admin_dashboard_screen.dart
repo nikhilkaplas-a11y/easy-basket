@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/store_status_provider.dart';
 import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
@@ -261,12 +262,67 @@ void _startAutoRefresh() {
       body: RefreshIndicator(
         onRefresh: () async {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          await Provider.of<StoreStatusProvider>(context, listen: false)
+              .refresh(force: true);
           await adminProvider.fetchStats(token: authProvider.token);
         },
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Closed-store alert. Loud and top-of-page on purpose: a store
+              // left accidentally closed earns nothing, and the failure is
+              // silent otherwise — no orders simply looks like a quiet day.
+              Consumer<StoreStatusProvider>(
+                builder: (context, storeStatus, _) {
+                  if (storeStatus.isOpen) return const SizedBox.shrink();
+                  final status = storeStatus.status;
+                  return InkWell(
+                    onTap: () => context.push('/admin/store-status'),
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: status.reason.gradient),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.pause_circle_filled_rounded,
+                              color: Colors.white, size: 28),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'STORE IS CLOSED',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Not accepting new orders — tap to reopen',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
               // Stats Overview
               if (adminProvider.stats != null)
   Padding(
@@ -397,6 +453,19 @@ const SizedBox(height: 24),
                     const SizedBox(height: 12),
                     Column(
   children: [
+
+    Consumer<StoreStatusProvider>(
+      builder: (context, storeStatus, _) => ActionTile(
+        title: "Store Status",
+        subtitle: storeStatus.isOpen
+            ? "Open — accepting orders"
+            : "Closed — ${storeStatus.status.reason.adminLabel}",
+        icon: storeStatus.isOpen
+            ? Icons.storefront_outlined
+            : Icons.pause_circle_outline_rounded,
+        onTap: () => context.push('/admin/store-status'),
+      ),
+    ),
 
     ActionTile(
       title: "Orders",

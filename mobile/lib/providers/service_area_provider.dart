@@ -35,14 +35,24 @@ class ServiceAreaProvider with ChangeNotifier {
 
     try {
       final hasCoords = latitude != null && longitude != null;
+      final cleanPincode = (pincode ?? '').trim().replaceAll(' ', '');
+      final pincodeQuery =
+          '&pincode=$cleanPincode&country=${Uri.encodeComponent(country)}';
       final String queryString;
       if (hasCoords) {
-        queryString = '?lat=$latitude&lng=$longitude';
+        // Send the pincode ALONGSIDE the coordinates. The backend prefers the
+        // radius check and only reads the pincode if the store radius isn't
+        // configured — so this keeps pincode as a pure fallback. Omitting it
+        // meant that fallback had nothing to fall back to: the server would
+        // reach its pincode branch with no pincode and return 400, which this
+        // provider's catch turns into "not serviceable".
+        queryString = '?lat=$latitude&lng=$longitude'
+            '${cleanPincode.isEmpty ? '' : pincodeQuery}';
         if (kDebugMode) {
-          print('🌐 [API CALL] Checking service for coords: $latitude,$longitude');
+          print('🌐 [API CALL] Checking service for coords: $latitude,$longitude'
+              '${cleanPincode.isEmpty ? '' : ' (pincode fallback: $cleanPincode)'}');
         }
       } else {
-        final cleanPincode = (pincode ?? '').trim().replaceAll(' ', '');
         queryString = '?pincode=$cleanPincode&country=${Uri.encodeComponent(country)}';
         if (kDebugMode) {
           print('🌐 [API CALL] Checking service for pincode: $cleanPincode, country: $country');

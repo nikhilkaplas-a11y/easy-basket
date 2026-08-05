@@ -199,6 +199,8 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
         final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
         // Don't await - let it run in background
         serviceAreaProvider.checkServiceAvailability(
+          latitude: lat,
+          longitude: lng,
           pincode: pincode,
           country: 'India',
         ).catchError((e) {

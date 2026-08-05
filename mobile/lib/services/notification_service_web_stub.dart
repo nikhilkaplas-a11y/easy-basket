@@ -37,6 +37,10 @@ class NotificationService {
   Future<bool> areNotificationsEnabled() async => true;
 
   String? get currentSubscribedPincode => null;
+  /// No-op on web — FCM topics aren't supported here. Web users pick up a
+  /// store reopen via app-resume refresh or pull-to-refresh instead.
+  Future<void> subscribeToBroadcastTopic() async {}
+
   Future<void> switchPincodeTopic(String newPincode) async {}
   Future<void> subscribeToPincode(String pincode) async {}
   Future<void> subscribeToAllPincodes(List<String> pincodes) async {}

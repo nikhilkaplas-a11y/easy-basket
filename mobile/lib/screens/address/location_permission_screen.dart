@@ -657,7 +657,9 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
       final serviceAreaProvider =
           Provider.of<ServiceAreaProvider>(context, listen: false);
       final isServiceable = await serviceAreaProvider.checkServiceAvailability(
-        pincode: partial!.pincode!,
+        latitude: partial!.latitude,
+        longitude: partial.longitude,
+        pincode: partial.pincode!,
         country: 'India',
       );
 

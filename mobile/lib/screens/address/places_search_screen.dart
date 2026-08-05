@@ -139,6 +139,8 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
     if (result.pincode.length == 6) {
       final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
       final isServiceable = await serviceAreaProvider.checkServiceAvailability(
+        latitude: result.latitude,
+        longitude: result.longitude,
         pincode: result.pincode,
         country: 'India',
       );

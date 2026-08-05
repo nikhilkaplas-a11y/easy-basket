@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/order_provider.dart';
+import '../providers/store_status_provider.dart';
 import '../routes/app_router.dart';
 import '../core/startup_deep_link.dart';
 
@@ -90,6 +91,13 @@ class NotificationService {
 
     // 8. Check — agar app notification tap se khuli hai (cold start)
     _handleInitialMessageRefreshOnly();
+
+    // 9. Broadcast topic — store reopen announcements jaate hain yahan
+    // Kyun: pincode topic sirf address save karne ke baad milta hai, isliye
+    // naye users reopen push miss kar dete.
+    // Note: guests yahan tak pahunchte hi nahi (initialize sirf logged-in users
+    // ke liye chalta hai), isliye main.dart ise alag se bhi call karta hai.
+    await subscribeToBroadcastTopic();
 
     _isInitialized = true;
     debugPrint('✅ [FCM] Notification service initialized');
@@ -196,6 +204,26 @@ class NotificationService {
         type.contains('order') || (hasOrderId && type.isEmpty);
     if (shouldRefresh) {
       _refreshOrders();
+    }
+
+    // Store reopened while the app was open — refresh so the closed banner
+    // disappears and the checkout buttons come back to life without the user
+    // having to background the app or pull to refresh.
+    if (type == 'store_reopened') {
+      _refreshStoreStatus();
+    }
+  }
+
+  /// Re-read store status. No auth needed — the endpoint is public.
+  void _refreshStoreStatus() {
+    if (_context == null) return;
+
+    try {
+      Provider.of<StoreStatusProvider>(_context!, listen: false)
+          .refresh(force: true);
+      debugPrint('🏪 [FCM] Store status refreshed after reopen push');
+    } catch (e) {
+      debugPrint('❌ [FCM] Error refreshing store status: $e');
     }
   }
 
@@ -476,6 +504,37 @@ class NotificationService {
   // ── FCM Topic Subscribe (Pincode-based promo notifications) ──
   // Rule: User is subscribed to ONLY 1 pincode topic at a time
   // This ensures user only receives promos for their current delivery area
+
+  /// Broadcast topic — sab devices isme rehte hain.
+  /// Store reopen announcement isi topic pe jaata hai (backend:
+  /// StoreStatusController.broadcastReopen).
+  static const String broadcastTopic = 'all_users';
+
+  /// Ek hi baar subscribe karo — main.dart ka postFrameCallback har rebuild pe
+  /// chalta hai, warna har rebuild pe ek network call chali jaati.
+  bool _broadcastSubscribed = false;
+
+  /// Subscribe to the broadcast topic.
+  ///
+  /// PUBLIC and deliberately independent of [initialize] — that runs only for
+  /// logged-in users (see main.dart), so guests would otherwise never receive
+  /// the store-reopen announcement. Only needs Firebase.initializeApp(), which
+  /// main() already does unconditionally on mobile.
+  ///
+  /// Failure yahan swallow karte hain — notification na milna app ko todna
+  /// nahi chahiye.
+  Future<void> subscribeToBroadcastTopic() async {
+    if (kIsWeb || _broadcastSubscribed) return;
+    try {
+      await _messaging.subscribeToTopic(broadcastTopic);
+      _broadcastSubscribed = true;
+      debugPrint('📌 [FCM] Subscribed to: $broadcastTopic');
+    } catch (e) {
+      // Leave the flag false so a later attempt can retry (e.g. iOS before the
+      // APNs token exists).
+      debugPrint('⚠️ [FCM] Broadcast topic subscribe failed: $e');
+    }
+  }
 
   /// Currently subscribed pincode — track to avoid unnecessary calls
   String? _currentSubscribedPincode;

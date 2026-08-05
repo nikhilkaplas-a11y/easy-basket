@@ -40,6 +40,7 @@ import '../screens/admin/category_order_screen.dart';
 import '../screens/admin/send_notification_screen.dart';
 import '../screens/admin/campaign_list_screen.dart';
 import '../screens/admin/campaign_form_screen.dart';
+import '../screens/admin/store_status_screen.dart';
 import '../models/address_model.dart';
 import '../models/campaign_model.dart';
 import '../screens/service_area/service_not_available_screen.dart';
@@ -448,6 +449,10 @@ class AppRouter {
           final campaign = state.extra as CampaignModel?;
           return CampaignFormScreen(campaign: campaign);
         },
+      ),
+      GoRoute(
+        path: '/admin/store-status',
+        builder: (context, state) => const StoreStatusScreen(),
       ),
       GoRoute(
         path: '/admin/products/add',
