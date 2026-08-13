@@ -468,7 +468,14 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
 
     final pincode = _pincodeController.text.trim();
     if (pincode.isNotEmpty) {
-      final ok = await serviceAreaProvider.checkServiceAvailability(pincode: pincode, country: 'India');
+      // Coordinates first (from the GPS partial that pre-filled this sheet);
+      // pincode remains the fallback for coord-less entries.
+      final ok = await serviceAreaProvider.checkServiceAvailability(
+        latitude: double.tryParse(_latitude ?? ''),
+        longitude: double.tryParse(_longitude ?? ''),
+        pincode: pincode,
+        country: 'India',
+      );
       if (!ok && mounted) {
         setState(() {
           _isSaving = false;

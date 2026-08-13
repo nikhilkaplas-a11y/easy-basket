@@ -7,7 +7,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/proximity_provider.dart';
+import '../../providers/store_status_provider.dart';
 import '../../widgets/address_completion_sheet.dart';
+import '../../widgets/store_closed_banner.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 
@@ -372,6 +374,15 @@ class CartScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              // Store closed notice — shown here as well as on home, because a
+              // user can deep-link straight into the cart and would otherwise
+              // meet a dead button with no explanation.
+              Consumer<StoreStatusProvider>(
+                builder: (context, storeStatus, _) {
+                  if (storeStatus.isOpen) return const SizedBox.shrink();
+                  return StoreClosedBar(status: storeStatus.status);
+                },
+              ),
               // Address warning
               if (!hasAddress && authProvider.isAuthenticated)
                 Container(
@@ -402,10 +413,16 @@ class CartScreen extends StatelessWidget {
                   ),
                 ),
               // Checkout button
-              SizedBox(
+              Consumer<StoreStatusProvider>(
+                builder: (context, storeStatus, _) {
+              final storeClosed = storeStatus.isClosed;
+              return SizedBox(
                 width: double.infinity,
                 child: AppTheme.gradientButton(
-                  onPressed: () {
+                  // Null onPressed renders the button grey and unclickable
+                  // (see AppTheme.gradientButton). This is UX only — the real
+                  // gate is the 409 STORE_CLOSED from POST /api/orders.
+                  onPressed: storeClosed ? null : () {
                     if (!authProvider.isAuthenticated) {
                       // Bounce back to /cart after OTP so the user keeps their items
                       // and the button auto-updates to "Add Address" / "Proceed to Checkout".
@@ -472,26 +489,32 @@ class CartScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        !authProvider.isAuthenticated
-                            ? Icons.login_rounded
-                            : !hasAddress
-                                ? Icons.location_on_rounded
-                                : Icons.shopping_cart_checkout_rounded,
+                        storeClosed
+                            ? Icons.storefront_rounded
+                            : !authProvider.isAuthenticated
+                                ? Icons.login_rounded
+                                : !hasAddress
+                                    ? Icons.location_on_rounded
+                                    : Icons.shopping_cart_checkout_rounded,
                         size: 20,
                         color: Colors.white,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        !authProvider.isAuthenticated
-                            ? 'Login to Checkout'
-                            : !hasAddress
-                                ? 'Add Address to Checkout'
-                                : 'Proceed to Checkout',
+                        storeClosed
+                            ? 'Store Closed'
+                            : !authProvider.isAuthenticated
+                                ? 'Login to Checkout'
+                                : !hasAddress
+                                    ? 'Add Address to Checkout'
+                                    : 'Proceed to Checkout',
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
                       ),
                     ],
                   ),
                 ),
+              );
+                },
               ),
             ],
           ),

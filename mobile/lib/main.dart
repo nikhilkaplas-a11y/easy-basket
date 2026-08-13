@@ -8,6 +8,7 @@ import 'core/startup_deep_link.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'widgets/app_lifecycle_refresh.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/product_provider.dart';
@@ -18,6 +19,7 @@ import 'providers/service_area_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/address_provider.dart';
 import 'providers/proximity_provider.dart';
+import 'providers/store_status_provider.dart';
 import 'routes/app_router.dart';
 import 'utils/theme.dart';
 import 'services/razorpay_service.dart';
@@ -164,6 +166,12 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => ProximityProvider(),
         ),
+        // Store open/closed — public endpoint, so no auth wiring needed.
+        // Fetched immediately: the home banner and the checkout buttons both
+        // read it, and guests need it before they ever log in.
+        ChangeNotifierProvider(
+          create: (_) => StoreStatusProvider()..refresh(),
+        ),
       ],
       child: MaterialApp.router(
         title: 'Easy Basket',
@@ -172,13 +180,23 @@ class MyApp extends StatelessWidget {
         routerConfig: AppRouter.router,
         builder: (context, child) {
           final content = child ?? const SizedBox.shrink();
-          // Active order refresh is handled by home screen only (not globally).
-          final wrapped = content;
+          // Refresh store status (and active orders) when the app returns to the
+          // foreground. Mounted here, globally, because home_screen already
+          // assumes it exists — it dropped its own observer with a comment
+          // pointing at this wrapper, so while this was unwrapped NEITHER ran.
+          // Guests depend on it most: they never reach the FCM push path.
+          final wrapped = AppLifecycleRefresh(child: content);
           if (!kIsWeb) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               try {
                 final authProvider = Provider.of<AuthProvider>(context, listen: false);
                 final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+
+                // Store-reopen broadcast — subscribed for EVERY device, logged
+                // in or not. initialize() below runs only for logged-in users,
+                // so leaving this inside it meant guests never got the push.
+                // Self-guards against the repeat calls this callback makes.
+                NotificationService().subscribeToBroadcastTopic();
 
                 if (authProvider.user != null) {
                   debugPrint('📱 [NOTIFICATION] Initializing for user: ${authProvider.user!.role}');

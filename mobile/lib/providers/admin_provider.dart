@@ -845,23 +845,35 @@
 
     /// Approve a customer's cancellation request → cancels the order and initiates
     /// a full refund if it was prepaid.
+    /// Refreshes the local order list so every admin screen (list, dashboard,
+    /// detail) reflects the decision immediately — not just after the next poll.
     Future<bool> approveCancellation({required String token, required int orderId}) async {
       try {
         await apiService.post('/admin/orders/$orderId/approve-cancellation', {}, token: token);
+        if (_orders.any((o) => o.id == orderId)) {
+          await fetchOrders(token: token);
+        }
         return true;
       } catch (e) {
         _error = e.toString().replaceAll('Exception: ', '');
+        notifyListeners();
         return false;
       }
     }
 
     /// Decline a customer's cancellation request — the order stays active.
+    /// Refreshes the local order list so the pending-request badge clears
+    /// immediately across admin screens.
     Future<bool> rejectCancellation({required String token, required int orderId}) async {
       try {
         await apiService.post('/admin/orders/$orderId/reject-cancellation', {}, token: token);
+        if (_orders.any((o) => o.id == orderId)) {
+          await fetchOrders(token: token);
+        }
         return true;
       } catch (e) {
         _error = e.toString().replaceAll('Exception: ', '');
+        notifyListeners();
         return false;
       }
     }

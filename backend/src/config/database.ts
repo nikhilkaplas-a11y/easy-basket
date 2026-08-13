@@ -15,6 +15,7 @@ import { RiderProfile } from '../entities/RiderProfile';
 import { RiderWallet } from '../entities/RiderWallet';
 import { RoleChangeAudit } from '../entities/RoleChangeAudit';
 import { ServiceArea } from '../entities/ServiceArea';
+import { StoreStatus } from '../entities/StoreStatus';
 import { User } from '../entities/User';
 import { WebhookEvent } from '../entities/WebhookEvent';
 import dotenv from 'dotenv';

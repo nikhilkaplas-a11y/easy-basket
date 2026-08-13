@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
@@ -186,18 +187,7 @@ class ProfileScreen extends StatelessWidget {
             // ── Preferences Section ──
             _buildSectionLabel('Preferences'),
             const SizedBox(height: 8),
-            _buildTile(
-              context,
-              icon: Icons.notifications_outlined,
-              title: 'Notifications',
-              bgColor: const Color(0xFFFFF3E0),
-              iconColor: Colors.orange,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notifications coming soon')),
-                );
-              },
-            ),
+            const _NotificationToggleTile(),
             _buildTile(
               context,
               icon: Icons.language_outlined,
@@ -453,6 +443,141 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Notifications on/off toggle for the profile Preferences section.
+/// Off by default for guests (not logged in); for logged-in users with no saved
+/// preference it reflects the actual OS permission. Turning it on requests
+/// permission; turning it off unsubscribes from push topics. The choice is
+/// persisted so it sticks across sessions.
+class _NotificationToggleTile extends StatefulWidget {
+  const _NotificationToggleTile();
+
+  @override
+  State<_NotificationToggleTile> createState() =>
+      _NotificationToggleTileState();
+}
+
+class _NotificationToggleTileState extends State<_NotificationToggleTile> {
+  static const _prefKey = 'notifications_enabled';
+  bool _enabled = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    // Read auth synchronously before any await (no context across async gaps).
+    final isAuth =
+        Provider.of<AuthProvider>(context, listen: false).isAuthenticated;
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getBool(_prefKey);
+    if (stored != null) {
+      if (mounted) setState(() => _enabled = stored);
+      return;
+    }
+    // No saved preference → OFF by default for guests; for logged-in users
+    // reflect the real OS permission so the switch matches reality.
+    var defaultOn = false;
+    if (isAuth) {
+      defaultOn = await NotificationService().areNotificationsEnabled();
+    }
+    if (mounted) setState(() => _enabled = defaultOn);
+  }
+
+  Future<void> _toggle(bool value) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final prefs = await SharedPreferences.getInstance();
+    final service = NotificationService();
+
+    if (value) {
+      final granted = await service.requestNotificationPermission();
+      await prefs.setBool(_prefKey, granted);
+      if (!mounted) return;
+      if (!granted) {
+        // OS permission denied — can't enable; keep off and guide the user.
+        setState(() {
+          _enabled = false;
+          _busy = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Allow notifications for Easy Basket in your phone settings to turn this on.'),
+          ),
+        );
+        return;
+      }
+      setState(() {
+        _enabled = true;
+        _busy = false;
+      });
+    } else {
+      await service.unsubscribeCurrentTopic();
+      await prefs.setBool(_prefKey, false);
+      if (!mounted) return;
+      setState(() {
+        _enabled = false;
+        _busy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.notifications_outlined,
+                    color: Colors.orange, size: 20),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Text(
+                  'Notifications',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.black,
+                  ),
+                ),
+              ),
+              Switch(
+                value: _enabled,
+                onChanged: _busy ? null : _toggle,
+                activeThumbColor: AppTheme.primaryGreen,
+              ),
+            ],
           ),
         ),
       ),

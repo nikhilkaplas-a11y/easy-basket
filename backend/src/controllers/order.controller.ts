@@ -13,6 +13,7 @@ import { PaymentService } from '../services/payment.service';
 import { FCMService } from '../services/fcm.service';
 import { OrderInventoryService } from '../services/order-inventory.service';
 import { ServiceabilityService, isValidLat, isValidLng } from '../services/serviceability.service';
+import { StoreStatusService } from '../services/store-status.service';
 import { ProductController } from './product.controller';
 import { QueryFailedError, In } from 'typeorm';
 
@@ -56,6 +57,32 @@ export class OrderController {
         res
           .status(400)
           .json({ message: 'Invalid paymentMethod. Allowed: upi, cod (aliases: cash, razorpay).' });
+        return;
+      }
+
+      // Enforce store open/closed server-side — never trust the client's UX
+      // check. The app greys out the Place Order button, but a stale in-memory
+      // flag (app opened before the store closed) or a direct API call would
+      // sail straight past it. Checked BEFORE the user/address/product lookups
+      // so a closed store rejects cheaply.
+      //
+      // Uses the uncached read: order creation is low-volume next to status
+      // polling, and this is the one call site where being seconds stale costs
+      // real money. Reads fail OPEN, so a database blip can't shut the shop.
+      //
+      // Scope: NEW orders only. Existing orders, rider deliveries, admin
+      // actions and cancellations all continue normally while closed — a
+      // customer who already paid still gets their groceries.
+      const storeStatus = await StoreStatusService.isAcceptingOrders();
+      if (!storeStatus.isOpen) {
+        res.status(409).json({
+          message:
+            storeStatus.customMessage ||
+            "We're not accepting orders right now. Please try again shortly.",
+          code: 'STORE_CLOSED',
+          closedReason: storeStatus.closedReason,
+          expectedReopenAt: storeStatus.expectedReopenAt,
+        });
         return;
       }
 

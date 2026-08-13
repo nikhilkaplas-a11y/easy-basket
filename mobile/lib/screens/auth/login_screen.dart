@@ -211,7 +211,11 @@ class _LoginScreenState extends State<LoginScreen>
 
     // Check service availability
     final serviceAreaProvider = Provider.of<ServiceAreaProvider>(context, listen: false);
+    // Coordinates first — the backend radius check decides, and only falls back
+    // to the pincode table when the store radius isn't configured.
     final isServiceable = await serviceAreaProvider.checkServiceAvailability(
+      latitude: partial.latitude,
+      longitude: partial.longitude,
       pincode: partial.pincode!,
       country: 'India',
     );

@@ -562,6 +562,36 @@ Expanded(
 
       const SizedBox(height: 6),
 
+      // Urgent flag so pending cancellation requests are visible in the polled
+      // list without opening each order's detail screen.
+      if (order.hasPendingCancelRequest) ...[
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFEBEE),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.red.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.report_gmailerrorred_rounded,
+                  size: 13, color: Colors.red.shade700),
+              const SizedBox(width: 4),
+              Text(
+                'Cancellation requested',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.red.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+
       Wrap(
         spacing: 8,
         runSpacing: 4,

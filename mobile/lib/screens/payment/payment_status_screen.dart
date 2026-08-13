@@ -46,17 +46,30 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen>
     );
     _controller.forward();
 
-    final isSuccess = widget.status == PaymentStatus.success ||
-        widget.status == PaymentStatus.orderPlaced;
+    // Any placed order — paid success, COD, or a prepaid order still confirming
+    // (the pending fallback from the Razorpay flow) — should offer notifications.
+    // Only a hard failure skips the ask.
+    final isOrderPlaced = widget.status != PaymentStatus.failed;
 
-    if (!kIsWeb && isSuccess) {
-      // Show in-app prompt after animation completes
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() => _showNotificationPrompt = true);
-      });
+    if (!kIsWeb && isOrderPlaced) {
+      _maybePromptNotifications();
     } else {
       _scheduleRedirect();
     }
+  }
+
+  /// Ask for notifications on every placed order until the user grants them.
+  /// Once granted we never ask again — just redirect.
+  Future<void> _maybePromptNotifications() async {
+    final enabled = await NotificationService().areNotificationsEnabled();
+    if (!mounted) return;
+    if (enabled) {
+      _scheduleRedirect();
+      return;
+    }
+    // Not granted yet → show the in-app prompt after the entry animation.
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) setState(() => _showNotificationPrompt = true);
   }
 
   @override
@@ -96,12 +109,25 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isSuccess = widget.status == PaymentStatus.success ||
-        widget.status == PaymentStatus.orderPlaced;
-    final color =
-        isSuccess ? const Color(0xFF2E7D32) : const Color(0xFFE53935);
-    final icon = isSuccess ? Icons.check_circle_rounded : Icons.error_rounded;
-    final title = isSuccess ? 'Order Placed!' : 'Payment Failed';
+    final isFailed = widget.status == PaymentStatus.failed;
+    final isPending = widget.status == PaymentStatus.pending;
+    final Color color;
+    final IconData icon;
+    final String title;
+    if (isFailed) {
+      color = const Color(0xFFE53935);
+      icon = Icons.error_rounded;
+      title = 'Payment Failed';
+    } else if (isPending) {
+      // Order was created; payment confirmation is still pending — not a failure.
+      color = const Color(0xFFF57C00);
+      icon = Icons.hourglass_top_rounded;
+      title = 'Order Placed';
+    } else {
+      color = const Color(0xFF2E7D32);
+      icon = Icons.check_circle_rounded;
+      title = 'Order Placed!';
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,

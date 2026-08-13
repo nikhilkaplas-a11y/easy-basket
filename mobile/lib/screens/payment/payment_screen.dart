@@ -11,7 +11,9 @@ import '../../services/razorpay_service.dart';
 import '../../utils/theme.dart';
 import '../../providers/proximity_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/store_status_provider.dart';
 import '../../widgets/address_completion_sheet.dart';
+import '../../widgets/store_closed_banner.dart';
 import 'payment_status_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -51,6 +53,15 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       RazorpayService.onError = _handlePaymentError;
       RazorpayService.onExternalWallet = _handleExternalWallet;
     }
+
+    // This is the last screen before money moves, so don't gate on a status
+    // that was fetched who-knows-when. `ensureFresh` re-checks only if the
+    // cached value has gone stale, so arriving here is not another guaranteed
+    // round-trip.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Provider.of<StoreStatusProvider>(context, listen: false).ensureFresh();
+    });
   }
   
   @override
@@ -377,11 +388,32 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     );
 
     if (order == null) {
-      if (mounted) {
+      if (!mounted) return;
+
+      // The order was refused. If the store shut between this screen loading
+      // and the tap, our cached flag is now wrong — re-check so the button
+      // greys out and the banner appears, instead of leaving the user to tap a
+      // button that will keep failing.
+      final storeStatus = Provider.of<StoreStatusProvider>(context, listen: false);
+      await storeStatus.refresh(force: true);
+      if (!mounted) return;
+
+      if (storeStatus.isClosed) {
+        // Cart is deliberately left intact — they can order the moment we
+        // reopen, and losing a full basket here would be infuriating.
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(orderProvider.error ?? 'Failed to create order')),
+          SnackBar(
+            content: Text(storeStatus.status.headline),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 4),
+          ),
         );
+        return;
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(orderProvider.error ?? 'Failed to create order')),
+      );
       return;
     }
 
@@ -656,41 +688,63 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
               BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 10, offset: const Offset(0, -2)),
             ],
           ),
-          child: Consumer<OrderProvider>(
-            builder: (context, orderProvider, _) => Row(
-              children: [
-                // Total on left
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Total', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
-                    const SizedBox(height: 2),
-                    Text(
-                      currencyFormat.format(cartProvider.totalAmount),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black),
+          child: Consumer2<OrderProvider, StoreStatusProvider>(
+            builder: (context, orderProvider, storeStatus, _) {
+              final storeClosed = storeStatus.isClosed;
+              final busy = orderProvider.isLoading || _isProcessingPayment;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Explain the dead button before the user tries to press it.
+                  if (storeClosed)
+                    StoreClosedBar(
+                      status: storeStatus.status,
+                      margin: const EdgeInsets.only(bottom: 10),
                     ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                // Place Order button
-                Expanded(
-                  child: AppTheme.gradientButton(
-                    onPressed: (orderProvider.isLoading || _isProcessingPayment) ? null : _placeOrder,
-                    height: 48,
-                    child: (orderProvider.isLoading || _isProcessingPayment)
-                        ? const SizedBox(
-                            height: 20, width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(
-                            _selectedPaymentMethod == 'razorpay' ? 'Pay & Place Order' : 'Place Order',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                  Row(
+                    children: [
+                      // Total on left
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Total', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                          const SizedBox(height: 2),
+                          Text(
+                            currencyFormat.format(cartProvider.totalAmount),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black),
                           ),
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      // Place Order button
+                      Expanded(
+                        child: AppTheme.gradientButton(
+                          // Closed → null, so the button greys out and stops
+                          // responding. UX only; POST /api/orders re-checks and
+                          // returns 409 STORE_CLOSED regardless of this.
+                          onPressed: (busy || storeClosed) ? null : _placeOrder,
+                          height: 48,
+                          child: busy
+                              ? const SizedBox(
+                                  height: 20, width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : Text(
+                                  storeClosed
+                                      ? 'Store Closed'
+                                      : _selectedPaymentMethod == 'razorpay'
+                                          ? 'Pay & Place Order'
+                                          : 'Place Order',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                ],
+              );
+            },
           ),
         ),
       ),

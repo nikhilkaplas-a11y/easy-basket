@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller';
+import { StoreStatusController } from '../controllers/storeStatus.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { RedisService } from '../services/redis.service';
 import { MissingTranslationController } from '../controllers/missingTranslation.controller';
@@ -45,5 +46,11 @@ router.post('/orders/:id/complete-rto', AdminController.completeRto);
 router.post('/orders/:id/approve-cancellation', AdminController.approveCancellation);
 router.post('/orders/:id/reject-cancellation', AdminController.rejectCancellation);
 router.get('/orders/:id/events', AdminController.getOrderEvents);
+
+// --- Store open/closed ---
+// Read is also exposed publicly at GET /api/store/status; this admin copy lets
+// the panel read back the authoritative state without a second base URL.
+router.get('/store/status', StoreStatusController.getStatus);
+router.put('/store/status', StoreStatusController.updateStatus);
 
 export default router;
