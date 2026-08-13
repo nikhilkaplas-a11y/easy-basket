@@ -19,6 +19,9 @@ import { StoreStatus } from '../entities/StoreStatus';
 import { User } from '../entities/User';
 import { WebhookEvent } from '../entities/WebhookEvent';
 import dotenv from 'dotenv';
+import { Translation } from "../entities/Translation";
+import { MissingTranslation } from "../entities/MissingTranslation";
+
 
 dotenv.config();
 
@@ -32,26 +35,27 @@ export const AppDataSource = new DataSource({
   synchronize: false, // Disabled to prevent index drop errors with foreign keys. Schema is already correct.
   logging: process.env.NODE_ENV === 'development',
   entities: [
-    User,
-    Product,
-    Order,
-    Category,
-    Address,
-    OrderItem,
-    RefreshToken,
-    ServiceArea,
-    ProductVariant,
-    Campaign,
-    Payment,
-    Refund,
-    WebhookEvent,
-    RiderProfile,
-    RiderWallet,
-    RiderCashDeposit,
-    OrderEvent,
-    RoleChangeAudit,
-    StoreStatus,
-  ],
+  User,
+  Product,
+  Order,
+  Category,
+  Address,
+  OrderItem,
+  RefreshToken,
+  ServiceArea,
+  ProductVariant,
+  Campaign,
+  Payment,
+  Refund,
+  WebhookEvent,
+  RiderProfile,
+  RiderWallet,
+  RiderCashDeposit,
+  OrderEvent,
+  RoleChangeAudit,
+  Translation,
+  MissingTranslation,
+],
   subscribers: [],
   migrations: [],
   timezone: 'Z', // RDS MySQL uses UTC — tell mysql2 to interpret times as UTC, not local

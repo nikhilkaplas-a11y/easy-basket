@@ -26,6 +26,9 @@ import storeStatusRoutes from './routes/storeStatus.routes';
 import uploadRoutes from './routes/upload.routes';
 import variantRoutes from './routes/variant.routes';
 import campaignRoutes from './routes/campaign.routes';
+import { languageMiddleware } from "./middleware/language.middleware";
+import { TranslationService } from "./services/translation.service";
+import { responseMiddleware } from "./middleware/response.middleware";
 
 // Load environment variables FIRST before importing any modules that use them
 dotenv.config();
@@ -60,6 +63,8 @@ app.post(
 );
 
 app.use(express.json());
+app.use(languageMiddleware);
+app.use(responseMiddleware);
 app.use(RequestTimingMiddleware.handle);
 
 // Routes
@@ -92,6 +97,8 @@ app.get('/api/health', (req, res) => {
 AppDataSource.initialize()
   .then(async () => {
     console.log('✅ Database connected successfully');
+    await TranslationService.loadCache();
+    console.log("✅ Translation cache loaded");
     console.log(`📊 Database: ${process.env.DB_NAME || 'easy_basket'}`);
     console.log(`🌐 Host: ${process.env.DB_HOST || 'localhost'}`);
 

@@ -3,6 +3,7 @@ import { AdminController } from '../controllers/admin.controller';
 import { StoreStatusController } from '../controllers/storeStatus.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { RedisService } from '../services/redis.service';
+import { MissingTranslationController } from '../controllers/missingTranslation.controller';
 
 const router = Router();
 
@@ -31,6 +32,9 @@ router.get('/products', AdminController.getAllProducts);
 router.post('/products', AdminController.createProduct);
 router.put('/products/:id', AdminController.updateProduct);
 router.delete('/products/:id', AdminController.deleteProduct);
+router.get('/missing-translations',MissingTranslationController.getMissingTranslations);
+
+router.put('/missing-translations/:id',MissingTranslationController.completeMissingTranslation);
 router.post('/notifications/send', AdminController.sendPromoNotification);
 
 // --- Phase 1: rider management + delivery-aware order actions ---
