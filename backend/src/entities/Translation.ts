@@ -13,20 +13,24 @@ export class Translation {
   id!: number;
 
   @Index({ unique: true })
-  @Column()
+  @Column({ length: 255 })
   key!: string;
 
-  @Column()
+  /*
+   * Source text. TEXT rather than VARCHAR(255) because product
+   * descriptions routinely exceed 255 characters.
+   */
+  @Column("text")
   en!: string;
 
-  @Column({ nullable: true })
-  hi!: string;
+  @Column("text", { nullable: true })
+  hi!: string | null;
 
-  @Column({ nullable: true })
-  pa!: string;
+  @Column("text", { nullable: true })
+  pa!: string | null;
 
   @Column({
-    default: "product",
+    default: "content",
   })
   type!: string;
 

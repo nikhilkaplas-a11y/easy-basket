@@ -99,6 +99,8 @@ AppDataSource.initialize()
     console.log('✅ Database connected successfully');
     await TranslationService.loadCache();
     console.log("✅ Translation cache loaded");
+    // Pick up translations saved by other API instances behind the LB.
+    TranslationService.startCacheSync();
     console.log(`📊 Database: ${process.env.DB_NAME || 'easy_basket'}`);
     console.log(`🌐 Host: ${process.env.DB_HOST || 'localhost'}`);
 

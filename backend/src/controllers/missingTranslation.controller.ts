@@ -3,16 +3,33 @@ import { AppDataSource } from "../config/database";
 import { MissingTranslation } from "../entities/MissingTranslation";
 import { Translation } from "../entities/Translation";
 import { TranslationService } from "../services/translation.service";
+import { MissingTranslationService } from "../services/missing-translation.service";
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+
+/** Treat undefined / null / blank alike. */
+function cleanValue(input: unknown): string | null {
+
+    if (typeof input !== "string")
+        return null;
+
+    const trimmed = input.trim();
+
+    return trimmed.length ? trimmed : null;
+}
 
 export class MissingTranslationController {
 
     /**
-     * Get pending missing translations
+     * Get missing translations
      *
      * GET /api/admin/missing-translations
+     *     ?status=pending|completed|all
+     *     &page=1&limit=50
      */
     static async getMissingTranslations(
-        _req: Request,
+        req: Request,
         res: Response
     ) {
 
@@ -21,20 +38,40 @@ export class MissingTranslationController {
             const repository =
                 AppDataSource.getRepository(MissingTranslation);
 
-            const missingTranslations =
-                await repository.find({
-                    where: {
-                        status: "pending",
-                    },
+            const status =
+                String(req.query.status || "pending").toLowerCase();
+
+            const page =
+                Math.max(1, Number(req.query.page) || 1);
+
+            const limit =
+                Math.min(
+                    MAX_LIMIT,
+                    Math.max(1, Number(req.query.limit) || DEFAULT_LIMIT)
+                );
+
+            const where =
+                status === "all"
+                    ? {}
+                    : { status };
+
+            const [rows, total] =
+                await repository.findAndCount({
+                    where,
                     order: {
                         createdAt: "ASC",
                     },
+                    skip: (page - 1) * limit,
+                    take: limit,
                 });
 
             return res.json({
                 success: true,
-                count: missingTranslations.length,
-                data: missingTranslations,
+                count: rows.length,
+                total,
+                page,
+                limit,
+                data: rows,
             });
 
         } catch (error) {
@@ -61,6 +98,9 @@ export class MissingTranslationController {
      *   "hi": "ताज़ा दूध",
      *   "pa": "ਤਾਜ਼ਾ ਦੁੱਧ"
      * }
+     *
+     * The entry is only marked "completed" once BOTH languages are
+     * present, so a half-filled row stays visible to the admin.
      */
     static async completeMissingTranslation(
         req: Request,
@@ -71,7 +111,7 @@ export class MissingTranslationController {
 
             const id = Number(req.params.id);
 
-            if (!Number.isInteger(id)) {
+            if (!Number.isInteger(id) || id <= 0) {
 
                 return res.status(400).json({
                     success: false,
@@ -79,10 +119,19 @@ export class MissingTranslationController {
                 });
             }
 
-            const {
-                hi,
-                pa,
-            } = req.body;
+            const hi = cleanValue(req.body?.hi);
+            const pa = cleanValue(req.body?.pa);
+
+            /*
+             * At least one language should be provided.
+             */
+            if (!hi && !pa) {
+
+                return res.status(400).json({
+                    success: false,
+                    message: "Provide Hindi or Punjabi translation",
+                });
+            }
 
             const missingRepository =
                 AppDataSource.getRepository(MissingTranslation);
@@ -106,20 +155,6 @@ export class MissingTranslationController {
             }
 
             /*
-             * At least one language should be provided.
-             */
-            if (
-                (hi === undefined || hi === null || hi === "") &&
-                (pa === undefined || pa === null || pa === "")
-            ) {
-
-                return res.status(400).json({
-                    success: false,
-                    message: "Provide Hindi or Punjabi translation",
-                });
-            }
-
-            /*
              * Check whether translation already exists.
              */
             let translation =
@@ -129,64 +164,59 @@ export class MissingTranslationController {
                     },
                 });
 
-            if (translation) {
+            if (!translation) {
 
-                /*
-                 * Update existing translation.
-                 */
-                if (hi !== undefined)
-                    translation.hi = hi;
-
-                if (pa !== undefined)
-                    translation.pa = pa;
-
-                translation.en = missing.en;
-                translation.type = missing.type;
-
-                await translationRepository.save(
-                    translation
-                );
-
-            } else {
-
-                /*
-                 * Create a new translation.
-                 */
                 translation =
                     translationRepository.create({
                         key: missing.key,
                         en: missing.en,
-                        hi: hi || "",
-                        pa: pa || "",
+                        hi: null,
+                        pa: null,
                         type: missing.type,
                     });
-
-                await translationRepository.save(
-                    translation
-                );
             }
 
             /*
-             * Mark missing entry as completed.
+             * Only overwrite a language that was actually supplied, so a
+             * second call adding Punjabi does not wipe existing Hindi.
              */
-            missing.status = "completed";
+            if (hi)
+                translation.hi = hi;
 
-            await missingRepository.save(
-                missing
-            );
+            if (pa)
+                translation.pa = pa;
+
+            translation.en = missing.en;
+            translation.type = missing.type;
+
+            await translationRepository.save(translation);
 
             /*
-             * Update in-memory translation cache immediately.
-             *
-             * No server restart required.
+             * Complete only when both languages are filled in.
              */
-            TranslationService.addToCache(
-                translation
-            );
+            missing.status =
+                translation.hi && translation.pa
+                    ? "completed"
+                    : "pending";
+
+            await missingRepository.save(missing);
+
+            /*
+             * Update this process's cache immediately, then tell every
+             * other process to reload. No server restart required.
+             */
+            TranslationService.addToCache(translation);
+
+            MissingTranslationService.forget(missing.key);
+
+            await TranslationService.bumpVersion();
 
             return res.json({
                 success: true,
-                message: "Translation completed successfully",
+                message:
+                    missing.status === "completed"
+                        ? "Translation completed successfully"
+                        : "Translation saved. Still awaiting the other language.",
                 data: {
                     missingTranslation: missing,
                     translation,

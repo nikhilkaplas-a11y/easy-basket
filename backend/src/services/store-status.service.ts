@@ -50,9 +50,7 @@ function toView(row: StoreStatus): StoreStatusView {
 
 export class StoreStatusService {
   static isValidReason(value: unknown): value is StoreClosedReason {
-    return (
-      typeof value === 'string' && (STORE_CLOSED_REASONS as readonly string[]).includes(value)
-    );
+    return typeof value === 'string' && (STORE_CLOSED_REASONS as readonly string[]).includes(value);
   }
 
   /** Drop the in-process cache. Only affects THIS instance — see CACHE_TTL_MS. */

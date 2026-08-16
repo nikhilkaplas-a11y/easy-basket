@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { ResponseTranslator } from "../transport/responseTranslator";
+import { ResponseTranslator } from "../Transport/responseTranslator";
 
 export const responseMiddleware = (
     req: Request,
