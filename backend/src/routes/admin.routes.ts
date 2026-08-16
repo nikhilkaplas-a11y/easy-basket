@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller';
 import { StoreStatusController } from '../controllers/storeStatus.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -33,6 +33,16 @@ router.post('/products', AdminController.createProduct);
 router.put('/products/:id', AdminController.updateProduct);
 router.delete('/products/:id', AdminController.deleteProduct);
 router.get('/missing-translations',MissingTranslationController.getMissingTranslations);
+
+// Static segments must be declared before the ':id' route below.
+router.get('/missing-translations/export', MissingTranslationController.exportCsv);
+
+router.post(
+  '/missing-translations/bulk',
+  // Global express.json() ignores text/csv, so parse the raw CSV here.
+  express.text({ type: ['text/csv', 'text/plain'], limit: '5mb' }),
+  MissingTranslationController.bulkComplete
+);
 
 router.put('/missing-translations/:id',MissingTranslationController.completeMissingTranslation);
 router.post('/notifications/send', AdminController.sendPromoNotification);
