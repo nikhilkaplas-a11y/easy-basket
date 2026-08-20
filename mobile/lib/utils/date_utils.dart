@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import '../services/api_service.dart';
+
 /// Converts a DateTime to IST (Indian Standard Time, UTC+5:30)
 /// Assumes the input DateTime is in UTC (as stored in database)
 DateTime toIST(DateTime dateTime) {
@@ -15,10 +17,13 @@ DateTime toIST(DateTime dateTime) {
   }
 }
 
-/// Formats a DateTime to IST timezone with the given format
+/// Formats a DateTime to IST timezone with the given format.
+///
+/// Passes the app language to [DateFormat] so month and weekday names render
+/// in the chosen script — without it 'MMM' stays "Aug" on a Hindi screen.
 String formatIST(DateTime dateTime, String format) {
   final istDateTime = toIST(dateTime);
-  return DateFormat(format).format(istDateTime);
+  return DateFormat(format, ApiService.language).format(istDateTime);
 }
 
 /// Formats a DateTime to IST with default format: 'MMM dd, yyyy hh:mm a'

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
+import 'api_service.dart';
 
 /// Callback types for speech events
 typedef OnTranscriptUpdate = void Function(String text, bool isFinal);
@@ -97,10 +98,29 @@ class SpeechService {
           onDone?.call();
         }
       },
-      localeId: 'hi_IN',
+      // Follows the app language instead of assuming Hindi. Punjabi STT is
+      // not available on every device, so 'pa' falls back to Hindi, which
+      // recognises Punjabi grocery words far better than English does.
+      localeId: _sttLocaleId(ApiService.language),
       listenFor: const Duration(seconds: 30),
       pauseFor: pauseFor,
     );
+  }
+
+  /// Map the app language onto a speech-recognition locale.
+  ///
+  /// Punjabi ('pa') deliberately resolves to Hindi: Android STT support for
+  /// pa-IN is patchy, and Hindi recognition handles Punjabi product names
+  /// much better than falling back to English would.
+  static String _sttLocaleId(String languageCode) {
+    switch (languageCode) {
+      case 'en':
+        return 'en_IN';
+      case 'pa':
+      case 'hi':
+      default:
+        return 'hi_IN';
+    }
   }
 
   /// Stop listening manually.

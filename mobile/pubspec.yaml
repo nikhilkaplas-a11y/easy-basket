@@ -55,8 +55,15 @@ dependencies:
   # Voice Search
   speech_to_text: ^7.3.0
 
+  # Localization — English / Hindi / Punjabi.
+  # flutter_localizations supplies the Global*Localizations delegates, which
+  # translate Flutter's OWN widget text (date picker, copy/paste menu).
+  # Our app strings come from lib/l10n/*.arb via gen_l10n (generate: true below).
+  flutter_localizations:
+    sdk: flutter
+
   # Utilities
-  intl: ^0.18.1
+  intl: ^0.20.2
   uuid: ^4.2.1
   url_launcher: ^6.2.2
   google_fonts: ^8.0.2
@@ -73,7 +80,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
+  # Generates AppLocalizations from lib/l10n/*.arb (see l10n.yaml)
+  generate: true
+
   assets:
     - assets/images/
     - assets/icons/

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
@@ -80,7 +81,8 @@ class CartScreen extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.transparent,
         title: Text(
-          'My Cart (${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'})',
+          '${AppLocalizations.of(context).cartTitle} '
+          '(${AppLocalizations.of(context).cartItemCount(cartProvider.itemCount)})',
           style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.black),
         ),
         leading: IconButton(

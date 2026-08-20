@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/cart_provider.dart';
 
 /// Reusable floating cart bar widget (Blinkit/Swiggy style)
@@ -81,7 +82,8 @@ class FloatingCartBar extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${cartProvider.itemCount} ${cartProvider.itemCount == 1 ? 'item' : 'items'}',
+                              AppLocalizations.of(context)
+                                  .cartItemCount(cartProvider.itemCount),
                               style: const TextStyle(
                                 fontSize: 15,
                                 color: Colors.white,

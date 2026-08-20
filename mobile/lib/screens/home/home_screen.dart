@@ -42,6 +42,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _hasCheckedServiceAvailability = false;
   String? _serviceNotAvailableMessage;
+
+  /// Whether the user closed the "not serviceable" strip. Kept separate from
+  /// [_serviceNotAvailableMessage] on purpose: dismissing hides the strip only,
+  /// it does not clear the unserviceable state. Sharing one flag meant tapping
+  /// × silently marked the area deliverable again.
+  bool _serviceBannerDismissed = false;
   bool _isHomeLoading = true;
   Timer? _orderPollingTimer;
   List<CampaignModel> _heroBanners = []; // Homepage promo banners
@@ -321,107 +327,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Soft banner — don't block, let user browse
         setState(() {
           _serviceNotAvailableMessage = "We don't deliver to ${cityForDisplay ?? pinToCheck} yet";
+          // A fresh unserviceable result re-shows the strip even if the user
+          // dismissed a previous one — the location changed, so say so again.
+          _serviceBannerDismissed = false;
         });
       }
     } catch (e) {
       debugPrint('❌ [Home] Service check error: $e');
     }
-  }
-
-  /// "Not in your area" card — replaces products when not serviceable
-  Widget _buildNotServiceableCard(AddressProvider addrProv) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Emoji + icon
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3E0),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.location_off_rounded, size: 40, color: Color(0xFFF57C00)),
-          ),
-          const SizedBox(height: 18),
-
-          // Title
-          const Text(
-            "We're not in your area yet",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-
-          // Subtitle
-          Text(
-            _serviceNotAvailableMessage ?? "We don't deliver to this location yet.",
-            style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.4),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-
-          // Option 1: Try saved address (if user has saved addresses)
-          if (addrProv.hasAddresses) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => context.push('/addresses'),
-                    child: const Center(
-                      child: Text(
-                        'Try Saved Address',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-
-          // Option 2: Add different address
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () => context.push('/addresses'),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey[300]!),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: Text(
-                'Add Different Address',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Auto-detect location for new users (seamless onboarding)
@@ -1179,8 +1092,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       },
                     ),
 
-                    // Soft "not serviceable" banner — doesn't block, just informs
-                    if (_serviceNotAvailableMessage != null)
+                    // Soft "not serviceable" strip — informs and offers the fix
+                    // (change address), but never blocks browsing. Ordering is
+                    // gated where it belongs: the address list re-checks the
+                    // chosen address, and createOrder enforces the radius
+                    // server-side with OUT_OF_SERVICE_AREA.
+                    if (_serviceNotAvailableMessage != null && !_serviceBannerDismissed)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: Container(
@@ -1200,8 +1117,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF57C00)),
                                 ),
                               ),
+                              // The actual fix for most people hitting this:
+                              // their GPS is somewhere they're passing through
+                              // and their real address is deliverable.
                               GestureDetector(
-                                onTap: () => setState(() => _serviceNotAvailableMessage = null),
+                                onTap: () => context.push('/addresses'),
+                                behavior: HitTestBehavior.opaque,
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  child: Text(
+                                    'Change',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFE65100),
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Color(0xFFE65100),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                // Hides the strip only — the unserviceable state
+                                // stays in effect.
+                                onTap: () => setState(() => _serviceBannerDismissed = true),
                                 child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
                               ),
                             ],
@@ -1518,10 +1457,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       && !addrProv.hasAddresses
                       && proximityProv.partialAddress == null;
 
-                  // Not serviceable — show "not in your area" card instead of products
-                  if (_serviceNotAvailableMessage != null) {
-                    return _buildNotServiceableCard(addrProv);
-                  }
+                  // Not serviceable → deliberately NOT blocked here. Browsing
+                  // stays open: the commonest cause is a GPS mismatch (user is
+                  // travelling, or hasn't set a delivery address yet) and those
+                  // people usually DO have a deliverable saved address — hiding
+                  // the catalogue from them helps nobody. Out-of-area users may
+                  // also legitimately order to another address. The strip above
+                  // explains the situation and offers "Change"; ordering itself
+                  // is blocked by the address-list re-check and, definitively,
+                  // by createOrder's server-side radius check.
 
                   if (productProvider.isLoading && productProvider.products.isEmpty) {
                     return const Padding(

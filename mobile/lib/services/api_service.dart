@@ -5,6 +5,15 @@ import '../config/app_config.dart';
 class ApiService {
   static String get baseUrl => AppConfig.apiBaseUrl;
 
+  /// Language sent as `Accept-Language` on every request, which is how the
+  /// backend decides whether to resolve product and category names into
+  /// Hindi or Punjabi (see backend ResponseTranslator).
+  ///
+  /// Static because `ApiService()` is constructed independently in several
+  /// providers — an instance field would leave some of them still asking for
+  /// English. Owned by LocaleProvider; nothing else should assign to it.
+  static String language = 'en';
+
   // Callback to refresh the token when the server reports it expired (401).
   Future<bool> Function()? onTokenExpired;
 
@@ -98,7 +107,10 @@ class ApiService {
     String? Function()? getUpdatedToken,
   }) async {
     Future<http.Response> dispatch(String? authToken) {
-      final headers = <String, String>{'Content-Type': 'application/json'};
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'Accept-Language': language,
+      };
       if (authToken != null) headers['Authorization'] = 'Bearer $authToken';
       if (extraHeaders != null) headers.addAll(extraHeaders);
 

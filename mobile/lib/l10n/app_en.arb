@@ -1,0 +1,56 @@
+{
+  "@@locale": "en",
+
+  "commonCancel": "Cancel",
+  "commonRemove": "Remove",
+  "commonSave": "Save",
+  "commonRetry": "Retry",
+
+  "languageTitle": "Language",
+  "languageSubtitle": "Choose the language you want to use in the app",
+  "languageEnglish": "English",
+  "languageHindi": "Hindi",
+  "languagePunjabi": "Punjabi",
+  "languageUpdated": "Language updated",
+  "languageChangeFailed": "Couldn't change language. Please try again.",
+
+  "profileCustomer": "Customer",
+  "profileOrders": "Orders",
+  "profileAddresses": "Addresses",
+  "profileRating": "Rating",
+  "profileAccount": "Account",
+  "profileEditProfile": "Edit Profile",
+  "profileMyOrders": "My Orders",
+  "profileMyAddresses": "My Addresses",
+  "profilePreferences": "Preferences",
+  "profileSupport": "Support",
+  "profileHelpSupport": "Help & Support",
+  "profileHelpComingSoon": "Help & Support coming soon",
+  "profileAbout": "About",
+  "profileAboutApp": "About Easy Basket",
+  "profileLogout": "Logout",
+  "profileLogoutConfirm": "Are you sure you want to logout?",
+
+  "cartTitle": "My Cart",
+  "cartItemCount": "{count, plural, =1{{count} item} other{{count} items}}",
+  "@cartItemCount": {
+    "description": "Item count shown in the cart title and floating bar",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "cartEmpty": "Your cart is empty",
+  "cartEmptySubtitle": "Add items to your cart to get started",
+  "cartStartShopping": "Start Shopping",
+  "cartRemoveItem": "Remove Item",
+  "cartSubtotal": "Subtotal",
+  "cartDeliveryFee": "Delivery Fee",
+  "cartTotal": "Total",
+  "cartAddressRequired": "Delivery address required",
+  "cartAddAddressToProceed": "Add address to proceed",
+  "cartAddAddressFirst": "Please add a delivery address first",
+  "cartStoreClosed": "Store Closed",
+  "cartLoginToCheckout": "Login to Checkout",
+  "cartAddAddressToCheckout": "Add Address to Checkout",
+  "cartProceedToCheckout": "Proceed to Checkout"
+}

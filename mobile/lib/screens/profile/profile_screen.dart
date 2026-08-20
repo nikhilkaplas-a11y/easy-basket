@@ -9,6 +9,7 @@ import '../../providers/location_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/proximity_provider.dart';
 import '../../services/notification_service.dart';
+import '../../l10n/app_localizations.dart';
 import '../../utils/theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -191,14 +192,10 @@ class ProfileScreen extends StatelessWidget {
             _buildTile(
               context,
               icon: Icons.language_outlined,
-              title: 'Language',
+              title: AppLocalizations.of(context).languageTitle,
               bgColor: const Color(0xFFE0F2F1),
               iconColor: Colors.teal,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Language selection coming soon')),
-                );
-              },
+              onTap: () => context.push('/language'),
             ),
 
             const SizedBox(height: 20),

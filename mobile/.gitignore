@@ -82,3 +82,6 @@ app.*.map.json
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 
+
+# gen_l10n coverage report (regenerated on every build)
+l10n_untranslated.txt

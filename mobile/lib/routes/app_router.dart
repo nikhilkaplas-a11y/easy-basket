@@ -21,6 +21,7 @@ import '../screens/orders/order_tracking_screen.dart';
 import '../screens/orders/order_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/profile/edit_profile_screen.dart';
+import '../screens/profile/language_screen.dart';
 import '../screens/delivery/delivery_dashboard_screen.dart';
 import '../screens/delivery/delivery_orders_screen.dart';
 import '../screens/delivery/delivery_order_detail_screen.dart';
@@ -319,6 +320,13 @@ class AppRouter {
       GoRoute(
         path: '/profile/edit',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+      // Top-level, NOT under /profile/, because _requiresLogin gates every
+      // /profile/* path — a guest must be able to pick their language before
+      // signing in.
+      GoRoute(
+        path: '/language',
+        builder: (context, state) => const LanguageScreen(),
       ),
       // Delivery Routes
       GoRoute(

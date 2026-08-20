@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/startup_deep_link.dart';
@@ -20,12 +21,19 @@ import 'providers/location_provider.dart';
 import 'providers/address_provider.dart';
 import 'providers/proximity_provider.dart';
 import 'providers/store_status_provider.dart';
+import 'providers/locale_provider.dart';
+import 'l10n/app_localizations.dart';
 import 'routes/app_router.dart';
 import 'utils/theme.dart';
 import 'services/razorpay_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load month/weekday names for every supported locale. DateFormat(fmt, 'hi')
+  // throws if its locale data was never initialized, so this must run before
+  // the first screen builds.
+  await initializeDateFormatting();
 
   // Initialize SharedPreferences before Firebase cold-start route (needs role from prefs)
   final prefs = await SharedPreferences.getInstance();
@@ -79,6 +87,11 @@ class MyApp extends StatelessWidget {
     
     return MultiProvider(
       providers: [
+        // Language — created first so ApiService.language is set before any
+        // other provider fires its first request.
+        ChangeNotifierProvider(
+          create: (_) => LocaleProvider(prefs: prefs),
+        ),
         ChangeNotifierProvider(
           create: (_) {
             final apiService = ApiService();
@@ -173,10 +186,16 @@ class MyApp extends StatelessWidget {
           create: (_) => StoreStatusProvider()..refresh(),
         ),
       ],
-      child: MaterialApp.router(
+      child: Consumer<LocaleProvider>(
+        builder: (context, localeProvider, _) => MaterialApp.router(
         title: 'Easy Basket',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
+        // Swaps to Noto Sans Gurmukhi for Punjabi; Poppins covers en + hi.
+        theme: AppTheme.themeFor(localeProvider.language.code),
+        // Explicit user choice — deliberately NOT the device locale.
+        locale: localeProvider.locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         routerConfig: AppRouter.router,
         builder: (context, child) {
           final content = child ?? const SizedBox.shrink();
@@ -215,6 +234,7 @@ class MyApp extends StatelessWidget {
           }
           return wrapped;
         },
+      ),
       ),
     );
   }

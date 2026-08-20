@@ -105,12 +105,40 @@ class AppTheme {
     );
   }
 
-  static ThemeData get lightTheme {
-    final baseTextTheme = GoogleFonts.poppinsTextTheme();
+  /// Theme for a given language.
+  ///
+  /// Poppins ships Latin AND Devanagari, so English and Hindi both render
+  /// correctly on it. It has NO Gurmukhi coverage, so Punjabi falls back to
+  /// Noto Sans Gurmukhi — without this every Punjabi screen renders as tofu
+  /// boxes no matter how good the translations are.
+  static ThemeData themeFor(String languageCode) {
+    return languageCode == 'pa' ? _buildTheme(gurmukhi: true) : lightTheme;
+  }
+
+  static ThemeData get lightTheme => _buildTheme(gurmukhi: false);
+
+  static ThemeData _buildTheme({required bool gurmukhi}) {
+    final baseTextTheme = gurmukhi
+        ? GoogleFonts.notoSansGurmukhiTextTheme()
+        : GoogleFonts.poppinsTextTheme();
+
+    TextStyle headingFont({
+      Color? color,
+      double? fontSize,
+      FontWeight? fontWeight,
+    }) {
+      return gurmukhi
+          ? GoogleFonts.notoSansGurmukhi(
+              color: color, fontSize: fontSize, fontWeight: fontWeight)
+          : GoogleFonts.poppins(
+              color: color, fontSize: fontSize, fontWeight: fontWeight);
+    }
 
     return ThemeData(
       useMaterial3: true,
-      fontFamily: GoogleFonts.poppins().fontFamily,
+      fontFamily: gurmukhi
+          ? GoogleFonts.notoSansGurmukhi().fontFamily
+          : GoogleFonts.poppins().fontFamily,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryGreen,
         primary: primaryGreen,
@@ -121,7 +149,7 @@ class AppTheme {
         backgroundColor: white,
         elevation: 0,
         iconTheme: const IconThemeData(color: black),
-        titleTextStyle: GoogleFonts.poppins(
+        titleTextStyle: headingFont(
           color: black,
           fontSize: 20,
           fontWeight: FontWeight.bold,
@@ -163,7 +191,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.poppins(
+          textStyle: headingFont(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
