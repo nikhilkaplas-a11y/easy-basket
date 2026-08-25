@@ -1,4 +1,5 @@
 import 'user_model.dart';
+import 'refund_info.dart';
 import 'address_model.dart';
 import 'product_model.dart';
 import 'product_variant_model.dart';
@@ -85,6 +86,21 @@ class OrderModel {
   /// parses orders created before the migration ran.
   final String? deliveryStatus; // unassigned|assigned|at_store|picked|out_for_delivery|arrived|payment_pending|delivered|rto_pending|rto_completed
   final String? paymentStatus; // initiated|success_unverified|paid|failed|refund_pending|refunded
+
+  /// Latest refund's status for this order: 'pending' | 'processed' | 'failed'.
+  /// Null when no refund was ever raised. Sent only on admin list endpoints.
+  final String? refundStatus;
+
+  /// True when that refund exhausted its automatic retries and needs an admin
+  /// to press "Retry refund". Drives the warning badge on the orders list —
+  /// without it a broken refund is only discoverable by opening each order.
+  final bool refundNeedsAttention;
+
+  /// Full customer-facing refund detail. Present only on the order DETAIL
+  /// response — list endpoints send the two flags above instead, to keep the
+  /// per-page cost to one batched query.
+  final CustomerRefund? refund;
+
   final int? cashCollectedPaise;
   final int deliveryAttempts;
   final DateTime? deliveryAssignedAt;
@@ -112,6 +128,9 @@ class OrderModel {
     this.deliveryBoy,
     this.deliveryStatus,
     this.paymentStatus,
+    this.refundStatus,
+    this.refundNeedsAttention = false,
+    this.refund,
     this.cashCollectedPaise,
     this.deliveryAttempts = 0,
     this.deliveryAssignedAt,
@@ -213,6 +232,12 @@ class OrderModel {
           : null,
       deliveryStatus: json['deliveryStatus'] as String? ?? json['delivery_status'] as String?,
       paymentStatus: json['paymentStatus'] as String? ?? json['payment_status'] as String?,
+      refundStatus: json['refundStatus'] as String? ?? json['refund_status'] as String?,
+      refundNeedsAttention:
+          json['refundNeedsAttention'] as bool? ?? json['refund_needs_attention'] as bool? ?? false,
+      refund: json['refund'] is Map<String, dynamic>
+          ? CustomerRefund.fromJson(json['refund'] as Map<String, dynamic>)
+          : null,
       cashCollectedPaise: parseNullableInt(json['cashCollectedPaise'] ?? json['cash_collected_paise']),
       deliveryAttempts: parseNullableInt(json['deliveryAttempts'] ?? json['delivery_attempts']) ?? 0,
       deliveryAssignedAt: parseNullableDateTime(json['deliveryAssignedAt'] ?? json['delivery_assigned_at']),

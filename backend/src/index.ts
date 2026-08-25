@@ -8,6 +8,8 @@ import { PaymentsReconcilerService } from './services/payments-reconciler.servic
 import { ServiceabilityService } from './services/serviceability.service';
 import { startPaymentWorker } from './services/queue/payment-reconcile.worker';
 import { paymentQueue } from './services/queue/payment-queue';
+import { startRefundWorker } from './services/queue/refund-retry.worker';
+import { refundQueue } from './services/queue/refund-queue';
 import { RedisService } from './services/redis.service';
 import addressRoutes from './routes/address.routes';
 import adminRoutes from './routes/admin.routes';
@@ -177,12 +179,18 @@ AppDataSource.initialize()
     // Payment reconcile worker: fast, restart-proof fallback when a webhook is missed.
     const paymentWorker = startPaymentWorker();
 
+    // Refund retry worker: performs the single automatic refund retry before a
+    // failed refund is parked for admin intervention.
+    const refundWorker = startRefundWorker();
+
     // Graceful shutdown — let in-flight jobs finish and close Redis connections cleanly.
     const shutdown = async (signal: string) => {
       console.log(`[shutdown] ${signal} received — closing payment queue/worker`);
       try {
         await paymentWorker.close();
+        await refundWorker.close();
         await paymentQueue.close();
+        await refundQueue.close();
       } catch (err) {
         console.error('[shutdown] error closing queue/worker', err);
       } finally {

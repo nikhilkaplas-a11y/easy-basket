@@ -14,6 +14,7 @@ export type RefundStatus = 'pending' | 'processed' | 'failed';
 
 @Entity({ name: 'refunds' })
 @Index('uniq_payment_idem', ['paymentId', 'idempotencyKey'], { unique: true })
+@Index('idx_refund_retry', ['status', 'nextRetryAt'])
 export class Refund {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: string;
@@ -43,6 +44,25 @@ export class Refund {
 
   @Column({ name: 'idempotency_key', type: 'char', length: 64 })
   idempotencyKey!: string;
+
+  /**
+   * Number of times we have actually POSTed this refund to Razorpay.
+   * Only a real API call increments it — a retry job that could not acquire the
+   * payment lock reschedules itself without burning an attempt.
+   */
+  @Column({ name: 'attempt_count', type: 'int', unsigned: true, default: 0 })
+  attemptCount!: number;
+
+  /** Short reason for the most recent failure. Surfaced to admin in the UI. */
+  @Column({ name: 'last_error', type: 'varchar', length: 255, nullable: true })
+  lastError!: string | null;
+
+  /** When the automatic retry is due. NULL once retries are exhausted or done. */
+  @Column({ name: 'next_retry_at', type: 'datetime', precision: 3, nullable: true })
+  nextRetryAt!: Date | null;
+
+  @Column({ name: 'last_attempt_at', type: 'datetime', precision: 3, nullable: true })
+  lastAttemptAt!: Date | null;
 
   @CreateDateColumn({ name: 'created_at', precision: 3 })
   createdAt!: Date;

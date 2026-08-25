@@ -63,6 +63,19 @@ export class RazorpayService {
     return this.client().refunds.fetch(razorpayRefundId);
   }
 
+  /**
+   * All refunds Razorpay holds against a payment.
+   *
+   * This is what makes retrying a refund safe. `receipt` is NOT an idempotency
+   * key on Razorpay's side (it is free-text), so if our POST timed out *after*
+   * Razorpay created the refund, blindly retrying would issue a SECOND real
+   * refund. Callers must check here first and adopt any existing refund that
+   * carries our refund id in `notes.refund_id`.
+   */
+  static async fetchRefundsForPayment(razorpayPaymentId: string) {
+    return this.client().payments.fetchMultipleRefund(razorpayPaymentId);
+  }
+
   static async createRefund(params: {
     razorpayPaymentId: string;
     amountPaise: number;

@@ -318,7 +318,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
 
                     // Payment Info
                     _buildPaymentCard(order, fmt),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+
+                    // Refund status — renders only when a refund exists.
+                    if (order.refund != null) ...[
+                      _buildRefundCard(order, fmt),
+                      const SizedBox(height: 16),
+                    ],
+                    const SizedBox(height: 4),
 
                     // Cancellation / refund-request actions
                     _buildCancellationSection(order),
@@ -967,7 +974,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     final ps = order.paymentStatus;
     String payLabel;
     Color payColor;
-    if (ps == 'refunded') {
+    // A refund that exhausted its automatic retries releases the payment back to
+    // `paid`, so paymentStatus alone would show a reassuring "Paid Online" right
+    // after the customer was pushed a "Refund Delayed" notice. The refund flag
+    // wins so the screen agrees with what we told them.
+    if (order.refundNeedsAttention) {
+      payLabel = 'Refund delayed';
+      payColor = const Color(0xFFC62828);
+    } else if (ps == 'refunded') {
       payLabel = 'Refunded';
       payColor = const Color(0xFF2E7D32);
     } else if (ps == 'refund_pending') {
@@ -983,42 +997,171 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
 
     return _accentCard(
       title: 'Payment',
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                order.paymentMethod?.toUpperCase() ?? 'N/A',
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    order.paymentMethod?.toUpperCase() ?? 'N/A',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: payColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(payLabel,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: payColor)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: payColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(payLabel,
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: payColor)),
+              Text(
+                fmt.format(order.totalAmount),
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2E7D32)),
               ),
             ],
           ),
-          Text(
-            fmt.format(order.totalAmount),
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF2E7D32)),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════
+  // REFUND STATUS
+  // ═══════════════════════════════════════
+
+  /// Full refund status for the customer. Renders only when a refund exists.
+  ///
+  /// The payment card's one-word label is not enough on its own: we push the
+  /// customer a notification promising a specific amount within 2–7 working
+  /// days, so the app has to show at least as much — how much, how far along,
+  /// by when, and a reference their bank will accept.
+  Widget _buildRefundCard(OrderModel order, NumberFormat fmt) {
+    final refund = order.refund;
+    if (refund == null) return const SizedBox.shrink();
+
+    const green = Color(0xFF2E7D32);
+    const red = Color(0xFFC62828);
+    const amber = Color(0xFFE65100);
+    const blue = Color(0xFF1565C0);
+
+    final (Color color, IconData icon, String headline, String detail) =
+        switch (refund) {
+      _ when refund.needsAttention => (
+          red,
+          Icons.error_outline,
+          'Refund delayed',
+          'We could not complete your refund automatically. Our team has been '
+              'alerted and is sorting it out — you do not need to do anything.',
+        ),
+      _ when refund.isProcessed => (
+          green,
+          Icons.check_circle,
+          'Refund completed',
+          'The money has been sent back to your original payment method. If it '
+              'is not showing yet, your bank may take a little longer to post it.',
+        ),
+      _ when refund.isSettling => (
+          blue,
+          Icons.schedule,
+          'Refund on its way',
+          'Your refund has been sent to your bank. It usually lands within '
+              '2–7 working days.',
+        ),
+      _ => (
+          amber,
+          Icons.autorenew,
+          'Refund started',
+          'We have started your refund. You will see it move to your bank shortly.',
+        ),
+    };
+
+    final expected = refund.expectedBy;
+    final showWindow = refund.isSettling && expected != null;
+
+    return _accentCard(
+      title: 'Refund',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  headline,
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700, color: color),
+                ),
+              ),
+              Text(
+                fmt.format(refund.amountRupees),
+                style: TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w800, color: color),
+              ),
+            ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            detail,
+            style: const TextStyle(
+                fontSize: 12.5, height: 1.45, color: Colors.black87),
+          ),
+
+          // Only promise a window once Razorpay actually has the refund —
+          // before that the clock has not started and a date would be a guess.
+          if (showWindow) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.event_available,
+                    size: 15, color: Colors.black54),
+                const SizedBox(width: 6),
+                Text(
+                  'Expected by ${DateFormat('d MMM').format(expected)}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54),
+                ),
+              ],
+            ),
+          ],
+
+          if (refund.initiatedAt != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Started ${DateFormat('d MMM, h:mm a').format(refund.initiatedAt!)}',
+              style: const TextStyle(fontSize: 11.5, color: Colors.black45),
+            ),
+          ],
+
+          // Give them something concrete to quote if they call their bank.
+          if (refund.referenceId != null) ...[
+            const SizedBox(height: 6),
+            SelectableText(
+              'Reference: ${refund.referenceId}',
+              style: const TextStyle(fontSize: 11.5, color: Colors.black45),
+            ),
+          ],
         ],
       ),
     );

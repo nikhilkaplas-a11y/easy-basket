@@ -5,7 +5,16 @@ import { PaymentsReconcilerService } from '../payments-reconciler.service';
 import { buildBullConnection } from './connection';
 import { PAYMENT_QUEUE_NAME, type PaymentReconcileJobData } from './payment-queue';
 
-const TERMINAL: PaymentStatus[] = ['paid', 'failed', 'refunded'];
+/**
+ * States this worker considers "done confirming".
+ *
+ * `refund_pending` counts: the payment was confirmed and is now being refunded,
+ * so there is nothing left for payment reconciliation to establish. Omitting it
+ * made the job throw and retry forever on the auto-refund path (payment goes
+ * paid → refund_pending within one tick), which the retry then read as
+ * non-terminal on every attempt.
+ */
+const TERMINAL: PaymentStatus[] = ['paid', 'failed', 'refunded', 'refund_pending'];
 const CONCURRENCY = Number(process.env.PAYMENT_WORKER_CONCURRENCY) || 5;
 
 /**

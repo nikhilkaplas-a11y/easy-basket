@@ -56,6 +56,8 @@ router.post('/orders/:id/complete-rto', AdminController.completeRto);
 router.post('/orders/:id/approve-cancellation', AdminController.approveCancellation);
 router.post('/orders/:id/reject-cancellation', AdminController.rejectCancellation);
 router.get('/orders/:id/events', AdminController.getOrderEvents);
+router.get('/orders/:id/refund', AdminController.getOrderRefund);
+router.post('/orders/:id/retry-refund', AdminController.retryRefund);
 
 // --- Store open/closed ---
 // Read is also exposed publicly at GET /api/store/status; this admin copy lets

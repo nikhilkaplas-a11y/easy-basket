@@ -175,7 +175,21 @@ export class PaymentsReconcilerService {
 
     for (const r of pending) {
       try {
-        if (!r.razorpayRefundId) continue; // Razorpay call never succeeded; leave alone.
+        // No Razorpay id means the API call never landed. This used to `continue`,
+        // which is why such rows were never retried by anything — and because a
+        // pending row still counts toward the active-refund cap, it permanently
+        // blocked any further refund for that payment. Hand it to the same retry
+        // path the queue uses; this is the backstop for a Redis/queue outage.
+        if (!r.razorpayRefundId) {
+          const result = await PaymentsV2Service.retryRefund({
+            refundId: r.id,
+            manual: false,
+          });
+          if (!result.ok && !('rescheduled' in result)) {
+            console.warn(`[Reconciler] refund ${r.id} not retried: ${result.reason}`);
+          }
+          continue;
+        }
         const rzpRefund = (await RazorpayService.fetchRefund(r.razorpayRefundId)) as {
           status?: string;
         };

@@ -86,6 +86,18 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   String _getPaymentStatusText(OrderModel order) {
+    // Refund states first: `isPaid` stays true after a refund, so checking it
+    // before these showed a flat "Paid" for orders that were already refunded.
+    if (order.refundNeedsAttention) {
+      return 'Refund delayed';
+    }
+    final ps = order.paymentStatus;
+    if (ps == 'refunded') {
+      return 'Refunded';
+    }
+    if (ps == 'refund_pending') {
+      return 'Refund in progress';
+    }
     if (order.isCod) {
       return 'Cash on Delivery';
     }

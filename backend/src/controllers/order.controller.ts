@@ -16,6 +16,7 @@ import { ServiceabilityService, isValidLat, isValidLng } from '../services/servi
 import { StoreStatusService } from '../services/store-status.service';
 import { ProductController } from './product.controller';
 import { QueryFailedError, In } from 'typeorm';
+import { PaymentsV2Service } from '../services/payments-v2.service';
 
 /**
  * Thrown inside the order-creation transaction when a stock UPDATE finds
@@ -401,7 +402,15 @@ export class OrderController {
           skip: offset,
           take: limit,
         });
-        res.json({ orders, total, limit, offset });
+        const flags = await PaymentsV2Service.getRefundFlagsForOrders(
+          orders.map((o) => o.id)
+        );
+        res.json({
+          orders: orders.map((o) => ({ ...o, ...(flags.get(o.id) ?? {}) })),
+          total,
+          limit,
+          offset,
+        });
         return;
       }
 
@@ -418,7 +427,14 @@ export class OrderController {
         order: { createdAt: 'DESC' },
       });
 
-      res.json(orders);
+      // One batched lookup for the page so the list can distinguish a refunded
+      // order from a paid one, and flag a refund that needs our attention.
+      // The `fields=light` branch above is deliberately excluded: it exists to
+      // serve the home screen with zero joins.
+      const refundFlags = await PaymentsV2Service.getRefundFlagsForOrders(
+        orders.map((o) => o.id)
+      );
+      res.json(orders.map((o) => ({ ...o, ...(refundFlags.get(o.id) ?? {}) })));
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching orders' });
@@ -453,7 +469,15 @@ export class OrderController {
         return;
       }
 
-      res.json(order);
+      // Refund state for the tracking screen. Needed because a refund that fails
+      // permanently releases the payment back to `paid` — without this the customer
+      // would see a reassuring "Paid Online" moments after being told their refund
+      // was delayed.
+      const [refundFlags, refund] = await Promise.all([
+        PaymentsV2Service.getRefundFlagsForOrders([order.id]),
+        PaymentsV2Service.getCustomerRefundForOrder(order.id),
+      ]);
+      res.json({ ...order, ...(refundFlags.get(order.id) ?? {}), refund });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching order' });

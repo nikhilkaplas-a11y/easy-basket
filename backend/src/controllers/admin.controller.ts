@@ -44,8 +44,17 @@ export class AdminController {
 
       const [orders, total] = await queryBuilder.skip(skip).take(limit).getManyAndCount();
 
+      // One extra query for the whole page (not per order) so the list can flag
+      // orders whose refund failed and needs an admin to retry it.
+      const refundFlags = await PaymentsV2Service.getRefundFlagsForOrders(
+        orders.map((o) => o.id)
+      );
+
       res.json({
-        orders: orders.map(mapOrderPublic),
+        orders: orders.map((o) => ({
+          ...mapOrderPublic(o),
+          ...(refundFlags.get(o.id) ?? {}),
+        })),
         pagination: {
           page,
           limit,
@@ -1000,6 +1009,81 @@ export class AdminController {
     } catch (error) {
       console.error('[admin] getOrderEvents error', error);
       res.status(500).json({ message: 'Error fetching order events' });
+    }
+  }
+
+  /**
+   * GET /api/admin/orders/:id/refund
+   * Refund state for one order — drives the admin refund badge and the
+   * enabled/disabled state of the "Retry refund" button.
+   */
+  static async getOrderRefund(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const orderId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+      res.json({ refund: await PaymentsV2Service.getRefundStateForOrder(orderId) });
+    } catch (error) {
+      console.error('[admin] getOrderRefund error', error);
+      res.status(500).json({ message: 'Error fetching refund state' });
+    }
+  }
+
+  /**
+   * POST /api/admin/orders/:id/retry-refund
+   * Manually re-attempt a refund that exhausted its automatic retries.
+   *
+   * One click = one attempt. The underlying retry takes the shared payment lock
+   * and asks Razorpay whether a refund already exists for this row before
+   * creating one, so repeated clicks cannot double-refund the customer.
+   */
+  static async retryRefund(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const orderId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(orderId)) {
+        res.status(400).json({ message: 'Invalid order id' });
+        return;
+      }
+
+      const state = await PaymentsV2Service.getRefundStateForOrder(orderId);
+      if (!state) {
+        res.status(404).json({ message: 'No refund exists for this order' });
+        return;
+      }
+      if (state.status === 'processed') {
+        // Already done — nothing to retry. The UI disables the button on this state.
+        res.json({ message: 'Refund already completed', refund: state });
+        return;
+      }
+
+      const result = await PaymentsV2Service.retryRefund({
+        refundId: state.refundId,
+        manual: true,
+      });
+
+      const refund = await PaymentsV2Service.getRefundStateForOrder(orderId);
+
+      if (!result.ok) {
+        const rescheduled = 'rescheduled' in result;
+        res.status(rescheduled ? 202 : result.code).json({ message: result.reason, refund });
+        return;
+      }
+
+      console.log(
+        `[admin] manual refund retry for order #${orderId} by user ${req.user?.id} → ${result.status}`
+      );
+      res.json({
+        message:
+          result.status === 'processed'
+            ? 'Refund completed'
+            : 'Refund re-submitted to Razorpay',
+        refund,
+      });
+    } catch (error) {
+      console.error('[admin] retryRefund error', error);
+      res.status(500).json({ message: 'Error retrying refund' });
     }
   }
 

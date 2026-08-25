@@ -5,6 +5,7 @@
   import '../models/product_model.dart';
   import '../models/category_model.dart';
   import '../models/product_variant_model.dart';
+  import '../models/refund_info.dart';
 
   class AdminProvider with ChangeNotifier {
     final ApiService apiService;
@@ -858,6 +859,64 @@
         _error = e.toString().replaceAll('Exception: ', '');
         notifyListeners();
         return false;
+      }
+    }
+
+    /// Fetch refund state for an order — drives the refund card and the
+    /// enabled/disabled state of the "Retry refund" button.
+    /// Returns null when the order has no refund at all (the common case).
+    Future<RefundInfo?> fetchRefundInfo({
+      required String token,
+      required int orderId,
+    }) async {
+      try {
+        final res = await apiService.get('/admin/orders/$orderId/refund', token: token);
+        final data = res is Map<String, dynamic> ? res['refund'] : null;
+        if (data is Map<String, dynamic>) return RefundInfo.fromJson(data);
+        return null;
+      } catch (e) {
+        _error = e.toString().replaceAll('Exception: ', '');
+        return null;
+      }
+    }
+
+    /// Manually re-attempt a refund whose automatic retries were exhausted.
+    ///
+    /// One tap = one attempt. The server takes the payment lock and checks with
+    /// Razorpay whether a refund already exists for this row before creating
+    /// one, so repeated taps cannot refund the customer twice.
+    ///
+    /// Returns the refreshed state on both success and failure so the caller can
+    /// re-render the card either way; `_error` carries the message to surface.
+    Future<RefundInfo?> retryRefund({
+      required String token,
+      required int orderId,
+    }) async {
+      try {
+        final res = await apiService.post(
+          '/admin/orders/$orderId/retry-refund',
+          {},
+          token: token,
+        );
+        final data = res is Map<String, dynamic> ? res['refund'] : null;
+        if (res is Map<String, dynamic> && res['message'] != null) {
+          _error = null;
+        }
+        if (data is Map<String, dynamic>) {
+          final info = RefundInfo.fromJson(data);
+          if (_orders.any((o) => o.id == orderId)) {
+            await fetchOrders(token: token);
+          }
+          notifyListeners();
+          return info;
+        }
+        return null;
+      } catch (e) {
+        _error = e.toString().replaceAll('Exception: ', '');
+        notifyListeners();
+        // Fall back to a plain read so the UI still shows the latest attempt count
+        // and failure reason even though this attempt errored.
+        return fetchRefundInfo(token: token, orderId: orderId);
       }
     }
 

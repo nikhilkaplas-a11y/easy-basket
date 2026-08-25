@@ -621,6 +621,33 @@ Expanded(
               fontSize: 14,
             ),
           ),
+          // A refund that spent its automatic retries. Surfaced here because the
+          // "Retry refund" action lives on the detail screen — without this badge
+          // an admin would have to open every order to find the broken one.
+          if (order.refundNeedsAttention)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.error_outline, size: 12, color: Colors.red.shade700),
+                  const SizedBox(width: 3),
+                  Text(
+                    'REFUND FAILED',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.red.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
       

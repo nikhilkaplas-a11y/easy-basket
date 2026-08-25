@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/order_model.dart';
+import '../../models/refund_info.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
@@ -23,10 +24,33 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
   bool _isLoading = true;
   String? _error;
 
+  /// Refund state for this order, or null when no refund was ever raised.
+  RefundInfo? _refund;
+
+  /// True while a manual retry is in flight — keeps the button disabled so a
+  /// double-tap cannot queue a second attempt.
+  bool _retryingRefund = false;
+
   @override
   void initState() {
     super.initState();
-    _loadOrder();
+    _loadOrder().then((_) => _loadRefund());
+  }
+
+  /// Refund state lives behind its own endpoint rather than on the order
+  /// payload, so fetching the order list stays a single query.
+  Future<void> _loadRefund() async {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.accessToken;
+    if (token == null) return;
+
+    final info = await adminProvider.fetchRefundInfo(
+      token: token,
+      orderId: widget.orderId,
+    );
+    if (!mounted) return;
+    setState(() => _refund = info);
   }
 
   Future<void> _loadOrder() async {
@@ -204,6 +228,9 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
             
             // Payment Information
             _buildPaymentCard(order, currencyFormat),
+
+            // Refund status + manual retry. Renders only when a refund exists.
+            _buildRefundCard(currencyFormat),
 
             // Customer cancellation/refund request — approve or reject
             if (order.cancelRequestStatus == 'requested')
@@ -821,6 +848,173 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
     );
   }
 
+  /// Refund status card. Only rendered when a refund actually exists.
+  ///
+  /// This is the surface that was missing entirely: a permanently failed refund
+  /// previously displayed as "Refund in progress" forever, with no way for an
+  /// admin to tell it apart from a healthy one or to do anything about it.
+  Widget _buildRefundCard(NumberFormat currencyFormat) {
+    final refund = _refund;
+    if (refund == null) return const SizedBox.shrink();
+
+    final (Color color, IconData icon, String title, String detail) = switch (refund) {
+      _ when refund.isProcessed => (
+          Colors.green.shade700,
+          Icons.check_circle,
+          'Refund completed',
+          'The customer has been refunded. It reflects in their account within 2–7 working days.',
+        ),
+      _ when refund.isFailed => (
+          Colors.red.shade700,
+          Icons.error_outline,
+          'Refund failed',
+          'Tried ${refund.attemptCount} time${refund.attemptCount == 1 ? '' : 's'} automatically. '
+              'The customer has NOT been refunded — retry below.',
+        ),
+      _ when refund.isAutoRetrying => (
+          Colors.orange.shade800,
+          Icons.autorenew,
+          'Retrying automatically',
+          'Attempt ${refund.attemptCount} of ${refund.maxAutoAttempts} failed. '
+              'The next attempt runs on its own — no action needed yet.',
+        ),
+      _ => (
+          Colors.blue.shade700,
+          Icons.schedule,
+          'Refund in progress',
+          'Razorpay has accepted the refund and is settling it. '
+              'This usually completes within a few minutes.',
+        ),
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ),
+                Text(
+                  currencyFormat.format(refund.amountRupees),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(detail, style: const TextStyle(fontSize: 13, color: AppTheme.grey)),
+
+            // Surface the real reason so support can act without reading server logs.
+            if (refund.lastError != null && !refund.isProcessed) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  refund.lastError!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+
+            if (refund.razorpayRefundId != null) ...[
+              const SizedBox(height: 8),
+              SelectableText(
+                'Razorpay refund: ${refund.razorpayRefundId}',
+                style: const TextStyle(fontSize: 11, color: AppTheme.grey),
+              ),
+            ],
+
+            // Only shown when the server says a manual attempt is meaningful —
+            // never while a refund is completed or an automatic retry is pending.
+            if (refund.canRetry) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _retryingRefund ? null : _handleRetryRefund,
+                  icon: _retryingRefund
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.refresh, size: 18),
+                  label: Text(_retryingRefund ? 'Retrying…' : 'Retry refund'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One tap = one attempt. The button is disabled for the duration, and the
+  /// server's adopt-before-create check means even a stuck tap cannot cause a
+  /// second real refund.
+  Future<void> _handleRetryRefund() async {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.accessToken;
+    if (token == null) return;
+
+    setState(() => _retryingRefund = true);
+
+    final info = await adminProvider.retryRefund(
+      token: token,
+      orderId: widget.orderId,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _retryingRefund = false;
+      if (info != null) _refund = info;
+    });
+
+    final failure = adminProvider.error;
+    final succeeded = info?.isProcessed == true || info?.isAwaitingRazorpay == true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          succeeded
+              ? 'Refund re-submitted successfully.'
+              : failure ?? 'Retry did not go through. Check the reason above.',
+        ),
+        backgroundColor: succeeded ? Colors.green : Colors.red,
+      ),
+    );
+
+    // Pull the order again so the payment badge matches the new refund state.
+    await _loadOrder();
+  }
+
   Widget _buildActionButtons(
     BuildContext context,
     OrderModel order,
@@ -1236,7 +1430,20 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
     final String label;
     final Color color;
     final IconData icon;
-    if (ps == 'refunded') {
+
+    // A failed refund releases the payment back to `paid`, so paymentStatus alone
+    // would render a reassuring "Paid" badge while the customer is still owed
+    // money. The refund row is the truth here, so it wins.
+    final refund = _refund;
+    if (refund != null && refund.isFailed) {
+      label = 'Refund failed';
+      color = Colors.red.shade700;
+      icon = Icons.error_outline;
+    } else if (refund != null && refund.isAutoRetrying) {
+      label = 'Refund retrying';
+      color = Colors.orange.shade800;
+      icon = Icons.autorenew;
+    } else if (ps == 'refunded') {
       label = 'Refunded';
       color = Colors.grey.shade600;
       icon = Icons.undo;
