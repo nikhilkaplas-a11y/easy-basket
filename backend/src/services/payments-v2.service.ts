@@ -652,15 +652,32 @@ export class PaymentsV2Service {
     const list = (await RazorpayService.fetchRefundsForPayment(razorpayPaymentId)) as unknown as {
       items?: Array<{ id: string; status?: string; receipt?: string | null; notes?: unknown }>;
     };
-    for (const item of list.items ?? []) {
+    // A refund Razorpay itself marked `failed` moved no money (bank rejected it,
+    // account frozen, …). Adopting one would make the retry a no-op that re-reports
+    // the same failure forever, so those are skipped everywhere below and a fresh
+    // refund is allowed.
+    const live = (list.items ?? []).filter((i) => i.status !== 'failed');
+
+    // Preferred match: a refund we created, tagged with our row id.
+    for (const item of live) {
       const notes = (item.notes ?? {}) as Record<string, unknown>;
-      if (String(notes.refund_id ?? '') !== String(refundId)) continue;
-      // A refund Razorpay itself marked `failed` moved no money (bank rejected it,
-      // account frozen, …). Adopting it would make the retry a no-op that re-reports
-      // the same failure forever, so we skip it and let a fresh refund be created.
-      if (item.status === 'failed') continue;
-      return item;
+      if (String(notes.refund_id ?? '') === String(refundId)) return item;
     }
+
+    // Fallback: ANY live refund on this payment, even one we cannot tie to our row.
+    // easy-basket only ever issues full refunds, so a second refund against the same
+    // payment is never legitimate — it would just pay the customer twice. The usual
+    // source is a refund issued by hand from the Razorpay dashboard while our row sat
+    // stuck, which carries none of our notes. Adopt it rather than duplicate it.
+    if (live.length > 0) {
+      console.warn(
+        `[refund] adopting untagged Razorpay refund ${live[0].id} for refund ${refundId} — ` +
+          `payment already has a live refund (likely issued manually from the dashboard). ` +
+          `Refusing to create a second one.`
+      );
+      return live[0];
+    }
+
     return null;
   }
 
