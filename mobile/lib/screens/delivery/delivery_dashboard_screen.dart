@@ -43,7 +43,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen>
         deliveryProvider.fetchOrders(token: token);
         deliveryProvider.fetchWallet(token: token);
       }
-      _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         if (!mounted) return;
         final token = Provider.of<AuthProvider>(context, listen: false).accessToken;
         if (token == null) return;

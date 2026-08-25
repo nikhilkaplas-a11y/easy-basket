@@ -30,40 +30,48 @@ import 'services/razorpay_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load month/weekday names for every supported locale. DateFormat(fmt, 'hi')
-  // throws if its locale data was never initialized, so this must run before
-  // the first screen builds.
-  await initializeDateFormatting();
-
-  // Initialize SharedPreferences before Firebase cold-start route (needs role from prefs)
+  // SharedPreferences is needed early for auth + notification deep-link handling.
   final prefs = await SharedPreferences.getInstance();
 
-  // Initialize Firebase (required for FCM notifications — mobile only)
+  // Firebase is required early only on mobile so we can detect
+  // notification cold-start navigation.
   if (!kIsWeb) {
     await Firebase.initializeApp();
-    // Single read of getInitialMessage — used by GoRouter redirect (no home → order flash)
-    final initial = await FirebaseMessaging.instance.getInitialMessage();
+
+    final initial =
+        await FirebaseMessaging.instance.getInitialMessage();
+
     if (initial != null &&
         prefs.getString('access_token') != null &&
         prefs.getString('user_data') != null) {
       final role = StartupDeepLink.readRoleFromPrefs(prefs);
+
       final data = <String, dynamic>{};
+
       initial.data.forEach((k, v) {
         data[k.toString()] = v is String ? v : v.toString();
       });
+
       final path = routePathFromFcmData(data, role);
+
       if (path != null) {
-        StartupDeepLink.registerColdStart(route: path, refreshData: data);
+        StartupDeepLink.registerColdStart(
+          route: path,
+          refreshData: data,
+        );
       }
     }
   }
 
-  // Initialize Razorpay (only for mobile platforms, not web)
+  // Start the UI without waiting for non-critical initialization.
+  runApp(MyApp(prefs: prefs));
+
+  // Non-critical initialization can happen after the app starts.
+  initializeDateFormatting();
+
   if (!kIsWeb) {
     RazorpayService.initialize();
   }
-  
-  runApp(MyApp(prefs: prefs));
 }
 
 class MyApp extends StatelessWidget {

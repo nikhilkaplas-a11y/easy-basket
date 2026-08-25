@@ -487,6 +487,12 @@ const SizedBox(height: 24),
       icon: Icons.delivery_dining_outlined,
       onTap: () => context.push('/admin/riders'),
     ),
+    ActionTile(
+  title: "Support Requests",
+  subtitle: "Manage customer complaints",
+  icon: Icons.support_agent_outlined,
+  onTap: () => context.push('/admin/support-requests'),
+),
 
     ActionTile(
       title: "Products",
@@ -494,6 +500,7 @@ const SizedBox(height: 24),
       icon: Icons.inventory_2_outlined,
       onTap: () => context.push('/admin/products'),
     ),
+    
 
     ActionTile(
       title: "Categories",
