@@ -11,6 +11,7 @@ import '../../config/app_config.dart';
 import '../../utils/navigation_utils.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../l10n/app_localizations.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -230,7 +231,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
               icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: () => popOrRoleHub(context),
             ),
-            title: const Text('Track Order',
+            title:  Text(AppLocalizations.of(context).orderTrackOrder,
                 style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -566,7 +567,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     final name = order.deliveryBoy?.name ?? 'Delivery Partner';
 
     return _accentCard(
-      title: 'Driver is on the way!',
+      title: AppLocalizations.of(context).orderDriverOnWay,
       titleColor: const Color(0xFF2E7D32),
       child: Row(
         children: [
@@ -625,7 +626,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             }
           },
           icon: const Icon(Icons.phone_rounded, size: 18),
-          label: const Text('Contact Driver',
+          label:  Text(AppLocalizations.of(context).orderContactDriver,
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF2E7D32),
@@ -649,7 +650,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     final deliveryFee = order.totalAmount - subtotal;
 
     return _accentCard(
-      title: 'Order Details',
+      title: AppLocalizations.of(context).orderDetails,
       child: Column(
         children: [
           ...order.items.map((item) => Padding(
@@ -702,7 +703,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total Amount',
+                 Text(AppLocalizations.of(context).orderTotalAmount,
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -748,7 +749,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     // If customer has no coordinates, show fallback
     if (custLat == null || custLng == null) {
       return _accentCard(
-        title: 'Live Order Tracking',
+        title: AppLocalizations.of(context).orderLiveTracking,
         child: Container(
           height: 180,
           alignment: Alignment.center,
@@ -761,7 +762,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             children: [
               Icon(Icons.map_rounded, size: 40, color: Colors.grey[300]),
               const SizedBox(height: 8),
-              Text('Map not available',
+              Text(AppLocalizations.of(context).orderMapNotAvailable,
                   style: TextStyle(fontSize: 13, color: Colors.grey[400])),
             ],
           ),
@@ -788,13 +789,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
         markerId: const MarkerId('store'),
         position: LatLng(storeLat, storeLng),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: const InfoWindow(title: 'Easy Basket Store'),
+        infoWindow:  InfoWindow(title: AppLocalizations.of(context).orderStoreName),
       ),
       Marker(
         markerId: const MarkerId('customer'),
         position: LatLng(custLat, custLng),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: const InfoWindow(title: 'Your Location'),
+        infoWindow:  InfoWindow(title: AppLocalizations.of(context).orderYourLocation),
       ),
     };
 
@@ -812,7 +813,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     };
 
     return _accentCard(
-      title: 'Live Order Tracking',
+      title: AppLocalizations.of(context).orderLiveTracking,
       child: Column(
         children: [
           Container(
@@ -826,7 +827,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                   ? Container(
                       color: const Color(0xFFF5F5F5),
                       alignment: Alignment.center,
-                      child: Text('Map not available on web',
+                      child: Text(AppLocalizations.of(context).orderMapNotAvailableWeb,
                           style: TextStyle(
                               fontSize: 13, color: Colors.grey[400])),
                     )
@@ -915,7 +916,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
 
   Widget _buildAddressCard(OrderModel order) {
     return _accentCard(
-      title: 'Delivering To',
+      title: AppLocalizations.of(context).orderDeliveringTo,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1188,12 +1189,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                 Row(
                   children: [
                     Icon(Icons.hourglass_top, color: Colors.orange, size: 18),
                     SizedBox(width: 8),
                     Expanded(
-                      child: Text('Cancellation requested',
+                      child: Text(AppLocalizations.of(context).orderCancellationRequested,
                           style: TextStyle(
                               fontWeight: FontWeight.w700, color: Colors.black87)),
                     ),
@@ -1208,7 +1209,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 ),
                 if (reason != null && reason.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Text('Reason: $reason',
+                  Text(AppLocalizations.of(context).orderReason(reason),
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                 ],
               ],
@@ -1226,7 +1227,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
           if (order.cancelRequestRejected)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text('Your previous cancellation request was declined.',
+              child: Text(AppLocalizations.of(context).orderPrevCancelDeclined,
                   style: TextStyle(fontSize: 12, color: Colors.red.shade400)),
             ),
           SizedBox(
@@ -1260,7 +1261,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
             child: OutlinedButton.icon(
               onPressed: () => _onCancelNoRefund(order),
               icon: const Icon(Icons.close, size: 18),
-              label: const Text('Cancel Order',
+              label:  Text(AppLocalizations.of(context).orderCancelOrder,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFFD32F2F),
@@ -1302,16 +1303,16 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel order?'),
+        title:  Text(AppLocalizations.of(context).orderCancelQuestion),
         content: const Text(
             'Your order is already packed. Cancelling now will NOT refund your payment. Do you want to continue?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Keep order')),
+              child:  Text(AppLocalizations.of(context).orderKeepOrder)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel anyway',
+            child:  Text(AppLocalizations.of(context).orderCancelAnyway,
                 style: TextStyle(color: Color(0xFFD32F2F))),
           ),
         ],
@@ -1345,9 +1346,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
+             Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Why are you cancelling?',
+              child: Text(AppLocalizations.of(context).orderWhyCancelling,
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ),
             for (final r in reasons)

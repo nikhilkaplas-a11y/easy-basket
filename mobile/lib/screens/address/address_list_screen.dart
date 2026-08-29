@@ -16,6 +16,7 @@ import '../../utils/theme.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/address_completion_sheet.dart';
 import 'map_address_picker_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class AddressListScreen extends StatefulWidget {
   const AddressListScreen({super.key});
@@ -236,7 +237,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
             child: const Icon(Icons.shopping_basket_rounded, color: Colors.white, size: 18),
           ),
         ),
-        title: const Text('Choose Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title:  Text(AppLocalizations.of(context).addressChooseDelivery, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
             icon: const Icon(Icons.close, color: Colors.black54),
@@ -260,14 +261,14 @@ class _AddressListScreenState extends State<AddressListScreen> {
                         child: const Icon(Icons.location_off_outlined, size: 48, color: AppTheme.primaryGreen),
                       ),
                       const SizedBox(height: 16),
-                      const Text('No addresses found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                       Text(AppLocalizations.of(context).addressNoneFound, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
-                      Text('Add a delivery address to get started', style: TextStyle(fontSize: 13, color: AppTheme.grey)),
+                      Text(AppLocalizations.of(context).addressAddToStart, style: TextStyle(fontSize: 13, color: AppTheme.grey)),
                       const SizedBox(height: 20),
                       AppTheme.gradientButton(
                         onPressed: () => _showAddressSheet({}),
                         padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: const Text('Add Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                        child:  Text(AppLocalizations.of(context).addressAdd, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
                     ],
                   ),
@@ -289,7 +290,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                               controller: _searchController,
                               onChanged: _onSearchChanged,
                               decoration: InputDecoration(
-                                hintText: 'Search area, street, landmark...',
+                                hintText: AppLocalizations.of(context).addressSearchHint,
                                 hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
                                 prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 20),
                                 suffixIcon: _searchController.text.isNotEmpty
@@ -437,13 +438,13 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                         child: const Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen, size: 16),
                                       ),
                                       const SizedBox(width: 12),
-                                      const Expanded(
+                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text('Use Current Location', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
+                                            Text(AppLocalizations.of(context).locationUseCurrent, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
                                             SizedBox(height: 1),
-                                            Text('Detect via GPS', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                                            Text(AppLocalizations.of(context).locationDetectViaGps, style: TextStyle(fontSize: 11, color: AppTheme.grey)),
                                           ],
                                         ),
                                       ),
@@ -494,13 +495,13 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                     child: const Icon(Icons.map_rounded, color: Color(0xFF1565C0), size: 16),
                                   ),
                                   const SizedBox(width: 12),
-                                  const Expanded(
+                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('Pick on Map', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
+                                        Text(AppLocalizations.of(context).locationPickOnMap, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
                                         SizedBox(height: 1),
-                                        Text('Choose from map', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                                        Text(AppLocalizations.of(context).locationChooseFromMap, style: TextStyle(fontSize: 11, color: AppTheme.grey)),
                                       ],
                                     ),
                                   ),
@@ -518,9 +519,9 @@ class _AddressListScreenState extends State<AddressListScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Row(
                         children: [
-                          Text('Your Saved Addresses', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.grey)),
+                          Text(AppLocalizations.of(context).addressYourSaved, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.grey)),
                           const Spacer(),
-                          Text('${orderProvider.addresses.length} saved', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                          Text(AppLocalizations.of(context).addressSavedCount(orderProvider.addresses.length), style: TextStyle(fontSize: 11, color: AppTheme.grey)),
                         ],
                       ),
                     ),
@@ -770,7 +771,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                               child: OutlinedButton.icon(
                                 onPressed: () => _showAddressSheet({}),
                                 icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                                label: const Text('Add New Address', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                label:  Text(AppLocalizations.of(context).addressAddNew, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: const Color(0xFF0C831F),
                                   side: const BorderSide(color: Color(0xFF0C831F), width: 1.5),
@@ -801,7 +802,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                           height: 20, width: 20,
                                           child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
                                         )
-                                      : const Text('Continue to Payment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                                      :  Text(AppLocalizations.of(context).addressContinueToPayment, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
                                 ),
                               ),
                             ],

@@ -31,6 +31,7 @@ import '../../widgets/promo_banner_widget.dart';
 import '../../widgets/store_closed_banner.dart';
 import '../../models/campaign_model.dart';
 import '../../models/category_model.dart';
+import '../../l10n/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -375,12 +376,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         await orderProvider.fetchAddresses(authProvider.token!);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+             SnackBar(
               content: Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.white, size: 20),
                   SizedBox(width: 8),
-                  Text('Location detected! Start shopping now.'),
+                  Text(AppLocalizations.of(context).homeLocationDetected),
                 ],
               ),
               backgroundColor: AppTheme.primaryGreen,
@@ -1204,7 +1205,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       color: const Color(0xFF1565C0),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Text('Enable', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                                    child:  Text(AppLocalizations.of(context).commonEnable, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
                                   ),
                                 ],
                               ),
@@ -1318,7 +1319,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Lowest Prices, ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
+                         Text(AppLocalizations.of(context).homeLowestPrices, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
                         AnimatedBuilder(
                           animation: _shopNowShakeAnim,
                           builder: (context, child) {
@@ -1329,7 +1330,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           },
                           child: GestureDetector(
                             onTap: () => context.push('/categories'),
-                            child: Text('Shop Now!!', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
+                            child: Text(AppLocalizations.of(context).homeShopNow, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
                           ),
                         ),
                       ],

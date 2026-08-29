@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/service_area_provider.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Places Search Screen
 ///
@@ -198,7 +199,7 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
+            child:  Text(AppLocalizations.of(context).commonOk),
           ),
         ],
       ),
@@ -241,7 +242,7 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => context.pop(),
         ),
-        title: const Text('Search Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
+        title:  Text(AppLocalizations.of(context).addressSearchTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
       ),
       body: Column(
         children: [
@@ -253,7 +254,7 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
               autofocus: true,
               onChanged: _onSearchChanged,
               decoration: InputDecoration(
-                hintText: 'Search your area, street, sector...',
+                hintText: AppLocalizations.of(context).addressSearchYourArea,
                 hintStyle: TextStyle(fontSize: 14, color: Colors.grey[400]),
                 prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                 suffixIcon: _searchController.text.isNotEmpty

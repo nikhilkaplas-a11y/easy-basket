@@ -37,12 +37,36 @@ void main() {
     expect(pa.cartItemCount(3), '3 ਚੀਜ਼ਾਂ');
   });
 
-  test('Punjabi is fully translated (no English leaking through)', () async {
-    final en = await load('en');
-    final pa = await load('pa');
+  test('placeholder keys interpolate', () async {
+    final hi = await load('hi');
+    expect(hi.commonError('boom'), contains('boom'));
+    expect(hi.orderReason('late'), contains('late'));
+    expect(hi.cartPerUnit('kg'), contains('kg'));
+    expect(hi.paymentExternalWallet('paytm'), contains('paytm'));
+    expect(hi.addressSavedCount(4), contains('4'));
+  });
 
-    expect(pa.cartProceedToCheckout, isNot(en.cartProceedToCheckout));
-    expect(pa.profileMyOrders, isNot(en.profileMyOrders));
-    expect(pa.cartEmpty, isNot(en.cartEmpty));
+  test('every screen has real translations, no English leaking through',
+      () async {
+    final en = await load('en');
+    for (final locale in ['hi', 'pa']) {
+      final t = await load(locale);
+      final pairs = <String, List<String>>{
+        'cart': [en.cartProceedToCheckout, t.cartProceedToCheckout],
+        'orders': [en.orderTrackOrder, t.orderTrackOrder],
+        'payment': [en.paymentCod, t.paymentCod],
+        'address': [en.addressChooseDelivery, t.addressChooseDelivery],
+        'profile': [en.profileMyOrders, t.profileMyOrders],
+        'auth': [en.authEnterPhone, t.authEnterPhone],
+        'location': [en.locationUseCurrent, t.locationUseCurrent],
+        'product': [en.productSelectQuantity, t.productSelectQuantity],
+        'home': [en.homeShopNow, t.homeShopNow],
+        'editProfile': [en.profileFullName, t.profileFullName],
+      };
+      pairs.forEach((screen, v) {
+        expect(v[1], isNot(v[0]), reason: '$screen not translated in $locale');
+        expect(v[1].trim(), isNotEmpty, reason: '$screen empty in $locale');
+      });
+    }
   });
 }

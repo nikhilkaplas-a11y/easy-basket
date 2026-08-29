@@ -9,6 +9,7 @@ import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/service_area_provider.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Screen shown to new users to automatically detect their location
 /// Similar to Blinkit/Zomato onboarding flow
@@ -281,7 +282,7 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
     if (authProvider.token == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please login first')),
+           SnackBar(content: Text(AppLocalizations.of(context).commonLoginFirst)),
         );
       }
       return;
@@ -333,12 +334,12 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
           // Navigate to home
           context.go('/home');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+             SnackBar(
               content: Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.white),
                   SizedBox(width: 8),
-                  Text('Location saved! Start shopping now.'),
+                  Text(AppLocalizations.of(context).locationSaved),
                 ],
               ),
               backgroundColor: AppTheme.primaryGreen,
@@ -359,7 +360,7 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
         Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(AppLocalizations.of(context).commonError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -466,12 +467,12 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                       child: AppTheme.gradientButton(
                         onPressed: _detectLocation,
                         height: 52,
-                        child: const Row(
+                        child:  Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.refresh, color: Colors.white, size: 20),
                             SizedBox(width: 8),
-                            Text('Try Again', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                            Text(AppLocalizations.of(context).commonTryAgain, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                           ],
                         ),
                       ),
@@ -482,7 +483,7 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => context.push('/address/add'),
                         icon: const Icon(Icons.add_location),
-                        label: const Text('Add Address Manually'),
+                        label:  Text(AppLocalizations.of(context).locationAddManually),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.primaryGreen,
                           side: const BorderSide(color: AppTheme.primaryGreen),
@@ -574,12 +575,12 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                       child: AppTheme.gradientButton(
                         onPressed: _confirmAndSave,
                         height: 54,
-                        child: const Row(
+                        child:  Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.check_circle, color: Colors.white, size: 22),
                             SizedBox(width: 8),
-                            Text('Confirm & Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                            Text(AppLocalizations.of(context).locationConfirmContinue, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                           ],
                         ),
                       ),
@@ -592,7 +593,7 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => context.push('/address/add'),
                         icon: const Icon(Icons.edit_location),
-                        label: const Text('Refine Location'),
+                        label:  Text(AppLocalizations.of(context).locationRefine),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.primaryGreen,
                           side: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),

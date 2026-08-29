@@ -9,6 +9,7 @@ import '../../providers/service_area_provider.dart';
 import '../../models/address_model.dart';
 import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Edit Address Screen — Single page, matches AddressCompletionSheet design
 ///
@@ -215,7 +216,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                       ),
                       child: SwitchListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                        title: const Text('Set as default address', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                        title:  Text(AppLocalizations.of(context).addressSetDefault, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                         value: _isDefault,
                         onChanged: (v) => setState(() => _isDefault = v),
                         activeThumbColor: AppTheme.primaryGreen,
@@ -264,7 +265,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                       child: Center(
                         child: _isSaving
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                            : const Text('Save Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                            :  Text(AppLocalizations.of(context).addressSave, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                       ),
                     ),
                   ),
@@ -422,11 +423,11 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
       if (success && mounted) {
         context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+           SnackBar(
             content: Row(children: [
               Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
               SizedBox(width: 8),
-              Text('Address updated'),
+              Text(AppLocalizations.of(context).addressUpdated),
             ]),
             backgroundColor: AppTheme.primaryGreen,
             behavior: SnackBarBehavior.floating,

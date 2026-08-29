@@ -23,7 +23,15 @@ DateTime toIST(DateTime dateTime) {
 /// in the chosen script — without it 'MMM' stays "Aug" on a Hindi screen.
 String formatIST(DateTime dateTime, String format) {
   final istDateTime = toIST(dateTime);
-  return DateFormat(format, ApiService.language).format(istDateTime);
+  try {
+    return DateFormat(format, ApiService.language).format(istDateTime);
+  } on Object {
+    // initializeDateFormatting() is kicked off after runApp() so the first
+    // frame is not blocked on it. A screen that formats a date inside that
+    // window would otherwise throw LocaleDataException — fall back to the
+    // default locale rather than crash the list it is rendering.
+    return DateFormat(format).format(istDateTime);
+  }
 }
 
 /// Formats a DateTime to IST with default format: 'MMM dd, yyyy hh:mm a'

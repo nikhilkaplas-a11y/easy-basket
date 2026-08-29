@@ -1,19 +1,157 @@
 {
   "@@locale": "en",
-
   "commonCancel": "Cancel",
   "commonRemove": "Remove",
   "commonSave": "Save",
   "commonRetry": "Retry",
-
+  "commonTryAgain": "Try Again",
+  "commonOk": "OK",
+  "commonNotNow": "Not now",
+  "commonEnable": "Enable",
+  "commonLater": "Later",
+  "commonOpenSettings": "Open Settings",
+  "commonLoginFirst": "Please login first",
+  "commonSessionExpired": "Session expired. Please login again.",
+  "commonError": "Error: {message}",
+  "@commonError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "languageTitle": "Language",
   "languageSubtitle": "Choose the language you want to use in the app",
   "languageEnglish": "English",
   "languageHindi": "Hindi",
   "languagePunjabi": "Punjabi",
   "languageUpdated": "Language updated",
-  "languageChangeFailed": "Couldn't change language. Please try again.",
-
+  "languageChangeFailed": "Could not change language. Please try again.",
+  "homeLocationDetected": "Location detected! Start shopping now.",
+  "homeLowestPrices": "Lowest Prices, ",
+  "homeShopNow": "Shop Now!!",
+  "authEnterPhone": "Enter your phone number",
+  "authOtpSent": "OTP sent successfully!",
+  "authEnterOtp": "Please enter 6-digit OTP",
+  "authInvalidPhone": "Please enter a valid 10-digit phone number",
+  "locationAddManually": "Add Address Manually",
+  "locationConfirmContinue": "Confirm & Continue",
+  "locationSaved": "Location saved! Start shopping now.",
+  "locationRefine": "Refine Location",
+  "locationGrantPermission": "Grant Location Permission",
+  "locationTurnOn": "Turn on Location",
+  "locationRequired": "Location permission is required",
+  "locationEnableInSettings": "Please enable location in phone Settings",
+  "locationUseCurrent": "Use Current Location",
+  "locationSelect": "Select Location",
+  "locationUnableToGet": "Unable to get your location. Please try again.",
+  "locationWaitAddress": "Please wait for address to load completely",
+  "locationWaitLocation": "Please wait for location to load or select a valid location",
+  "locationCouldNotDetect": "Could not detect location. Try map picker.",
+  "locationDetectedFillDetails": "Location detected! Fill remaining details.",
+  "locationSelectedFillDetails": "Location selected! Fill remaining details.",
+  "locationSelectFirst": "Please select your location first (GPS or Map)",
+  "locationDetectViaGps": "Detect via GPS",
+  "locationPickOnMap": "Pick on Map",
+  "locationChooseFromMap": "Choose from map",
+  "serviceNotAvailable": "Service Not Available",
+  "categoryViewAllProducts": "View All Products",
+  "productAboutThis": "About this product",
+  "productDeliveryTime": "Delivery in 5-15 mins",
+  "productImageNotAvailable": "Image not available",
+  "productImageUnavailable": "Image unavailable",
+  "productSelectQuantity": "Select Quantity",
+  "productSearchHint": "Search products...",
+  "productMicPermission": "Microphone permission needed",
+  "orderMyOrders": "My Orders",
+  "orderCancelOrder": "Cancel Order",
+  "orderCancelAnyway": "Cancel anyway",
+  "orderCancelQuestion": "Cancel order?",
+  "orderCancellationRequested": "Cancellation requested",
+  "orderContactDriver": "Contact Driver",
+  "orderDeliveringTo": "Delivering To",
+  "orderDriverOnWay": "Driver is on the way!",
+  "orderStoreName": "Easy Basket Store",
+  "orderKeepOrder": "Keep order",
+  "orderLiveTracking": "Live Order Tracking",
+  "orderMapNotAvailableWeb": "Map not available on web",
+  "orderMapNotAvailable": "Map not available",
+  "orderDetails": "Order Details",
+  "orderPayment": "Payment",
+  "orderRefund": "Refund",
+  "orderTotalAmount": "Total Amount",
+  "orderTrackOrder": "Track Order",
+  "orderWhyCancelling": "Why are you cancelling?",
+  "orderYourLocation": "Your Location",
+  "orderPrevCancelDeclined": "Your previous cancellation request was declined.",
+  "orderReason": "Reason: {reason}",
+  "@orderReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentTitle": "Payment",
+  "paymentItemCount": "{count, plural, =1{{count} item} other{{count} items}}",
+  "@paymentItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "paymentNotesHint": "Any special instructions... (optional)",
+  "paymentCardsUpi": "Cards, UPI, Wallets, Netbanking",
+  "paymentCod": "Cash on Delivery",
+  "paymentDeliveryNotes": "Delivery Notes",
+  "paymentExternalWallet": "External wallet selected: {wallet}",
+  "@paymentExternalWallet": {
+    "placeholders": {
+      "wallet": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentInitFailed": "Failed to initialize payment. Please try again.",
+  "paymentInvalidMissing": "Invalid payment response. Missing payment details.",
+  "paymentInvalidResponse": "Invalid payment response. Please try again.",
+  "paymentOnline": "Online Payment",
+  "paymentPayOnReceive": "Pay when you receive",
+  "paymentWebOnlyCod": "Online payment is currently available on mobile app only. Please use Cash on Delivery or test on Android/iOS.",
+  "paymentOrderSummary": "Order Summary",
+  "paymentMethod": "Payment Method",
+  "paymentLoginToContinue": "Please login to continue.",
+  "paymentSelectAddress": "Please select an address",
+  "paymentTotal": "Total",
+  "paymentUnableIdentifyOrder": "Unable to identify order. Please check your orders.",
+  "paymentVerifying": "Verifying payment...",
+  "paymentTurnOnNotifications": "Turn On Notifications",
+  "addressDetails": "Address Details",
+  "addressSaved": "Address saved!",
+  "addressUpdated": "Address updated",
+  "addressSave": "Save Address",
+  "addressSaveAs": "Save as",
+  "addressLocation": "Location",
+  "addressAdd": "Add Address",
+  "addressAddNew": "Add New Address",
+  "addressAddToStart": "Add a delivery address to get started",
+  "addressChooseDelivery": "Choose Delivery Address",
+  "addressContinueToPayment": "Continue to Payment",
+  "addressNoneFound": "No addresses found",
+  "addressSearchHint": "Search area, street, landmark...",
+  "addressYourSaved": "Your Saved Addresses",
+  "addressSavedCount": "{count} saved",
+  "@addressSavedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addressSetDefault": "Set as default address",
+  "addressSearchTitle": "Search Address",
+  "addressSearchYourArea": "Search your area, street, sector...",
   "profileCustomer": "Customer",
   "profileOrders": "Orders",
   "profileAddresses": "Addresses",
@@ -30,13 +168,14 @@
   "profileAboutApp": "About Easy Basket",
   "profileLogout": "Logout",
   "profileLogoutConfirm": "Are you sure you want to logout?",
-
   "cartTitle": "My Cart",
   "cartItemCount": "{count, plural, =1{{count} item} other{{count} items}}",
   "@cartItemCount": {
     "description": "Item count shown in the cart title and floating bar",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "cartEmpty": "Your cart is empty",
@@ -52,5 +191,20 @@
   "cartStoreClosed": "Store Closed",
   "cartLoginToCheckout": "Login to Checkout",
   "cartAddAddressToCheckout": "Add Address to Checkout",
-  "cartProceedToCheckout": "Proceed to Checkout"
+  "cartProceedToCheckout": "Proceed to Checkout",
+  "cartPerUnit": "Per {unit}",
+  "@cartPerUnit": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "profileUpdated": "Profile updated successfully!",
+  "profileFullName": "Full Name",
+  "profileFullNameHint": "Enter your full name",
+  "profileEmail": "Email",
+  "profilePhoneNumber": "Phone Number",
+  "profileBirthday": "Birthday",
+  "profileBirthdayHint": "Select your birthday"
 }

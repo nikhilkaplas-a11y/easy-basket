@@ -13,6 +13,7 @@ import '../../utils/theme.dart';
 import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/product_card.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int productId;
@@ -146,7 +147,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     onPressed: () async {
                       await provider.fetchProductById(widget.productId);
                     },
-                    child: const Text('Retry'),
+                    child:  Text(AppLocalizations.of(context).commonRetry),
                   ),
                 ],
               ),
@@ -358,12 +359,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               errorWidget: (context, url, error) => Container(
                 color: const Color(0xFFF0F0F0),
-                child: const Column(
+                child:  Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.broken_image_outlined, size: 48, color: AppTheme.grey),
                     SizedBox(height: 8),
-                    Text('Image unavailable', style: TextStyle(color: AppTheme.grey)),
+                    Text(AppLocalizations.of(context).productImageUnavailable, style: TextStyle(color: AppTheme.grey)),
                   ],
                 ),
               ),
@@ -371,13 +372,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           else
             Container(
               color: AppTheme.primaryGreen.withValues(alpha: 0.06),
-              child: const Center(
+              child:  Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.image_outlined, size: 72, color: AppTheme.grey),
                     SizedBox(height: 8),
-                    Text('Image not available', style: TextStyle(color: AppTheme.grey, fontSize: 14)),
+                    Text(AppLocalizations.of(context).productImageNotAvailable, style: TextStyle(color: AppTheme.grey, fontSize: 14)),
                   ],
                 ),
               ),
@@ -532,7 +533,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             children: [
               const Icon(Icons.delivery_dining_outlined, size: 15, color: Colors.orange),
               const SizedBox(width: 6),
-              const Text('Delivery in 5–15 mins', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black)),
+               Text(AppLocalizations.of(context).productDeliveryTime, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black)),
             ],
           ),
           const SizedBox(height: 5),
@@ -562,7 +563,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Select Quantity', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black)),
+         Text(AppLocalizations.of(context).productSelectQuantity, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black)),
         const SizedBox(height: 8),
         Row(
           children: variants.map((variant) {
@@ -647,7 +648,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             children: [
               const Icon(Icons.info, size: 22, color: AppTheme.grey),
               const SizedBox(width: 8),
-              const Text('About this product', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black)),
+               Text(AppLocalizations.of(context).productAboutThis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black)),
             ],
           ),
           const SizedBox(height: 6),

@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class MapAddressPickerScreen extends StatefulWidget {
   final Function(double lat, double lng, String address) onLocationSelected;
@@ -54,7 +55,7 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is required')),
+           SnackBar(content: Text(AppLocalizations.of(context).locationRequired)),
         );
       }
       return;
@@ -97,7 +98,7 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unable to get your location. Please try again.')),
+             SnackBar(content: Text(AppLocalizations.of(context).locationUnableToGet)),
           );
         }
         return;
@@ -318,8 +319,8 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
     // Validate we have valid coordinates
     if (_selectedLat == 0 || _selectedLng == 0 || _selectedAddress.isEmpty || _selectedAddress == 'Loading location...') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please wait for location to load or select a valid location'),
+         SnackBar(
+          content: Text(AppLocalizations.of(context).locationWaitLocation),
           backgroundColor: Colors.orange,
         ),
       );
@@ -333,8 +334,8 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
     } else {
       // Fallback: try to get address again if placemark is missing
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please wait for address to load completely'),
+         SnackBar(
+          content: Text(AppLocalizations.of(context).locationWaitAddress),
           backgroundColor: Colors.orange,
         ),
       );
@@ -373,7 +374,7 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Location'),
+        title:  Text(AppLocalizations.of(context).locationSelect),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -619,12 +620,12 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
               onPressed: _getCurrentLocation,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               height: 52,
-              child: const Row(
+              child:  Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.my_location, color: Colors.white, size: 20),
                   SizedBox(width: 8),
-                  Text('Use Current Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                  Text(AppLocalizations.of(context).locationUseCurrent, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                 ],
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -32,6 +33,14 @@ class LanguageScreen extends StatelessWidget {
         duration: const Duration(seconds: 2),
       ),
     );
+
+    if (!ok) return;
+
+    // Land the user on home in the new language. `go` (not `push`) so the
+    // whole navigation stack is discarded — any screen still sitting under
+    // this one was built in the previous language, and popping back to it
+    // would show a half-translated app.
+    context.go('/home');
   }
 
   @override

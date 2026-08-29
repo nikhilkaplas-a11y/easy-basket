@@ -13,6 +13,7 @@ import '../../services/speech_service.dart';
 import '../../services/keyword_extraction_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
+import '../../l10n/app_localizations.dart';
 
 class ProductListScreen extends StatefulWidget {
   final int? categoryId;
@@ -242,7 +243,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Mic Permission Chahiye',
+        title:  Text(AppLocalizations.of(context).productMicPermission,
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
         content: const Text(
           'Easy Basket ko aapki awaaz sunne ke liye mic ki permission chahiye. Please settings mein jaake allow karein.',
@@ -251,7 +252,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Baad Mein'),
+            child:  Text(AppLocalizations.of(context).commonLater),
           ),
           ElevatedButton(
             onPressed: () {
@@ -262,7 +263,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Settings Kholein'),
+            child:  Text(AppLocalizations.of(context).commonOpenSettings),
           ),
         ],
       ),
@@ -367,7 +368,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                         child: TextField(
                           controller: _searchController,
                           decoration: InputDecoration(
-                            hintText: 'Search products...',
+                            hintText: AppLocalizations.of(context).productSearchHint,
                             hintStyle: TextStyle(
                               color: AppTheme.grey.withOpacity(0.6),
                               fontSize: 15,

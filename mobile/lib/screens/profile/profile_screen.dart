@@ -83,7 +83,7 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   // Name
                   Text(
-                    authProvider.user?.name ?? 'Customer',
+                    authProvider.user?.name ?? AppLocalizations.of(context).profileCustomer,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -128,7 +128,7 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   _buildStatItem(
                     Icons.shopping_bag_rounded,
-                    'Orders',
+                    AppLocalizations.of(context).profileOrders,
                     '${orderProvider.orders.length}',
                     const Color(0xFFE8F5E9),
                     AppTheme.primaryGreen,
@@ -136,7 +136,7 @@ class ProfileScreen extends StatelessWidget {
                   Container(width: 1, height: 36, color: const Color(0xFFF0F0F0)),
                   _buildStatItem(
                     Icons.location_on_rounded,
-                    'Addresses',
+                    AppLocalizations.of(context).profileAddresses,
                     '${orderProvider.addresses.length}',
                     const Color(0xFFE3F2FD),
                     Colors.blue,
@@ -144,7 +144,7 @@ class ProfileScreen extends StatelessWidget {
                   Container(width: 1, height: 36, color: const Color(0xFFF0F0F0)),
                   _buildStatItem(
                     Icons.star_rounded,
-                    'Rating',
+                    AppLocalizations.of(context).profileRating,
                     '4.8',
                     const Color(0xFFFFF3E0),
                     Colors.orange,
@@ -156,12 +156,12 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ── Account Section ──
-            _buildSectionLabel('Account'),
+            _buildSectionLabel(AppLocalizations.of(context).profileAccount),
             const SizedBox(height: 8),
             _buildTile(
               context,
               icon: Icons.person_outline_rounded,
-              title: 'Edit Profile',
+              title: AppLocalizations.of(context).profileEditProfile,
               bgColor: const Color(0xFFE8F5E9),
               iconColor: AppTheme.primaryGreen,
               onTap: () => context.push('/profile/edit'),
@@ -169,7 +169,7 @@ class ProfileScreen extends StatelessWidget {
             _buildTile(
               context,
               icon: Icons.shopping_bag_outlined,
-              title: 'My Orders',
+              title: AppLocalizations.of(context).profileMyOrders,
               bgColor: const Color(0xFFF3E5F5),
               iconColor: Colors.purple,
               onTap: () => context.push('/orders'),
@@ -177,7 +177,7 @@ class ProfileScreen extends StatelessWidget {
             _buildTile(
               context,
               icon: Icons.location_on_outlined,
-              title: 'My Addresses',
+              title: AppLocalizations.of(context).profileMyAddresses,
               bgColor: const Color(0xFFE3F2FD),
               iconColor: Colors.blue,
               onTap: () => context.push('/addresses'),
@@ -186,7 +186,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ── Preferences Section ──
-            _buildSectionLabel('Preferences'),
+            _buildSectionLabel(AppLocalizations.of(context).profilePreferences),
             const SizedBox(height: 8),
             const _NotificationToggleTile(),
             _buildTile(
@@ -201,24 +201,24 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ── Support Section ──
-            _buildSectionLabel('Support'),
+            _buildSectionLabel(AppLocalizations.of(context).profileSupport),
             const SizedBox(height: 8),
             _buildTile(
               context,
               icon: Icons.help_outline_rounded,
-              title: 'Help & Support',
+              title: AppLocalizations.of(context).profileHelpSupport,
               bgColor: const Color(0xFFE8EAF6),
               iconColor: Colors.indigo,
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Help & Support coming soon')),
+                   SnackBar(content: Text(AppLocalizations.of(context).profileHelpComingSoon)),
                 );
               },
             ),
             _buildTile(
               context,
               icon: Icons.info_outline_rounded,
-              title: 'About',
+              title: AppLocalizations.of(context).profileAbout,
               bgColor: const Color(0xFFF5F5F5),
               iconColor: AppTheme.grey,
               onTap: () {
@@ -228,7 +228,7 @@ class ProfileScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    title: const Text('About Easy Basket'),
+                    title:  Text(AppLocalizations.of(context).profileAboutApp),
                     content: const Text(
                       'Easy Basket - Instant Grocery Delivery\n\nVersion ${AppConfig.appVersion}\n\nYour trusted partner for quick grocery delivery.',
                     ),
@@ -259,20 +259,20 @@ class ProfileScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        title: const Text(
-                          'Logout',
+                        title:  Text(
+                          AppLocalizations.of(context).profileLogout,
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        content: const Text('Are you sure you want to logout?'),
+                        content:  Text(AppLocalizations.of(context).profileLogoutConfirm),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
+                            child:  Text(AppLocalizations.of(context).commonCancel),
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: TextButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('Logout'),
+                            child:  Text(AppLocalizations.of(context).profileLogout),
                           ),
                         ],
                       ),
@@ -288,8 +288,8 @@ class ProfileScreen extends StatelessWidget {
                     }
                   },
                   icon: const Icon(Icons.logout_rounded, size: 20),
-                  label: const Text(
-                    'Logout',
+                  label:  Text(
+                    AppLocalizations.of(context).profileLogout,
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                   style: OutlinedButton.styleFrom(

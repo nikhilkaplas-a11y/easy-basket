@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/service_area_provider.dart';
 import '../services/notification_service.dart';
 import '../utils/theme.dart';
+import '../l10n/app_localizations.dart';
 
 /// Universal Address Form Bottom Sheet — Premium, Blinkit style
 ///
@@ -162,7 +163,7 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
                   child: const Icon(Icons.add_location_alt_rounded, color: AppTheme.primaryGreen, size: 16),
                 ),
                 const SizedBox(width: 10),
-                const Text('Add Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
+                 Text(AppLocalizations.of(context).addressAdd, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
               ],
             ),
           ),
@@ -361,7 +362,7 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
                     child: Center(
                       child: _isSaving
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                          : const Text('Save Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                          :  Text(AppLocalizations.of(context).addressSave, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                     ),
                   ),
                 ),
@@ -521,7 +522,7 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).commonError(e.toString())), backgroundColor: Colors.red));
       }
     }
   }

@@ -32,7 +32,7 @@ class CartScreen extends StatelessWidget {
         appBar: AppBar(
           elevation: 0,
           backgroundColor: Colors.transparent,
-          title: const Text('My Cart', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.black)),
+          title:  Text(AppLocalizations.of(context).cartTitle, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.black)),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: AppTheme.black),
             onPressed: () => context.go('/home'),
@@ -51,20 +51,20 @@ class CartScreen extends StatelessWidget {
                 child: const Icon(Icons.shopping_cart_outlined, size: 80, color: AppTheme.primaryGreen),
               ),
               const SizedBox(height: 24),
-              const Text('Your cart is empty', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+               Text(AppLocalizations.of(context).cartEmpty, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Add items to your cart to get started', style: TextStyle(fontSize: 14, color: AppTheme.grey)),
+              Text(AppLocalizations.of(context).cartEmptySubtitle, style: TextStyle(fontSize: 14, color: AppTheme.grey)),
               const SizedBox(height: 32),
               AppTheme.gradientButton(
                 onPressed: () => context.go('/home'),
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 height: 48,
-                child: const Row(
+                child:  Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.shopping_bag_rounded, size: 20, color: Colors.white),
                     SizedBox(width: 8),
-                    Text('Start Shopping', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                    Text(AppLocalizations.of(context).cartStartShopping, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
                   ],
                 ),
               ),
@@ -218,7 +218,7 @@ class CartScreen extends StatelessWidget {
                   Text(
                     item.variant != null
                         ? item.variant!.label
-                        : (item.product.unit != null ? 'Per ${item.product.unit}' : ''),
+                        : (item.product.unit != null ? AppLocalizations.of(context).cartPerUnit(item.product.unit!) : ''),
                     style: TextStyle(fontSize: 11, color: AppTheme.grey),
                   ),
                   const SizedBox(height: 4),
@@ -303,12 +303,12 @@ class CartScreen extends StatelessWidget {
   AlertDialog _buildRemoveDialog(BuildContext context, dynamic item, CartProvider cartProvider) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Remove Item', style: TextStyle(fontWeight: FontWeight.bold)),
+      title:  Text(AppLocalizations.of(context).cartRemoveItem, style: TextStyle(fontWeight: FontWeight.bold)),
       content: Text('Remove ${item.product.name}${item.variant != null ? " (${item.variant!.label})" : ""} from cart?'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel', style: TextStyle(color: AppTheme.grey)),
+          child:  Text(AppLocalizations.of(context).commonCancel, style: TextStyle(color: AppTheme.grey)),
         ),
         ElevatedButton(
           onPressed: () {
@@ -323,7 +323,7 @@ class CartScreen extends StatelessWidget {
             );
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-          child: const Text('Remove'),
+          child:  Text(AppLocalizations.of(context).commonRemove),
         ),
       ],
     );
@@ -364,9 +364,9 @@ class CartScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildPriceRow('Subtotal', cartProvider.totalAmount, currencyFormat, false),
+                    _buildPriceRow(AppLocalizations.of(context).cartSubtotal, cartProvider.totalAmount, currencyFormat, false),
                     const SizedBox(height: 6),
-                    _buildPriceRow('Delivery Fee', 0, currencyFormat, false, isFree: true),
+                    _buildPriceRow(AppLocalizations.of(context).cartDeliveryFee, 0, currencyFormat, false, isFree: true),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Divider(height: 1),
@@ -403,10 +403,10 @@ class CartScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Delivery address required',
+                            Text(AppLocalizations.of(context).cartAddressRequired,
                                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange.shade700)),
                             const SizedBox(height: 2),
-                            Text('Add address to proceed',
+                            Text(AppLocalizations.of(context).cartAddAddressToProceed,
                                 style: TextStyle(fontSize: 11, color: Colors.orange.shade600)),
                           ],
                         ),
@@ -431,12 +431,12 @@ class CartScreen extends StatelessWidget {
                       context.go('/login?returnTo=${Uri.encodeComponent('/cart')}');
                     } else if (!hasAddress) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
+                         SnackBar(
                           content: Row(
                             children: [
                               Icon(Icons.location_off, color: Colors.white),
                               SizedBox(width: 8),
-                              Expanded(child: Text('Please add a delivery address first')),
+                              Expanded(child: Text(AppLocalizations.of(context).cartAddAddressFirst)),
                             ],
                           ),
                           backgroundColor: Colors.orange,
@@ -504,12 +504,12 @@ class CartScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         storeClosed
-                            ? 'Store Closed'
+                            ? AppLocalizations.of(context).cartStoreClosed
                             : !authProvider.isAuthenticated
-                                ? 'Login to Checkout'
+                                ? AppLocalizations.of(context).cartLoginToCheckout
                                 : !hasAddress
-                                    ? 'Add Address to Checkout'
-                                    : 'Proceed to Checkout',
+                                    ? AppLocalizations.of(context).cartAddAddressToCheckout
+                                    : AppLocalizations.of(context).cartProceedToCheckout,
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
                       ),
                     ],

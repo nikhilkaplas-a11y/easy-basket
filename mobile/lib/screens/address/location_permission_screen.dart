@@ -7,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/service_area_provider.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Location Permission Screen — Premium onboarding with skeleton loading
 ///
@@ -614,7 +615,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
       } else if (locationProvider.isPermissionPermanentlyDenied && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Please enable location in phone Settings'),
+            content:  Text(AppLocalizations.of(context).locationEnableInSettings),
             backgroundColor: Colors.orange,
             action: SnackBarAction(
               label: 'Open Settings',
@@ -724,7 +725,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             style: TextButton.styleFrom(foregroundColor: AppTheme.grey),
-            child: const Text('Not now'),
+            child:  Text(AppLocalizations.of(context).commonNotNow),
           ),
           ElevatedButton(
             onPressed: () {
@@ -740,7 +741,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Turn on Location'),
+            child:  Text(AppLocalizations.of(context).locationTurnOn),
           ),
         ],
       ),

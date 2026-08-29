@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/order_provider.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class ServiceNotAvailableScreen extends StatelessWidget {
   final String? pincode;
@@ -31,7 +32,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Service Not Available'),
+        title:  Text(AppLocalizations.of(context).serviceNotAvailable),
         // During onboarding, don't show back button (user must add address)
         automaticallyImplyLeading: !isOnboardingFlow,
         leading: isOnboardingFlow

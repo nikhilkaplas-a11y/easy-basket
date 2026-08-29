@@ -7,6 +7,7 @@ import '../../models/category_model.dart';
 import '../../providers/product_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
+import '../../l10n/app_localizations.dart';
 
 class SubcategorySelectionScreen extends StatefulWidget {
   final int parentCategoryId;
@@ -112,12 +113,12 @@ class _SubcategorySelectionScreenState extends State<SubcategorySelectionScreen>
                       AppTheme.gradientButton(
                         onPressed: () => context.push('/products?categoryId=${widget.parentCategoryId}'),
                         padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: const Row(
+                        child:  Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.shopping_bag, color: Colors.white, size: 20),
                             SizedBox(width: 8),
-                            Text('View All Products', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                            Text(AppLocalizations.of(context).categoryViewAllProducts, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                           ],
                         ),
                       ),

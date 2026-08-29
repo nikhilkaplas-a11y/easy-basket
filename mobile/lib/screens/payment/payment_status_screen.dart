@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../services/notification_service.dart';
+import '../../l10n/app_localizations.dart';
 
 enum PaymentStatus {
   success,
@@ -200,7 +201,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen>
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('Turn On Notifications',
+                            child:  Text(AppLocalizations.of(context).paymentTurnOnNotifications,
                                 style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700)),

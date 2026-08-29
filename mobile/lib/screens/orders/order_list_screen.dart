@@ -10,6 +10,7 @@ import '../../utils/theme.dart';
 import '../../utils/date_utils.dart';
 import '../../utils/navigation_utils.dart';
 import 'package:intl/intl.dart';
+import '../../l10n/app_localizations.dart';
 
 class OrderListScreen extends StatefulWidget {
   const OrderListScreen({super.key});
@@ -176,7 +177,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        title: const Text('My Orders', style: TextStyle(fontWeight: FontWeight.bold)),
+        title:  Text(AppLocalizations.of(context).orderMyOrders, style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => popOrRoleHub(context),
@@ -248,12 +249,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 _loadOrders();
               },
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: const Row(
+              child:  Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.refresh, color: Colors.white, size: 20),
                   SizedBox(width: 8),
-                  Text('Try Again', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                  Text(AppLocalizations.of(context).commonTryAgain, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                 ],
               ),
             ),
@@ -334,12 +335,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 onPressed: () => context.go('/home'),
                 padding: const EdgeInsets.symmetric(horizontal: 40),
                 height: 52,
-                child: const Row(
+                child:  Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.shopping_cart_rounded, size: 22, color: Colors.white),
                     SizedBox(width: 8),
-                    Text('Start Shopping', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                    Text(AppLocalizations.of(context).cartStartShopping, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                   ],
                 ),
               ),

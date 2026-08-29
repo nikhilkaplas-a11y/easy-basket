@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -76,12 +77,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (authProvider.error == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+           SnackBar(
             content: Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.white, size: 20),
                 SizedBox(width: 8),
-                Text('Profile updated successfully!'),
+                Text(AppLocalizations.of(context).profileUpdated),
               ],
             ),
             backgroundColor: AppTheme.primaryGreen,
@@ -102,7 +103,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(AppLocalizations.of(context).commonError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -226,8 +227,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextFormField(
                       controller: _nameController,
                       decoration: InputDecoration(
-                        labelText: 'Full Name',
-                        hintText: 'Enter your full name',
+                        labelText: AppLocalizations.of(context).profileFullName,
+                        hintText: AppLocalizations.of(context).profileFullNameHint,
                         prefixIcon: const Icon(Icons.person_outline_rounded),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -263,7 +264,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextFormField(
                       initialValue: authProvider.user?.phoneNumber ?? '',
                       decoration: InputDecoration(
-                        labelText: 'Phone Number',
+                        labelText: AppLocalizations.of(context).profilePhoneNumber,
                         prefixIcon: const Icon(Icons.phone_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -297,8 +298,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 : '',
                           ),
                           decoration: InputDecoration(
-                            labelText: 'Birthday',
-                            hintText: 'Select your birthday',
+                            labelText: AppLocalizations.of(context).profileBirthday,
+                            hintText: AppLocalizations.of(context).profileBirthdayHint,
                             prefixIcon: const Icon(Icons.calendar_today_outlined),
                             suffixIcon: Icon(
                               Icons.arrow_drop_down_rounded,
@@ -334,7 +335,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       TextFormField(
                         initialValue: authProvider.user?.email ?? '',
                         decoration: InputDecoration(
-                          labelText: 'Email',
+                          labelText: AppLocalizations.of(context).profileEmail,
                           prefixIcon: const Icon(Icons.email_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),

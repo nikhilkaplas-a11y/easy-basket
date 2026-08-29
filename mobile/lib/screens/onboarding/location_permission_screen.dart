@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Screen shown when location permission is denied during onboarding
 /// Similar to Blinkit's permission explanation screen
@@ -109,12 +110,12 @@ class LocationPermissionScreen extends StatelessWidget {
                 child: AppTheme.gradientButton(
                   onPressed: () => _requestPermissionAgain(context),
                   height: 54,
-                  child: const Row(
+                  child:  Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.location_on, size: 22, color: Colors.white),
                       SizedBox(width: 8),
-                      Text('Grant Location Permission', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                      Text(AppLocalizations.of(context).locationGrantPermission, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                     ],
                   ),
                 ),

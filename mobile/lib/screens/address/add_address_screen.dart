@@ -9,6 +9,7 @@ import '../../providers/location_provider.dart';
 import '../../providers/service_area_provider.dart';
 import '../../utils/theme.dart';
 import 'map_address_picker_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Add Address Screen — Redesigned (Single page, clean form)
 ///
@@ -283,7 +284,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   child: const Icon(Icons.home_rounded, color: AppTheme.primaryGreen, size: 16),
                 ),
                 const SizedBox(width: 8),
-                const Text('Address Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                 Text(AppLocalizations.of(context).addressDetails, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 16),
@@ -316,7 +317,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   child: const Icon(Icons.location_on_rounded, color: Color(0xFF1565C0), size: 16),
                 ),
                 const SizedBox(width: 8),
-                const Text('Location', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                 Text(AppLocalizations.of(context).addressLocation, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 16),
@@ -342,7 +343,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             const SizedBox(height: 20),
 
             // Tag selector — Home / Office / Other
-            const Text('Save as', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black54)),
+             Text(AppLocalizations.of(context).addressSaveAs, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black54)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -455,7 +456,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 child: Center(
                   child: _isSaving
                       ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                      : const Text('Save Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                      :  Text(AppLocalizations.of(context).addressSave, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
               ),
             ),
@@ -481,7 +482,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         setState(() => _isDetecting = false);
         if (locationProvider.isPermissionPermanentlyDenied && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable location in phone Settings'), backgroundColor: Colors.orange),
+             SnackBar(content: Text(AppLocalizations.of(context).locationEnableInSettings), backgroundColor: Colors.orange),
           );
           await locationProvider.openAppSettings();
         }
@@ -510,13 +511,13 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location detected! Fill remaining details.'), backgroundColor: AppTheme.primaryGreen, duration: Duration(seconds: 2)),
+         SnackBar(content: Text(AppLocalizations.of(context).locationDetectedFillDetails), backgroundColor: AppTheme.primaryGreen, duration: Duration(seconds: 2)),
       );
     } else {
       setState(() => _isDetecting = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not detect location. Try map picker.'), backgroundColor: Colors.orange),
+           SnackBar(content: Text(AppLocalizations.of(context).locationCouldNotDetect), backgroundColor: Colors.orange),
         );
       }
     }
@@ -560,7 +561,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location selected! Fill remaining details.'), backgroundColor: AppTheme.primaryGreen, duration: Duration(seconds: 2)),
+         SnackBar(content: Text(AppLocalizations.of(context).locationSelectedFillDetails), backgroundColor: AppTheme.primaryGreen, duration: Duration(seconds: 2)),
       );
     }
   }
@@ -571,7 +572,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
     if (_latitude == null || _longitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your location first (GPS or Map)'), backgroundColor: Colors.red),
+         SnackBar(content: Text(AppLocalizations.of(context).locationSelectFirst), backgroundColor: Colors.red),
       );
       return;
     }
@@ -610,7 +611,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     String? token = authProvider.accessToken ?? authProvider.token;
     if (token == null) {
       setState(() => _isSaving = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login first')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar( SnackBar(content: Text(AppLocalizations.of(context).commonLoginFirst)));
       return;
     }
 
@@ -672,7 +673,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         }
         if (!success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Session expired. Please login again.'), backgroundColor: Colors.orange),
+             SnackBar(content: Text(AppLocalizations.of(context).commonSessionExpired), backgroundColor: Colors.orange),
           );
         }
       }
@@ -683,8 +684,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     if (success && mounted) {
       context.pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(children: [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 8), Text('Address saved!')]),
+         SnackBar(
+          content: Row(children: [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 8), Text(AppLocalizations.of(context).addressSaved)]),
           backgroundColor: AppTheme.primaryGreen,
           behavior: SnackBarBehavior.floating,
         ),

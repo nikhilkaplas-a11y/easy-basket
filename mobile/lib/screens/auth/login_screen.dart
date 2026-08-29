@@ -12,6 +12,7 @@ import '../../providers/proximity_provider.dart';
 import '../../providers/service_area_provider.dart';
 import '../../services/notification_service.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _sendOTP() async {
     if (_phoneController.text.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 10-digit phone number')),
+         SnackBar(content: Text(AppLocalizations.of(context).authInvalidPhone)),
       );
       return;
     }
@@ -62,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (authProvider.error == null) {
       setState(() => _isOtpSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP sent successfully!')),
+         SnackBar(content: Text(AppLocalizations.of(context).authOtpSent)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _verifyOTP() async {
     if (_otpController.text.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter 6-digit OTP')),
+         SnackBar(content: Text(AppLocalizations.of(context).authEnterOtp)),
       );
       return;
     }
@@ -491,7 +492,7 @@ class _PhoneForm extends StatelessWidget {
                     letterSpacing: 1,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Enter your phone number',
+                    hintText: AppLocalizations.of(context).authEnterPhone,
                     hintStyle: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
