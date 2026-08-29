@@ -51,6 +51,9 @@ import '../screens/onboarding/location_detection_screen.dart';
 import '../screens/onboarding/location_permission_screen.dart';
 import '../screens/address/location_permission_screen.dart' as customer_location_gate;
 import '../core/startup_deep_link.dart';
+import '../screens/help/help_support_screen.dart';
+import '../screens/support/support_request_screen.dart';
+import '../screens/admin/admin_support_requests_screen.dart';
 
 class AppRouter {
   /// Routes that require an authenticated customer (or admin/delivery).
@@ -179,6 +182,19 @@ class AppRouter {
         path: '/home',
         builder: (context, state) => const HomeScreen(),
       ),
+      GoRoute(
+  path: '/support',
+  builder: (context, state) {
+    
+
+    return const SupportRequestScreen();
+  },
+),
+     GoRoute(
+  path: '/admin/support-requests',
+  builder: (context, state) =>
+      const AdminSupportRequestsScreen(),
+),
       GoRoute(
         path: '/service-not-available',
         builder: (context, state) {
@@ -317,6 +333,10 @@ class AppRouter {
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
+      GoRoute(
+        path: '/help-support',
+        builder: (context, state) => const HelpSupportScreen(),
+     ),
       GoRoute(
         path: '/profile/edit',
         builder: (context, state) => const EditProfileScreen(),
