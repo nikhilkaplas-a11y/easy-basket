@@ -2,9 +2,54 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
+import { OrderEvent } from '../entities/OrderEvent';
 import { PaymentsV2Service } from '../services/payments-v2.service';
 import { RazorpayService } from '../services/razorpay.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { RateLimitService } from '../services/rate-limit.service';
+
+/**
+ * Per-user rate limits for the payment endpoints.
+ *
+ * None of these were limited before, though RateLimitService already existed (used
+ * only for OTP send). create-order issues a real Razorpay API call per request, so
+ * an authenticated loop burns the account's API quota and fills the payments table;
+ * verify is otherwise a free signature-checking oracle. The ceilings are set well
+ * above what a human retrying a stuck checkout would ever produce.
+ */
+const PAYMENT_RATE_LIMITS = {
+  createOrder: { limit: 10, windowSec: 60 },
+  verify: { limit: 20, windowSec: 60 },
+  refund: { limit: 20, windowSec: 60 },
+} as const;
+
+/** Returns true if the request may proceed; writes the 429 itself if not. */
+async function withinRateLimit(
+  res: Response,
+  bucket: keyof typeof PAYMENT_RATE_LIMITS,
+  userId: number
+): Promise<boolean> {
+  const { limit, windowSec } = PAYMENT_RATE_LIMITS[bucket];
+  try {
+    const out = await RateLimitService.checkAndIncrement(
+      `rl:payment:${bucket}:${userId}`,
+      limit,
+      windowSec
+    );
+    if (!out.allowed) {
+      res
+        .status(429)
+        .json({ message: 'Too many payment requests. Please wait a moment and try again.' });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    // Redis down. Fail OPEN — blocking checkout entirely is worse than the abuse
+    // this guards against, and the endpoints remain authenticated regardless.
+    console.warn(`[payment] rate limit check failed for ${bucket}`, (err as Error).message);
+    return true;
+  }
+}
 
 export class PaymentController {
   /**
@@ -47,6 +92,26 @@ export class PaymentController {
         return;
       }
 
+      if (!(await withinRateLimit(res, 'createOrder', userId))) return;
+
+      // A COD order is not payable online by default. Nothing checked paymentMethod
+      // here before, so a COD order could be pushed through the online flow and then
+      // ALSO have cash collected at the door. The rider's "Switch to UPI" flow is the
+      // one legitimate exception, and it records a `switched_to_upi` order event —
+      // which is what we look for rather than mutating order.paymentMethod, so the
+      // rider can still fall back to cash if the customer never completes the payment.
+      if (order.paymentMethod === 'cod') {
+        const switched = await AppDataSource.getRepository(OrderEvent).findOne({
+          where: { orderId: orderIdNum, eventType: 'switched_to_upi' },
+        });
+        if (!switched) {
+          res.status(409).json({
+            message: 'This is a cash-on-delivery order. Ask the delivery partner to switch it to UPI.',
+          });
+          return;
+        }
+      }
+
       const amountPaise = PaymentsV2Service.toPaise(order.totalAmount);
       const out = await PaymentsV2Service.initiatePayment({
         orderId: orderIdNum,
@@ -79,6 +144,8 @@ export class PaymentController {
         res.status(401).json({ message: 'Authentication required' });
         return;
       }
+
+      if (!(await withinRateLimit(res, 'verify', userId))) return;
 
       const body = req.body as {
         razorpayOrderId?: string;
@@ -161,7 +228,14 @@ export class PaymentController {
         payload: parsed as unknown as Record<string, unknown>,
       });
 
-      // Always 200 unless signature / body is invalid — Razorpay retries on non-2xx.
+      // A busy payment lock means we did NOT process this event. Answering 200 would
+      // retire it from Razorpay's retry schedule and lose it, so ask to be retried.
+      if (result.retryable) {
+        res.status(503).json({ received: false, ...result });
+        return;
+      }
+
+      // Otherwise 200 — the event was processed, or safely deduped as a replay.
       res.status(200).json({ received: true, ...result });
     } catch (error) {
       console.error('[webhook] handler error', error);
@@ -172,7 +246,9 @@ export class PaymentController {
 
   /**
    * POST /api/payment/refund
-   * Authenticated. Owner or admin can request a refund for a paid order.
+   * ADMIN ONLY. Refunds are never self-service — the customer-facing route to a
+   * refund is requesting a cancellation, which AdminController.approveCancellation
+   * grants only before the order is packed.
    * Idempotency-Key header required.
    */
   static async refund(req: AuthRequest, res: Response): Promise<void> {
@@ -182,6 +258,8 @@ export class PaymentController {
         res.status(401).json({ message: 'Authentication required' });
         return;
       }
+
+      if (!(await withinRateLimit(res, 'refund', userId))) return;
 
       const { orderId, reason } = req.body as { orderId?: number; reason?: string };
       const idem = (req.header('idempotency-key') ?? '').trim();
@@ -203,9 +281,9 @@ export class PaymentController {
         return;
       }
 
-      const isOwner = order.user.id === userId;
-      const isAdmin = req.user?.role === 'admin';
-      if (!isOwner && !isAdmin) {
+      // Route is already gated by authorize('admin'); assert it here too so the
+      // handler stays safe if it is ever remounted somewhere less strict.
+      if (req.user?.role !== 'admin') {
         res.status(403).json({ message: 'Forbidden' });
         return;
       }

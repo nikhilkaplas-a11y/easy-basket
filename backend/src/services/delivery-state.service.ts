@@ -603,7 +603,7 @@ export class DeliveryStateService {
     orderId: number;
     actorUserId: number;
   }): Promise<DeliveryTransitionResult> {
-    return AppDataSource.manager.transaction(async (em) => {
+    const result: DeliveryTransitionResult = await AppDataSource.manager.transaction(async (em) => {
       const orderRepo = em.getRepository(Order);
       const order = await orderRepo.findOne({
         where: { id: params.orderId },
@@ -634,22 +634,39 @@ export class DeliveryStateService {
         em
       );
 
-      // If the order had been paid online, trigger refund.
-      if (order.paymentStatus === 'paid') {
-        try {
-          await PaymentsV2Service.createRefund({
-            orderId: order.id,
-            userId: order.user.id,
-            actorUserId: params.actorUserId,
-            reason: 'rto',
-            idempotencyKey: `rto-${order.id}`,
-          });
-        } catch (refErr) {
-          console.error(`[rto] refund call failed for order #${order.id}`, refErr);
-        }
-      }
       return { ok: true, order };
     });
+
+    // Refund AFTER the transaction commits — never inside it.
+    //
+    // createRefund uses AppDataSource repositories (a different connection from the
+    // transaction's manager), takes a Redis lock, and makes up to two Razorpay HTTP
+    // calls. Running it inside the transaction meant: the refund row committed on its
+    // own connection regardless of whether this transaction later rolled back (so a
+    // rollback left a customer refunded for an order that is not cancelled); row locks
+    // on orders/order_items were held across external network I/O, which exhausts the
+    // pool under load; and the refund could not see this transaction's uncommitted
+    // order.status = 'cancelled'. Same ordering markPaymentPaid already uses for its
+    // auto-refund on a cancelled order.
+    if (result.ok && result.order.paymentStatus === 'paid') {
+      const order = result.order;
+      try {
+        const refund = await PaymentsV2Service.createRefund({
+          orderId: order.id,
+          userId: order.user.id,
+          actorUserId: params.actorUserId,
+          reason: 'rto',
+          idempotencyKey: `rto-${order.id}`,
+        });
+        if (!refund.ok) {
+          console.error(`[rto] refund not initiated for order #${order.id}: ${refund.reason}`);
+        }
+      } catch (refErr) {
+        console.error(`[rto] refund call failed for order #${order.id}`, refErr);
+      }
+    }
+
+    return result;
   }
 }
 

@@ -1,7 +1,7 @@
 name: easy_basket
 description: Easy Basket - Instant Grocery Delivery App
 publish_to: 'none'
-version: 10.0.0+100
+version: 10.0.1+101
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

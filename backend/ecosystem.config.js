@@ -25,6 +25,9 @@ module.exports = {
       JWT_SECRET: process.env.JWT_SECRET,
       RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
       RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+      // Signs server->server webhook POSTs. Distinct from RAZORPAY_KEY_SECRET.
+      // Omitting it makes every webhook fail signature verification silently.
+      RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
       FIREBASE_SERVICE_ACCOUNT: process.env.FIREBASE_SERVICE_ACCOUNT,
       TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
       TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,

@@ -272,13 +272,26 @@ export class OrderController {
 
       await ProductController.invalidateProductListCache();
 
-      // Create payment order if UPI
+      // Create payment order if UPI.
+      //
+      // A failure here used to be swallowed: the response still came back 201 with
+      // paymentOrder: null and no indication anything was wrong. Since no Payment row
+      // exists in that case, neither the BullMQ worker nor the reconciler will ever
+      // look at this order (both scan the payments table), so the reserved stock just
+      // sits until auto-cancel notices 30 minutes later.
+      //
+      // The order itself is genuinely created, so this stays a 201 rather than an
+      // error — but the failure is now reported. The mobile client recovers anyway by
+      // calling /payment/create-order separately; paymentError is for any client that
+      // relies on this response.
       let paymentOrder = null;
+      let paymentError: string | null = null;
       if (normalizedPaymentMethod === 'upi') {
         try {
           paymentOrder = await PaymentService.createOrder(totalAmount, 'INR', `ORDER_${order.id}`);
         } catch (error) {
-          console.error('Payment order creation error:', error);
+          paymentError = 'Could not start the payment. Open the order and retry payment.';
+          console.error(`[order] payment order creation failed for order #${order.id}:`, error);
         }
       }
 
@@ -297,6 +310,7 @@ export class OrderController {
       res.status(201).json({
         order,
         paymentOrder, // Razorpay order details if UPI
+        paymentError, // non-null when the order exists but payment could not be started
       });
     } catch (error) {
       if (error instanceof InsufficientStockError) {

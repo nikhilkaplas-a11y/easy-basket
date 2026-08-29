@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { In } from 'typeorm';
+import { AsyncLocalStorage } from 'async_hooks';
+import { In, Not } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
 import { Payment, PaymentStatus } from '../entities/Payment';
@@ -60,7 +61,14 @@ export class PaymentsV2Service {
       initiated: ['success_unverified', 'paid', 'failed'],
       success_unverified: ['paid', 'failed'],
       paid: ['refund_pending'],
-      failed: [],
+      // Money can legitimately land on a `failed` row: a capture that arrived after
+      // we abandoned the payment (stale checkout sheet), or a duplicate capture for
+      // an order another payment already settled. We refuse to honour those against
+      // the order, but we DO refund them — and that outcome has to be recordable,
+      // otherwise the refund completes at Razorpay while our row still reads 'failed'
+      // and the customer is never told. Refund is the only exit; there is no way back
+      // to `paid` from here.
+      failed: ['refunded'],
       refund_pending: ['refunded', 'paid'],
       refunded: [],
     };
@@ -100,7 +108,9 @@ export class PaymentsV2Service {
 
     if (existing) {
       if (existing.amountPaise !== String(params.amountPaise)) {
-        // Amount changed mid-checkout (cart edited). Abandon the old one and create a new.
+        // Amount changed mid-checkout (cart edited). Abandon the old one and create a
+        // new one. Kept ahead of the SUPERSEDED sweep below so this row retains the
+        // more specific failure code for support.
         existing.status = 'failed';
         existing.failureCode = 'AMOUNT_CHANGED';
         await paymentRepo.save(existing);
@@ -113,6 +123,24 @@ export class PaymentsV2Service {
         };
       }
     }
+
+    // Abandon every other still-open payment for this order before minting a new
+    // Razorpay order.
+    //
+    // The 15-minute freshness cutoff above only stops us REUSING a stale row — it
+    // left the old row `initiated` and its Razorpay order fully payable. A customer
+    // who leaves checkout open, returns after 20 minutes and retries then had two
+    // live Razorpay orders for one basket, and paying both charged them twice.
+    // (The rider's "Switch to UPI" path lands here too and could add a third.)
+    //
+    // A raw UPDATE, deliberately not markPaymentFailed: this order is still being
+    // paid for, so its stock must stay reserved and it must not be cancelled.
+    // Failing these rows is safe now that applyCapture refunds a capture arriving
+    // on a failed row instead of stranding the money.
+    await paymentRepo.update(
+      { orderId: params.orderId, status: 'initiated' },
+      { status: 'failed', failureCode: 'SUPERSEDED' }
+    );
 
     const rzpOrder = await RazorpayService.createOrder({
       amountPaise: params.amountPaise,
@@ -242,7 +270,7 @@ export class PaymentsV2Service {
     eventId: string;
     eventType: string;
     payload: Record<string, unknown>;
-  }): Promise<{ processed: boolean; reason?: string }> {
+  }): Promise<{ processed: boolean; reason?: string; retryable?: boolean }> {
     const eventRepo = AppDataSource.getRepository(WebhookEvent);
 
     // Insert event row first — UNIQUE(event_id) is our atomic dedupe.
@@ -276,14 +304,23 @@ export class PaymentsV2Service {
     const lockKey = razorpayOrderId ? `lock:payment:${razorpayOrderId}` : null;
     let lockToken: string | null = null;
     if (lockKey) {
-      lockToken = await acquireLock(lockKey, 30);
+      lockToken = await acquireLock(lockKey, PAYMENT_LOCK_TTL_SECONDS);
       if (!lockToken) {
-        // Returning without processing; Razorpay will retry the webhook.
-        return { processed: false, reason: 'busy' };
+        // Hand it back to Razorpay's retry schedule. `retryable` MUST make the
+        // controller answer non-2xx: this used to return here and be served as
+        // HTTP 200, which Razorpay never retries — so the event was simply lost.
+        // Not academic: payment.captured has the BullMQ worker as a fallback, but
+        // refund.processed and refund.failed have nothing faster than the 30-min
+        // sweep, so a customer's refund silently stalled.
+        //
+        // The webhook_events row stays with processed_at = NULL, and the duplicate
+        // handler above deliberately falls through to reprocess such rows, so the
+        // retry lands correctly rather than being swallowed by dedupe.
+        return { processed: false, reason: 'busy', retryable: true };
       }
     }
 
-    try {
+    const dispatch = async (): Promise<void> => {
       switch (params.eventType) {
         case 'payment.captured':
           await this.onPaymentCaptured(params.payload);
@@ -300,6 +337,18 @@ export class PaymentsV2Service {
         default:
           // Known events we don't act on (order.paid, refund.created, etc.).
           break;
+      }
+    };
+
+    try {
+      // Register the lock as held for this async context. Handlers below reach code
+      // that legitimately re-enters withPaymentLock (markPaymentPaid's auto-refund,
+      // the orphan-capture refund); without this they deadlock against us and give
+      // up silently. See heldPaymentLocks.
+      if (lockKey) {
+        await runHoldingLock(lockKey, dispatch);
+      } else {
+        await dispatch();
       }
 
       await eventRepo.update({ eventId: params.eventId }, { processedAt: new Date() });
@@ -361,16 +410,35 @@ export class PaymentsV2Service {
     // fixed key, so webhook + reconciler both landing here can't double-refund.
     if (paidOnCancelledOrder) {
       try {
-        await this.createRefund({
+        const result = await this.createRefund({
           orderId: payment.orderId,
           userId: payment.userId,
           actorUserId: payment.userId,
           reason: 'late_payment_on_cancelled_order',
           idempotencyKey: `late-cancel-${payment.orderId}`,
         });
-        console.log(`[payment] auto-refund issued for late payment on cancelled order #${payment.orderId}`);
+        // The result used to be discarded, so this logged success unconditionally —
+        // including for the 409 that the lock self-deadlock produced every single
+        // time. A refund we failed to issue must never look like one we issued.
+        if (result.ok) {
+          console.log(
+            `[payment] auto-refund issued for late payment on cancelled order #${payment.orderId} (refund ${result.refundId})`
+          );
+        } else {
+          console.error(
+            `[payment] auto-refund NOT issued for cancelled order #${payment.orderId}: ${result.reason}`
+          );
+          await this.notifyAdminsUnrefundedCapture(
+            payment,
+            `Auto-refund failed for a late payment on cancelled order #${payment.orderId}: ${result.reason}`
+          );
+        }
       } catch (e) {
         console.error(`[payment] auto-refund failed for cancelled order #${payment.orderId}`, e);
+        await this.notifyAdminsUnrefundedCapture(
+          payment,
+          `Auto-refund threw for cancelled order #${payment.orderId}: ${describeError(e)}`
+        );
       }
     }
   }
@@ -423,10 +491,17 @@ export class PaymentsV2Service {
     fn: () => Promise<T>
   ): Promise<{ ran: true; result: T } | { ran: false }> {
     const lockKey = `lock:payment:${razorpayOrderId}`;
-    const lockToken = await acquireLock(lockKey, 30);
+
+    // Re-entrant: this call chain already owns the lock, so run inline rather than
+    // deadlocking against ourselves. See heldPaymentLocks.
+    if (alreadyHoldsLock(lockKey)) {
+      return { ran: true, result: await fn() };
+    }
+
+    const lockToken = await acquireLock(lockKey, PAYMENT_LOCK_TTL_SECONDS);
     if (!lockToken) return { ran: false };
     try {
-      const result = await fn();
+      const result = await runHoldingLock(lockKey, fn);
       return { ran: true, result };
     } finally {
       await releaseLock(lockKey, lockToken);
@@ -446,6 +521,24 @@ export class PaymentsV2Service {
       return;
     }
 
+    // Currency check. Everything is INR today, which is exactly why this is cheap
+    // insurance: the amount comparison below is meaningless the moment a second
+    // currency is enabled on the account, since 900 JPY != 900 paise.
+    if (entity.currency && entity.currency.toUpperCase() !== payment.currency.toUpperCase()) {
+      console.error('[webhook] CURRENCY MISMATCH', {
+        rzpOrder: entity.order_id,
+        expected: payment.currency,
+        received: entity.currency,
+      });
+      if (entity.id) payment.razorpayPaymentId = entity.id;
+      await this.markPaymentFailed(payment, 'CURRENCY_MISMATCH', payload);
+      await this.notifyAdminsUnrefundedCapture(
+        payment,
+        `Captured in ${entity.currency} but the order is priced in ${payment.currency}. Not auto-refunded — verify, then refund by hand.`
+      );
+      return;
+    }
+
     // Amount check — refuse to confirm if Razorpay says a different amount than we priced.
     if (String(entity.amount) !== payment.amountPaise) {
       console.error('[webhook] AMOUNT MISMATCH', {
@@ -453,11 +546,189 @@ export class PaymentsV2Service {
         expected: payment.amountPaise,
         received: entity.amount,
       });
+      // Record the Razorpay payment id before failing the row. Without it the only
+      // handle on this money is buried in raw_webhook_json, which makes a manual
+      // refund a forensics exercise.
+      if (entity.id) payment.razorpayPaymentId = entity.id;
       await this.markPaymentFailed(payment, 'AMOUNT_MISMATCH', payload);
+
+      // Deliberately NOT auto-refunded. Every other unhonoured capture below IS
+      // refunded automatically, because there the amount is known-correct and equals
+      // payment.amountPaise. Here the two amounts disagree, so the cause is unknown
+      // (tampering, or a pricing/wiring bug) and the sum to return is exactly what is
+      // in dispute. Automating a money movement on unverified state is worse than
+      // paging a human. The defect being fixed is that previously NOBODY was told.
+      await this.notifyAdminsUnrefundedCapture(
+        payment,
+        `Razorpay captured Rs ${(Number(entity.amount) / 100).toFixed(2)} but we priced ` +
+          `Rs ${(Number(payment.amountPaise) / 100).toFixed(2)}. Not auto-refunded — verify the cause, then refund by hand.`
+      );
       return;
     }
 
-    await this.markPaymentPaid(payment, entity.id ?? null, payload);
+    await this.applyCapture(payment, entity.id ?? null, payload);
+  }
+
+  /**
+   * Apply a capture whose amount we have already confirmed matches what we priced.
+   *
+   * Splits the legitimate case from the two "right money, wrong place" cases that
+   * previously fell into a silent no-op inside markPaymentPaid.
+   */
+  private static async applyCapture(
+    payment: Payment,
+    razorpayPaymentId: string | null,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    // The row was abandoned (typically AMOUNT_CHANGED when the cart was edited
+    // mid-checkout) but the customer completed the stale Razorpay order anyway.
+    // markPaymentPaid would hit canTransition('failed','paid') === false and return
+    // silently: money captured, order never confirmed, no refund, no alert, and the
+    // row terminal so no sweep ever revisits it.
+    if (payment.status === 'failed') {
+      await this.refundOrphanCapture(payment, razorpayPaymentId, 'CAPTURE_ON_FAILED_PAYMENT', payload);
+      return;
+    }
+
+    // A different payment already settled this order — the classic double charge:
+    // initiatePayment mints a second Razorpay order once the first is >15 min old,
+    // leaving both payable. markPaymentPaid only ever inspected the row in front of
+    // it, so it would confirm the order twice and keep both payments.
+    const sibling = await AppDataSource.getRepository(Payment).findOne({
+      where: {
+        orderId: payment.orderId,
+        status: In(['paid', 'refund_pending', 'refunded']),
+        id: Not(payment.id),
+      },
+    });
+    if (sibling) {
+      console.warn(
+        `[webhook] duplicate capture for order #${payment.orderId}: payment ${payment.id} arrived after payment ${sibling.id} already settled it`
+      );
+      await this.refundOrphanCapture(payment, razorpayPaymentId, 'DUPLICATE_PAYMENT_FOR_ORDER', payload);
+      return;
+    }
+
+    await this.markPaymentPaid(payment, razorpayPaymentId, payload);
+  }
+
+  /**
+   * Real money we cannot apply to its order — refund it, and say so if we cannot.
+   *
+   * The payment row is parked at `failed` (we are not honouring it against the order)
+   * while the refund row carries the truth about the money. Deliberately does NOT
+   * touch orders.payment_status: on the duplicate-capture path the order is correctly
+   * `paid` from the OTHER payment, and stamping it here would corrupt a good order.
+   *
+   * Reuses attemptRazorpayRefund, so the adopt-before-create guard and the retry
+   * budget both apply. Safe to call from inside the webhook lock — that lock is
+   * re-entrant within one async context.
+   */
+  private static async refundOrphanCapture(
+    payment: Payment,
+    razorpayPaymentId: string | null,
+    code: string,
+    rawPayload: Record<string, unknown> | null
+  ): Promise<void> {
+    const paymentRepo = AppDataSource.getRepository(Payment);
+    const refundRepo = AppDataSource.getRepository(Refund);
+
+    if (!razorpayPaymentId) {
+      await this.notifyAdminsUnrefundedCapture(
+        payment,
+        `${code} but the webhook carried no Razorpay payment id — locate and refund by hand.`
+      );
+      return;
+    }
+
+    // Persist the handle first so the money stays traceable whatever happens next.
+    payment.razorpayPaymentId = razorpayPaymentId;
+    payment.failureCode = code;
+    if (rawPayload) payment.rawWebhookJson = rawPayload;
+    if (payment.status !== 'failed' && this.canTransition(payment.status, 'failed')) {
+      payment.status = 'failed';
+    }
+    await paymentRepo.save(payment);
+
+    // Fixed key per payment: webhook and reconciler both landing here resolve to the
+    // same row rather than issuing two refunds.
+    const idempotencyKey = `orphan-${payment.id}`;
+    let refund = await refundRepo.findOne({
+      where: { paymentId: payment.id, idempotencyKey },
+    });
+
+    if (!refund) {
+      const created = refundRepo.create({
+        paymentId: payment.id,
+        userId: payment.userId,
+        razorpayRefundId: null,
+        amountPaise: payment.amountPaise,
+        status: 'pending',
+        reason: code,
+        idempotencyKey,
+        attemptCount: 0,
+        lastError: null,
+        nextRetryAt: null,
+        lastAttemptAt: null,
+      });
+      try {
+        await refundRepo.save(created);
+        refund = created;
+      } catch (err) {
+        if (!isDuplicateKeyError(err)) throw err;
+        refund = await refundRepo.findOne({
+          where: { paymentId: payment.id, idempotencyKey },
+        });
+      }
+    }
+
+    if (!refund) {
+      await this.notifyAdminsUnrefundedCapture(payment, `${code}: could not record a refund row.`);
+      return;
+    }
+    if (refund.status === 'processed') return;
+
+    await this.attemptRazorpayRefund(refund, payment, razorpayPaymentId);
+
+    if (refund.razorpayRefundId) {
+      console.log(
+        `[payment] orphan capture on order #${payment.orderId} (${code}) refunded — refund ${refund.id} -> ${refund.razorpayRefundId}`
+      );
+    } else {
+      await this.notifyAdminsUnrefundedCapture(
+        payment,
+        `${code}: the automatic refund attempt failed (${refund.lastError ?? 'unknown error'}). Retries are scheduled.`
+      );
+    }
+  }
+
+  /**
+   * Page admins about captured money still sitting with Razorpay unrefunded.
+   * Every caller is a path where the customer has been charged and we either cannot,
+   * or deliberately will not, return it automatically.
+   */
+  private static async notifyAdminsUnrefundedCapture(
+    payment: Payment,
+    message: string
+  ): Promise<void> {
+    const amountRupees = (Number(payment.amountPaise) / 100).toFixed(2);
+    console.error(
+      `[payment] CAPTURED MONEY NOT REFUNDED — order #${payment.orderId}, payment ${payment.id}: ${message}`
+    );
+    FCMService.enqueue(
+      () =>
+        FCMService.sendNotificationToRole(
+          'admin',
+          '🚨 Payment needs a manual refund',
+          `Order #${payment.orderId}: ₹${amountRupees} was captured but not refunded automatically. ${message}`,
+          {
+            orderId: String(payment.orderId),
+            paymentId: String(payment.id),
+            type: 'unrefunded_capture',
+          }
+        ),
+      `notify admins unrefunded capture order=#${payment.orderId}`
+    );
   }
 
   private static async onPaymentFailed(payload: Record<string, unknown>): Promise<void> {
@@ -509,13 +780,27 @@ export class PaymentsV2Service {
     // Atomic: payment + order move to refunded together. If only the payment save
     // landed and the order update threw, the payment would be terminal (reconciler
     // skips it) while the order still shows the old paymentStatus.
+    // Mirror onto the order ONLY if this payment is the one the order reflects.
+    // On the duplicate-capture path (see applyCapture) the order is legitimately
+    // `paid` from a different payment, and stamping it 'refunded' because we
+    // returned the duplicate charge would corrupt a perfectly good order.
+    const sibling = await paymentRepo.findOne({
+      where: {
+        orderId: payment.orderId,
+        status: In(['paid', 'refund_pending']),
+        id: Not(payment.id),
+      },
+    });
+
     await AppDataSource.transaction(async (mgr) => {
       payment.status = 'refunded';
       await mgr.getRepository(Payment).save(payment);
-      await mgr.getRepository(Order).update(
-        { id: payment.orderId },
-        { paymentStatus: 'refunded' }
-      );
+      if (!sibling) {
+        await mgr.getRepository(Order).update(
+          { id: payment.orderId },
+          { paymentStatus: 'refunded' }
+        );
+      }
     });
 
     // Notify the customer their refund has completed. Enqueued AFTER the commit so a
@@ -603,8 +888,32 @@ export class PaymentsV2Service {
 
     try {
       // 1) Adopt an existing Razorpay refund for this row, if one is already there.
-      const adopted = await this.findExistingRazorpayRefund(razorpayPaymentId, refund.id);
-      if (adopted) {
+      const existing = await this.findExistingRazorpayRefund(
+        razorpayPaymentId,
+        refund.id,
+        Number(refund.amountPaise)
+      );
+
+      if (existing.kind === 'conflict') {
+        // A refund for a DIFFERENT amount already exists on this payment. Creating
+        // ours would over-refund; adopting it would under-refund while telling the
+        // customer they were made whole. Park it for a human.
+        const seen = Number(existing.item.amount ?? 0);
+        const message =
+          `Razorpay already holds refund ${existing.item.id} for ` +
+          `Rs ${(seen / 100).toFixed(2)} on this payment, but this row is for ` +
+          `Rs ${(Number(refund.amountPaise) / 100).toFixed(2)}. Needs manual resolution.`;
+        console.error(`[refund] AMOUNT CONFLICT on refund ${refund.id}: ${message}`);
+        refund.status = 'failed';
+        refund.nextRetryAt = null;
+        refund.lastError = message.slice(0, 255);
+        await refundRepo.save(refund);
+        await this.notifyAdminsRefundFailed(payment, refund);
+        return;
+      }
+
+      if (existing.kind === 'adopt') {
+        const adopted = existing.item;
         console.warn(
           `[refund] adopted existing Razorpay refund ${adopted.id} for refund ${refund.id} — previous attempt succeeded despite erroring`
         );
@@ -647,10 +956,21 @@ export class PaymentsV2Service {
    */
   private static async findExistingRazorpayRefund(
     razorpayPaymentId: string,
-    refundId: string
-  ): Promise<{ id: string; status?: string } | null> {
+    refundId: string,
+    expectedAmountPaise: number
+  ): Promise<
+    | { kind: 'adopt'; item: { id: string; status?: string } }
+    | { kind: 'none' }
+    | { kind: 'conflict'; item: { id: string; status?: string; amount?: number } }
+  > {
     const list = (await RazorpayService.fetchRefundsForPayment(razorpayPaymentId)) as unknown as {
-      items?: Array<{ id: string; status?: string; receipt?: string | null; notes?: unknown }>;
+      items?: Array<{
+        id: string;
+        status?: string;
+        amount?: number;
+        receipt?: string | null;
+        notes?: unknown;
+      }>;
     };
     // A refund Razorpay itself marked `failed` moved no money (bank rejected it,
     // account frozen, …). Adopting one would make the retry a no-op that re-reports
@@ -658,27 +978,38 @@ export class PaymentsV2Service {
     // refund is allowed.
     const live = (list.items ?? []).filter((i) => i.status !== 'failed');
 
-    // Preferred match: a refund we created, tagged with our row id.
+    // Preferred match: a refund we created, tagged with our row id. Definitively
+    // ours, so adopt it whatever the amount.
     for (const item of live) {
       const notes = (item.notes ?? {}) as Record<string, unknown>;
-      if (String(notes.refund_id ?? '') === String(refundId)) return item;
+      if (String(notes.refund_id ?? '') === String(refundId)) return { kind: 'adopt', item };
     }
 
-    // Fallback: ANY live refund on this payment, even one we cannot tie to our row.
-    // easy-basket only ever issues full refunds, so a second refund against the same
-    // payment is never legitimate — it would just pay the customer twice. The usual
-    // source is a refund issued by hand from the Razorpay dashboard while our row sat
-    // stuck, which carries none of our notes. Adopt it rather than duplicate it.
+    // Fallback: a live refund we cannot tie to our row — usually one issued by hand
+    // from the Razorpay dashboard while our row sat stuck. Creating a second refund
+    // alongside it would pay the customer twice, so we never do that here.
+    //
+    // But adopting it blindly (the previous behaviour) is only safe when it covers
+    // the SAME amount. The justification given was "easy-basket only ever issues full
+    // refunds" — true of refunds this code creates, and false of a manual one. A ₹200
+    // goodwill refund on a ₹900 order would be adopted, the row flipped to processed,
+    // and the customer told the full ₹900 was on its way.
     if (live.length > 0) {
-      console.warn(
-        `[refund] adopting untagged Razorpay refund ${live[0].id} for refund ${refundId} — ` +
-          `payment already has a live refund (likely issued manually from the dashboard). ` +
-          `Refusing to create a second one.`
-      );
-      return live[0];
+      const match = live.find((i) => Number(i.amount) === expectedAmountPaise);
+      if (match) {
+        console.warn(
+          `[refund] adopting untagged Razorpay refund ${match.id} for refund ${refundId} — ` +
+            `same amount, likely issued manually from the dashboard. Refusing to create a second one.`
+        );
+        return { kind: 'adopt', item: match };
+      }
+
+      // Partial (or otherwise mismatched) refund present. Neither adopt nor create:
+      // this needs a human to decide what the customer is actually owed.
+      return { kind: 'conflict', item: live[0] };
     }
 
-    return null;
+    return { kind: 'none' };
   }
 
   /**
@@ -1288,9 +1619,13 @@ function extractRazorpayOrderId(payload: Record<string, unknown>): string | null
   return r?.order_id ?? null;
 }
 
-function readPaymentEntity(
-  payload: Record<string, unknown>
-): { id: string; order_id: string; amount: number; error_code?: string } | null {
+function readPaymentEntity(payload: Record<string, unknown>): {
+  id: string;
+  order_id: string;
+  amount: number;
+  currency?: string;
+  error_code?: string;
+} | null {
   const payloadObj = payload.payload as Record<string, unknown> | undefined;
   const wrapper = payloadObj?.payment as Record<string, unknown> | undefined;
   const entity = wrapper?.entity as Record<string, unknown> | undefined;
@@ -1299,6 +1634,7 @@ function readPaymentEntity(
     id: entity.id as string,
     order_id: entity.order_id as string,
     amount: Number(entity.amount),
+    currency: entity.currency as string | undefined,
     error_code: entity.error_code as string | undefined,
   };
 }
@@ -1338,6 +1674,47 @@ function isDuplicateKeyError(err: unknown): boolean {
   return e?.code === 'ER_DUP_ENTRY' || e?.errno === 1062;
 }
 
+/**
+ * TTL for the per-payment lock.
+ *
+ * Was 30s, justified by "the handler path is sub-second". True for the webhook, but
+ * the same lock is held across createRefund, whose critical section contains TWO
+ * sequential Razorpay HTTP calls (fetchRefundsForPayment, then payments.refund). A
+ * slow Razorpay could blow the TTL, letting a second caller acquire the lock while
+ * the first still believed it held it. 90s comfortably exceeds two round-trips plus
+ * timeout, and costs nothing now that release is prompt and token-checked.
+ */
+const PAYMENT_LOCK_TTL_SECONDS = 90;
+
+/**
+ * Which payment locks the CURRENT async call chain already holds.
+ *
+ * The lock is a plain Redis SET NX, so it is not re-entrant: asking for a lock you
+ * already hold deadlocks against yourself. That was not theoretical. markPaymentPaid
+ * auto-refunds a payment that landed on a cancelled order by calling createRefund,
+ * which takes withPaymentLock — but markPaymentPaid is ONLY ever reached with that
+ * exact lock already held (handleWebhook takes it before onPaymentCaptured; the
+ * reconciler wraps markPaymentPaid in it). So the acquire always failed, createRefund
+ * returned 409, and markPaymentPaid ignored the result and logged "auto-refund issued".
+ * The customer was charged for a cancelled order and never refunded.
+ *
+ * AsyncLocalStorage scopes this to one logical operation, so a genuinely concurrent
+ * caller in another request still contends on Redis as before — only self-recursion
+ * is allowed through.
+ */
+const heldPaymentLocks = new AsyncLocalStorage<Set<string>>();
+
+/** Run `fn` with `lockKey` recorded as held by this async context. */
+function runHoldingLock<T>(lockKey: string, fn: () => Promise<T>): Promise<T> {
+  const held = new Set(heldPaymentLocks.getStore() ?? []);
+  held.add(lockKey);
+  return heldPaymentLocks.run(held, fn);
+}
+
+function alreadyHoldsLock(lockKey: string): boolean {
+  return heldPaymentLocks.getStore()?.has(lockKey) ?? false;
+}
+
 async function acquireLock(key: string, ttlSeconds: number): Promise<string | null> {
   const token = crypto.randomBytes(16).toString('hex');
   const client = await RedisService.getClient();
@@ -1345,12 +1722,30 @@ async function acquireLock(key: string, ttlSeconds: number): Promise<string | nu
   return ok === 'OK' ? token : null;
 }
 
-async function releaseLock(key: string, _token: string): Promise<void> {
-  // TTL-bounded (30s) so stale locks self-heal. Plain DEL is safe here because the
-  // handler path is sub-second; in the worst case another holder's release no-ops.
+/**
+ * Release ONLY if we still hold the lock.
+ *
+ * This used to be a plain DEL that ignored the token. Combined with a TTL shorter
+ * than the critical section, that is the classic lock-stealing bug: holder A's TTL
+ * expires, holder B legitimately acquires the lock, then A's `finally` deletes B's
+ * lock and a third caller walks straight in. Two refund flows then run unserialised
+ * against a SELECT-SUM-then-INSERT cap that is not transactional.
+ *
+ * The compare-and-delete has to be atomic, hence Lua — a GET followed by a DEL has
+ * the same race in miniature.
+ */
+const RELEASE_IF_OWNER = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+else
+  return 0
+end`;
+
+async function releaseLock(key: string, token: string): Promise<void> {
   try {
-    await RedisService.del(key);
+    const client = await RedisService.getClient();
+    await client.eval(RELEASE_IF_OWNER, { keys: [key], arguments: [token] });
   } catch {
-    // ignore
+    // Best-effort: the TTL is the backstop if the release itself fails.
   }
 }

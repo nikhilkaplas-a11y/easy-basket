@@ -19,6 +19,7 @@ import 'package:intl/intl.dart';
 
 // Conditional import for Razorpay types
 import 'package:razorpay_flutter/razorpay_flutter.dart' if (dart.library.html) '../../services/razorpay_web_stub.dart';
+import '../../l10n/app_localizations.dart';
 
 class PaymentScreen extends StatefulWidget {
   final int? addressId;
@@ -35,6 +36,11 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
   bool _isProcessingPayment = false;
   DateTime? _paymentStartTime;
   int? _currentOrderId; // Store the order ID we're processing
+  // Razorpay order id this screen opened checkout for. RazorpayService's callbacks
+  // are process-global statics, so a rebuilt/second PaymentScreen overwrites them
+  // and the wrong instance can receive a response. Comparing against this makes a
+  // mismatched callback a no-op instead of a wrongly-attributed payment.
+  String? _currentRazorpayOrderId;
 
   // Stable idempotency key for THIS checkout attempt. Reused on retry (timeout,
   // double-tap) so the backend returns the same order instead of creating a
@@ -131,6 +137,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       _isProcessingPayment = false;
     }
     _currentOrderId = null; // Clear stored order ID
+    _currentRazorpayOrderId = null;
     RazorpayService.clear();
     // Clear callbacks to prevent memory leaks
     RazorpayService.onSuccess = null;
@@ -141,6 +148,14 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     if (!mounted) return;
+
+    // Ignore a response that belongs to a different checkout than the one this
+    // screen opened — see _currentRazorpayOrderId.
+    final expected = _currentRazorpayOrderId;
+    if (expected != null && response.orderId != null && response.orderId != expected) {
+      print('Ignoring Razorpay success for ${response.orderId}; this screen owns $expected');
+      return;
+    }
     
     // Immediately reset loading state
     if (mounted) {
@@ -154,8 +169,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     // Show processing message
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verifying payment...'),
+         SnackBar(
+          content: Text(AppLocalizations.of(context).paymentVerifying),
           duration: Duration(seconds: 2),
         ),
       );
@@ -164,8 +179,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     if (authProvider.token == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login to continue.'),
+           SnackBar(
+            content: Text(AppLocalizations.of(context).paymentLoginToContinue),
             backgroundColor: Colors.red,
           ),
         );
@@ -198,8 +213,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     if (orderId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to identify order. Please check your orders.'),
+           SnackBar(
+            content: Text(AppLocalizations.of(context).paymentUnableIdentifyOrder),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 3),
           ),
@@ -217,8 +232,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       if (paymentId.isEmpty || signature.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Invalid payment response. Missing payment details.'),
+             SnackBar(
+              content: Text(AppLocalizations.of(context).paymentInvalidMissing),
               backgroundColor: Colors.red,
             ),
           );
@@ -260,24 +275,37 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
           });
         }
       } else {
+        // NOT a failure. Razorpay already reported success, so the money has left the
+        // customer's account; only our confirmation call did not land. The webhook is
+        // the authority and will settle this within seconds. Showing "failed" here
+        // (with the cart still full) is what pushed customers into paying twice.
         if (mounted) {
-          // Navigate to payment status page with failure
           context.go('/payment/status', extra: {
-            'status': PaymentStatus.failed,
-            'message': 'Payment verification failed. Please contact support or try again.',
+            'status': PaymentStatus.pending,
+            'message':
+                "Payment received — we're still confirming it. Your order will appear in Orders shortly.",
             'orderId': orderId,
+          });
+          // Clear the cart: the payment DID go through, so leaving the basket intact
+          // makes re-ordering the obvious next tap.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            cartProvider.clear();
           });
         }
       }
     } catch (e) {
-      // Ensure loading state is reset on error
+      // Same reasoning as above: an exception on our side says nothing about whether
+      // the customer was charged, and Razorpay told us they were.
       if (mounted) {
         setState(() => _isProcessingPayment = false);
-        // Navigate to payment status page with error
         context.go('/payment/status', extra: {
-          'status': PaymentStatus.failed,
-          'message': 'Error processing payment: ${e.toString()}',
+          'status': PaymentStatus.pending,
+          'message':
+              "Payment received — we're still confirming it. Your order will appear in Orders shortly.",
           'orderId': _currentOrderId,
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          cartProvider.clear();
         });
       }
     } finally {
@@ -307,7 +335,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('External wallet selected: ${response.walletName}'),
+          content: Text(AppLocalizations.of(context).paymentExternalWallet(response.walletName ?? '')),
         ),
       );
     }
@@ -320,7 +348,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
     if (authProvider.token == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login first')),
+         SnackBar(content: Text(AppLocalizations.of(context).commonLoginFirst)),
       );
       return;
     }
@@ -357,7 +385,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an address')),
+         SnackBar(content: Text(AppLocalizations.of(context).paymentSelectAddress)),
       );
       return;
     }
@@ -423,8 +451,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
         // Web platform - show message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Online payment is currently available on mobile app only. Please use Cash on Delivery or test on Android/iOS.'),
+             SnackBar(
+              content: Text(AppLocalizations.of(context).paymentWebOnlyCod),
               duration: Duration(seconds: 5),
             ),
           );
@@ -478,8 +506,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
         setState(() => _isProcessingPayment = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to initialize payment. Please try again.'),
+             SnackBar(
+              content: Text(AppLocalizations.of(context).paymentInitFailed),
               backgroundColor: Colors.red,
             ),
           );
@@ -487,16 +515,23 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
         return;
       }
 
-      // Extract values with null safety
+      // Extract values with null safety.
+      //
+      // `amount` is the authoritative integer paise the SERVER priced this order at
+      // and used to create the Razorpay order. Use it verbatim. Re-deriving paise
+      // from the local cart total was a real bug twice over: float truncation made
+      // some totals unpayable, and a cart total that had drifted from server pricing
+      // mismatched the order outright.
       final keyId = razorpayOrder['key'] as String?;
       final razorpayOrderId = razorpayOrder['razorpayOrderId'] as String?;
+      final amountPaise = (razorpayOrder['amount'] as num?)?.toInt();
 
-      if (keyId == null || razorpayOrderId == null) {
+      if (keyId == null || razorpayOrderId == null || amountPaise == null) {
         setState(() => _isProcessingPayment = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Invalid payment response. Please try again.'),
+             SnackBar(
+              content: Text(AppLocalizations.of(context).paymentInvalidResponse),
               backgroundColor: Colors.red,
             ),
           );
@@ -507,15 +542,16 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
 
-      // Store order ID in state for payment callback
+      // Store order + Razorpay order id in state for the payment callback
       setState(() {
         _currentOrderId = orderId;
+        _currentRazorpayOrderId = razorpayOrderId;
       });
 
       // Open Razorpay checkout
       RazorpayService.openCheckout(
         keyId: keyId,
-        amount: amount,
+        amountPaise: amountPaise,
         orderId: razorpayOrderId,
         name: 'Easy Basket',
         description: 'Grocery Order #$orderId',
@@ -531,7 +567,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(AppLocalizations.of(context).commonError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -549,7 +585,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        title: const Text('Payment', style: TextStyle(fontWeight: FontWeight.bold)),
+        title:  Text(AppLocalizations.of(context).paymentTitle, style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -579,9 +615,9 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                       child: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF0C831F)),
                     ),
                     const SizedBox(width: 8),
-                    const Text('Order Summary', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                     Text(AppLocalizations.of(context).paymentOrderSummary, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     const Spacer(),
-                    Text('${cartProvider.items.length} items', style: TextStyle(fontSize: 12, color: AppTheme.grey)),
+                    Text(AppLocalizations.of(context).paymentItemCount(cartProvider.items.length), style: TextStyle(fontSize: 12, color: AppTheme.grey)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -610,7 +646,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                     Text(AppLocalizations.of(context).paymentTotal, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     Text(
                       currencyFormat.format(cartProvider.totalAmount),
                       style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.black),
@@ -623,13 +659,13 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
           const SizedBox(height: 16),
 
           // Payment Method
-          const Text('Payment Method', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+           Text(AppLocalizations.of(context).paymentMethod, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
 
           // Online Payment tile
           _buildPaymentTile(
-            title: 'Online Payment',
-            subtitle: 'Cards, UPI, Wallets, Netbanking',
+            title: AppLocalizations.of(context).paymentOnline,
+            subtitle: AppLocalizations.of(context).paymentCardsUpi,
             icon: Icons.payment_rounded,
             value: 'razorpay',
           ),
@@ -637,8 +673,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
           // COD tile
           _buildPaymentTile(
-            title: 'Cash on Delivery',
-            subtitle: 'Pay when you receive',
+            title: AppLocalizations.of(context).paymentCod,
+            subtitle: AppLocalizations.of(context).paymentPayOnReceive,
             icon: Icons.money_rounded,
             value: 'cash',
           ),
@@ -657,14 +693,14 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Delivery Notes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                 Text(AppLocalizations.of(context).paymentDeliveryNotes, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _notesController,
                   maxLines: 2,
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
-                    hintText: 'Any special instructions... (optional)',
+                    hintText: AppLocalizations.of(context).paymentNotesHint,
                     hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey),
                     filled: true,
                     fillColor: const Color(0xFFF6F6F6),
@@ -708,7 +744,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Total', style: TextStyle(fontSize: 11, color: AppTheme.grey)),
+                          Text(AppLocalizations.of(context).paymentTotal, style: TextStyle(fontSize: 11, color: AppTheme.grey)),
                           const SizedBox(height: 2),
                           Text(
                             currencyFormat.format(cartProvider.totalAmount),

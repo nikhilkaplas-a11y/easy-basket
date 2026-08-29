@@ -67,6 +67,18 @@ class RazorpayService {
     }
   }
 
+  /// Ask the server to verify the checkout signature.
+  ///
+  /// Returns `true` only when the server actually confirmed it. Returns `false`
+  /// for BOTH a server rejection and a network failure — callers must not treat
+  /// `false` as "the payment failed", because by the time this runs Razorpay has
+  /// already taken the customer's money.
+  ///
+  /// It previously returned `response != null` inside a catch-all that mapped every
+  /// exception to `false`, and the caller rendered that as "Payment verification
+  /// failed. Please contact support or try again." with the cart still populated —
+  /// so a single network blip after a successful payment funnelled the customer
+  /// straight into paying a second time.
   static Future<bool> verifyPayment({
     required int orderId,
     required String paymentId,
@@ -89,14 +101,25 @@ class RazorpayService {
 
       return response != null;
     } catch (e) {
-      print('Error verifying payment: $e');
+      // Transport failure or a non-2xx. Either way the webhook remains the
+      // authority on this payment, so we report "not yet confirmed", never "failed".
+      print('Payment verify did not confirm (webhook will settle it): $e');
       return false;
     }
   }
 
+  /// [amountPaise] MUST be the integer paise amount the SERVER used to create the
+  /// Razorpay order (the `amount` field of /payment/create-order).
+  ///
+  /// It used to take rupees as a double and compute `(amount * 100).toInt()` here.
+  /// That truncates instead of rounding — Dart evaluates `354.7 * 100` as
+  /// 35469.999999999996, so `.toInt()` yielded 35469 against an order created for
+  /// 35470. Razorpay Checkout validates this option against the order it was given
+  /// and refuses to open on a mismatch, so specific cart totals could never be paid.
+  /// Passing server paise through untouched removes the float arithmetic entirely.
   static void openCheckout({
     required String keyId,
-    required double amount,
+    required int amountPaise,
     required String orderId,
     required String name,
     required String description,
@@ -108,7 +131,7 @@ class RazorpayService {
       // For web, open Razorpay checkout in new window
       _openRazorpayWebCheckout(
         keyId: keyId,
-        amount: amount,
+        amountPaise: amountPaise,
         orderId: orderId,
         name: name,
         description: description,
@@ -126,7 +149,7 @@ class RazorpayService {
 
     final options = {
       'key': keyId,
-      'amount': (amount * 100).toInt(), // Convert to paise
+      'amount': amountPaise, // already paise, straight from the server
       'name': name,
       'description': description,
       'order_id': orderId,
@@ -148,7 +171,7 @@ class RazorpayService {
 
   static void _openRazorpayWebCheckout({
     required String keyId,
-    required double amount,
+    required int amountPaise,
     required String orderId,
     required String name,
     required String description,

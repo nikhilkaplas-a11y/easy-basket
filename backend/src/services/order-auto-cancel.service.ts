@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
 import { FCMService } from './fcm.service';
 import { OrderInventoryService } from './order-inventory.service';
+import { LeaderElectionService } from './leader-election.service';
 
 /**
  * Periodic job: pending orders that stay unaccepted past the configured window are cancelled
@@ -51,6 +52,12 @@ export class OrderAutoCancelService {
 
   private static async checkAndCancelOrders(): Promise<void> {
     try {
+      // index.ts start()s this in every PM2 cluster worker and on every EC2 box,
+      // so without a gate the sweep runs N times concurrently. TTL is 3x the
+      // 60s interval so a slow tick never drops leadership mid-run.
+      const lead = await LeaderElectionService.isLeader('order-auto-cancel', 180);
+      if (!lead) return;
+
       const orderRepository = AppDataSource.getRepository(Order);
 
       const cutoffTime = new Date(Date.now() - this.autoCancelAfterMs);
@@ -70,9 +77,27 @@ export class OrderAutoCancelService {
       const windowMins = Math.round(this.autoCancelAfterMs / 60_000);
 
       for (const order of staleOrders) {
+        // Atomic claim BEFORE restoring stock. Without it this was a plain
+        // read-then-write: every PM2 cluster worker (instances: 'max') and every
+        // EC2 box behind the ALB reads the same order as 'pending' and each one
+        // calls restoreReservedStockForItems — crediting inventory N times for a
+        // single cancellation. PaymentsV2Service.markPaymentFailed restores stock
+        // under the identical `status === 'pending'` condition and races this too.
+        //
+        // Only the worker whose UPDATE actually flips the row does the restore.
+        // Same pattern as AdminController.updateOrderStatus / approveCancellation.
+        const claim = await orderRepository.update(
+          { id: order.id, status: 'pending' },
+          { status: 'cancelled' }
+        );
+        if (claim.affected !== 1) {
+          // Someone else (another worker, a payment failure, an admin) already
+          // moved this order out of 'pending'. They own the stock restore.
+          continue;
+        }
+
         await OrderInventoryService.restoreReservedStockForItems(order.items);
         order.status = 'cancelled';
-        await orderRepository.save(order);
 
         console.log(
           `❌ [AutoCancel] Order #${order.id} auto-cancelled (pending > ${windowMins} min), stock restored`

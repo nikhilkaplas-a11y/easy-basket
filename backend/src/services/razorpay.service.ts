@@ -13,20 +13,28 @@ import Razorpay from 'razorpay';
 export class RazorpayService {
   private static instance: Razorpay | null = null;
 
-  static init(): void {
-    const id = process.env.RAZORPAY_KEY_ID;
-    const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!id || !secret) {
-      console.warn('[Razorpay] KEY_ID / KEY_SECRET not set — payment init will fail');
-      return;
-    }
-    this.instance = new Razorpay({ key_id: id, key_secret: secret });
-    console.log('[Razorpay] initialized');
-  }
-
+  /**
+   * Lazily construct the SDK client on first use.
+   *
+   * This used to be an eager `RazorpayService.init()` at the bottom of this module.
+   * That ran at import time — and because TypeScript emits every `import` as a
+   * `require` hoisted above the first statement, it executed BEFORE index.ts called
+   * `dotenv.config()`. The keys were therefore always undefined at init, and the
+   * whole thing only worked in production by accident: ecosystem.config.js happens
+   * to inject RAZORPAY_KEY_ID/SECRET into the PM2 env. Run `npm start` directly, or
+   * trim that allowlist, and every payment threw 'Razorpay not initialized'.
+   *
+   * Reading env on first call instead makes the module load-order-independent.
+   */
   static client(): Razorpay {
     if (!this.instance) {
-      throw new Error('Razorpay not initialized (missing RAZORPAY_KEY_ID/SECRET)');
+      const id = process.env.RAZORPAY_KEY_ID;
+      const secret = process.env.RAZORPAY_KEY_SECRET;
+      if (!id || !secret) {
+        throw new Error('Razorpay not initialized (missing RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET)');
+      }
+      this.instance = new Razorpay({ key_id: id, key_secret: secret });
+      console.log('[Razorpay] client initialized');
     }
     return this.instance;
   }
@@ -132,5 +140,3 @@ function safeEqualHex(a: string, b: string): boolean {
     return false;
   }
 }
-
-RazorpayService.init();

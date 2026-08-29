@@ -1,9 +1,10 @@
-import { LessThan, In } from 'typeorm';
+import { LessThan, LessThanOrEqual, IsNull, In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Payment } from '../entities/Payment';
 import { Refund } from '../entities/Refund';
 import { RazorpayService } from './razorpay.service';
 import { PaymentsV2Service } from './payments-v2.service';
+import { LeaderElectionService } from './leader-election.service';
 
 /**
  * Reconciliation worker — the final coarse safety net.
@@ -51,6 +52,18 @@ export class PaymentsReconcilerService {
   }
 
   static async tick(): Promise<void> {
+    // One sweeper across the whole fleet. Every PM2 worker and every EC2 box runs
+    // start(), and each unguarded tick re-reads the same 200 rows and re-hits the
+    // Razorpay API with identical fetches — pure duplicated quota. The per-payment
+    // Redis lock keeps the WRITES safe either way; this stops the redundant READS.
+    // TTL is 2.5x the default 30-min interval.
+    const intervalMin = Number(process.env.RECONCILER_INTERVAL_MINUTES) || 30;
+    const lead = await LeaderElectionService.isLeader(
+      'payments-reconciler',
+      Math.round(intervalMin * 60 * 2.5)
+    );
+    if (!lead) return;
+
     await this.reconcileStalePayments();
     await this.reconcilePendingRefunds();
   }
@@ -68,6 +81,10 @@ export class PaymentsReconcilerService {
         status: In(['initiated', 'success_unverified']),
         createdAt: LessThan(cutoff),
       },
+      // Oldest first. An unordered LIMIT gives MySQL licence to return the same
+      // arbitrary 200 rows every tick, so a backlog larger than the page could
+      // starve indefinitely.
+      order: { id: 'ASC' },
       take: 200,
     });
 
@@ -168,8 +185,21 @@ export class PaymentsReconcilerService {
     const refundRepo = AppDataSource.getRepository(Refund);
     const cutoff = new Date(Date.now() - 30 * 60 * 1000);
 
+    // Honour next_retry_at, which is what the column is FOR.
+    //
+    // This used to select purely on `createdAt < now - 30m`, so recordRefundOwed —
+    // the Redis-down path, which writes next_retry_at = now precisely to mean "retry
+    // immediately" — was ignored and every deferred refund waited a full 30 minutes.
+    // Migration 006 added idx_refund_retry (status, next_retry_at) and documented it
+    // as "the index the reconciler backstop scans on"; nothing scanned it until now.
+    //
+    // Rows with no next_retry_at (the normal success path) keep the old age rule.
     const pending = await refundRepo.find({
-      where: { status: 'pending', createdAt: LessThan(cutoff) },
+      where: [
+        { status: 'pending', nextRetryAt: LessThanOrEqual(new Date()) },
+        { status: 'pending', nextRetryAt: IsNull(), createdAt: LessThan(cutoff) },
+      ],
+      order: { id: 'ASC' },
       take: 200,
     });
 

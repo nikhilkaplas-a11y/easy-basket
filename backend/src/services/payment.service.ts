@@ -14,7 +14,8 @@ import { RazorpayService } from './razorpay.service';
  */
 export class PaymentService {
   static initialize(): void {
-    // No-op: RazorpayService auto-initializes on import. Kept for import-side-effects callers.
+    // No-op: RazorpayService builds its SDK client lazily on first use, so there is
+    // nothing to initialize here. Kept for callers that relied on the side effect.
   }
 
   static async createOrder(

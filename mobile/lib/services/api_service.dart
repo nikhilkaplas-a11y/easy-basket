@@ -80,6 +80,28 @@ class ApiService {
     );
   }
 
+  /// PATCH. Mirrors put() exactly.
+  ///
+  /// This was missing while admin_support_requests_screen.dart already called it,
+  /// so the whole app failed to compile ("The method 'patch' isn't defined for the
+  /// type 'ApiService'"). The backend route it targets really is a PATCH
+  /// (support.routes.ts: router.patch('/:id/status')), so adding the verb is the
+  /// correct fix rather than rewriting the caller to use put().
+  Future<dynamic> patch(
+    String endpoint,
+    Map<String, dynamic> data, {
+    String? token,
+    bool retryOnExpired = true,
+  }) {
+    return _send(
+      method: 'PATCH',
+      endpoint: endpoint,
+      token: token,
+      body: data,
+      retryOnExpired: retryOnExpired,
+    );
+  }
+
   Future<dynamic> delete(
     String endpoint, {
     String? token,
@@ -126,6 +148,8 @@ class ApiService {
           return http.post(uri, headers: headers, body: encoded).timeout(_timeout, onTimeout: _onTimeout);
         case 'PUT':
           return http.put(uri, headers: headers, body: encoded).timeout(_timeout, onTimeout: _onTimeout);
+        case 'PATCH':
+          return http.patch(uri, headers: headers, body: encoded).timeout(_timeout, onTimeout: _onTimeout);
         case 'DELETE':
           return http.delete(uri, headers: headers).timeout(_timeout, onTimeout: _onTimeout);
         default:

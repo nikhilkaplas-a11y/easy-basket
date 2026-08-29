@@ -39,6 +39,12 @@ dotenv.config();
 // Must run after dotenv.config() and before any route handlers can serve traffic.
 require('./config/jwt');
 
+// Same for the three Razorpay secrets. RAZORPAY_WEBHOOK_SECRET especially: it is
+// read lazily and a missing value makes verifyWebhookSignature return false, so
+// every webhook 401s silently and the authoritative payment-confirmation path
+// quietly stops existing. Fail loudly at boot instead.
+require('./config/razorpay-env');
+
 // Re-initialize S3Service after dotenv.config() to ensure env vars are loaded
 // (S3Service.initialize() is called on module load, but env vars might not be ready)
 S3Service.initialize();

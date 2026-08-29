@@ -76,21 +76,45 @@ SET @ddl := IF(@col_exists = 0,
 PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ---------------------------------------------------------------------------
--- 5) Backfill existing rows.
+-- 5) Backfill existing rows. FIRST RUN ONLY.
 --
 -- Rows already in flight before this migration have made exactly one attempt.
 -- Marking them 1 means a stuck row gets its one automatic retry after deploy
 -- rather than being treated as never-attempted.
+--
+-- This MUST NOT run twice. The file's header promises it is safe to re-run, and
+-- the unguarded `WHERE attempt_count = 0` broke that promise: on a second run it
+-- silently burns one of the two automatic attempts belonging to every genuinely
+-- new refund. PaymentsV2Service.recordRefundOwed writes rows at exactly
+-- attempt_count = 0, so those legitimately-fresh rows were the ones hit.
+--
+-- Guarded on the marker table below, which only this migration writes.
 -- ---------------------------------------------------------------------------
-UPDATE refunds SET attempt_count = 1 WHERE attempt_count = 0;
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  name       VARCHAR(128) NOT NULL PRIMARY KEY,
+  applied_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Pre-existing orphans (the bug this migration exists for): pending with no
--- Razorpay id and no way to progress. Schedule them for an immediate retry so
--- the deploy itself drains the backlog.
-UPDATE refunds
-   SET next_retry_at = NOW(3)
- WHERE status = 'pending'
-   AND razorpay_refund_id IS NULL;
+SET @already := (
+  SELECT COUNT(*) FROM schema_migrations WHERE name = '006_refund_retries_backfill'
+);
+
+SET @ddl := IF(@already = 0,
+  'UPDATE refunds SET attempt_count = 1 WHERE attempt_count = 0',
+  'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @ddl := IF(@already = 0,
+  'UPDATE refunds SET next_retry_at = NOW(3) WHERE status = ''pending'' AND razorpay_refund_id IS NULL',
+  'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+INSERT IGNORE INTO schema_migrations (name) VALUES ('006_refund_retries_backfill');
+
+-- (The "schedule pre-existing orphans for immediate retry" statement that used to
+-- live here is now part of the guarded first-run block above, for the same reason:
+-- re-running it would reset next_retry_at on refunds that are legitimately waiting
+-- out their backoff, collapsing the retry spacing.)
 
 -- ---------------------------------------------------------------------------
 -- Rollback:

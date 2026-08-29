@@ -62,16 +62,36 @@ echo -e "${GREEN}📦 Installing dependencies...${NC}"
 npm install
 
 # Build TypeScript
+#
+# The old dist is removed first. `[ -d dist ]` alone was not a build check: a dist
+# left over from an earlier release satisfies it even when the build silently failed
+# or never ran, and PM2 then happily serves months-old code. That is not theoretical
+# — the checked-in dist predated the entire payments-v2 stack.
+echo -e "${GREEN}🧹 Removing previous build...${NC}"
+rm -rf dist
+
 echo -e "${GREEN}🔨 Building TypeScript...${NC}"
 npm run build
 
-# Check if build was successful
-if [ ! -d "dist" ]; then
-    echo -e "${RED}Build failed! dist directory not found.${NC}"
-    exit 1
-fi
+# Assert the build actually produced the current payment stack, not just *a* dist.
+REQUIRED_ARTIFACTS=(
+    "dist/index.js"
+    "dist/services/payments-v2.service.js"
+    "dist/services/payments-reconciler.service.js"
+    "dist/services/leader-election.service.js"
+    "dist/config/razorpay-env.js"
+    "dist/services/queue/payment-reconcile.worker.js"
+    "dist/services/queue/refund-retry.worker.js"
+)
+for artifact in "${REQUIRED_ARTIFACTS[@]}"; do
+    if [ ! -f "$artifact" ]; then
+        echo -e "${RED}Build incomplete! Missing $artifact${NC}"
+        echo -e "${RED}Refusing to deploy — this would ship a payment system without it.${NC}"
+        exit 1
+    fi
+done
 
-echo -e "${GREEN}✓ Build successful${NC}"
+echo -e "${GREEN}✓ Build successful (payment stack verified)${NC}"
 
 # Stop existing PM2 process if running
 if pm2 list | grep -q "easy-basket-api"; then
