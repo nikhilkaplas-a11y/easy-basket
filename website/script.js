@@ -1,74 +1,108 @@
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 // Smooth scroll for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
+        const targetId = this.getAttribute('href');
+        if (targetId.length < 2) return; // bare "#" — nothing to scroll to
+        const target = document.querySelector(targetId);
         if (target) {
+            e.preventDefault();
             target.scrollIntoView({
-                behavior: 'smooth',
+                behavior: prefersReducedMotion ? 'auto' : 'smooth',
                 block: 'start'
             });
         }
     });
 });
 
-// Navbar scroll effect
-let lastScroll = 0;
+// Navbar shadow once the page has scrolled past the hero's top edge
 const navbar = document.querySelector('.navbar');
+if (navbar) {
+    const updateNavbarState = () => {
+        navbar.classList.toggle('navbar--scrolled', window.pageYOffset > 20);
+    };
+    updateNavbarState();
+    window.addEventListener('scroll', updateNavbarState, { passive: true });
+}
 
-window.addEventListener('scroll', () => {
-    const currentScroll = window.pageYOffset;
-    
-    if (currentScroll > 100) {
-        navbar.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1)';
-    } else {
-        navbar.style.boxShadow = 'none';
-    }
-    
-    lastScroll = currentScroll;
-});
+// Mobile nav toggle (hamburger)
+const navToggle = document.getElementById('navToggle');
+const navLinks = document.getElementById('navLinks');
 
-// Intersection Observer for fade-in animations
-const observerOptions = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
-};
+if (navToggle && navLinks) {
+    const closeMenu = () => {
+        navLinks.classList.remove('is-open');
+        navToggle.setAttribute('aria-expanded', 'false');
+    };
 
-const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
+    navToggle.addEventListener('click', () => {
+        const isOpen = navLinks.classList.toggle('is-open');
+        navToggle.setAttribute('aria-expanded', String(isOpen));
+    });
+
+    navLinks.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', closeMenu);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!navLinks.classList.contains('is-open')) return;
+        if (!navLinks.contains(e.target) && !navToggle.contains(e.target)) {
+            closeMenu();
         }
     });
-}, observerOptions);
 
-// Observe feature cards and steps
-document.querySelectorAll('.feature-card, .step').forEach(el => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(30px)';
-    el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
-    observer.observe(el);
-});
-
-// Add click handlers for download buttons (placeholder)
-document.querySelectorAll('.download-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        // You can add actual download links here when apps are published
-        alert('Easy Basket will be available soon on Google Play and App Store!');
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeMenu();
     });
-});
+}
 
-// Subtle hover on hero device frame
+// Scroll-triggered reveal animations (feature cards, steps, team cards,
+// section headers). Elements only get the hiding `.reveal` class here in
+// JS, so if this script fails to load the content just stays visible —
+// no permanently-hidden sections.
+const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            revealObserver.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+
+function prepareReveal(selector, staggerGroup) {
+    document.querySelectorAll(selector).forEach((el, i) => {
+        el.classList.add('reveal');
+        if (!prefersReducedMotion) {
+            el.style.transitionDelay = `${(i % staggerGroup) * 90}ms`;
+        }
+        revealObserver.observe(el);
+    });
+}
+
+prepareReveal('.section-header', 1);
+prepareReveal('.feature-card', 3);
+prepareReveal('.step', 4);
+prepareReveal('.team-card', 2);
+
+// Subtle hover lift on the hero device frame (skipped for reduced-motion users)
 const heroDevice = document.querySelector('.hero-device');
-if (heroDevice) {
+if (heroDevice && !prefersReducedMotion) {
     heroDevice.addEventListener('mouseenter', () => {
         heroDevice.style.transform = 'scale(1.03)';
-        heroDevice.style.transition = 'transform 0.3s ease';
     });
 
     heroDevice.addEventListener('mouseleave', () => {
         heroDevice.style.transform = 'scale(1)';
     });
 }
+
+// Google Play button links out for real now — nothing to intercept there.
+// The App Store button is still a placeholder (href="javascript:void(0)")
+// until the iOS app ships, so just let people know it's coming.
+document.querySelectorAll('.download-btn--soon').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('Easy Basket for iOS is coming soon!');
+    });
+});
