@@ -14,8 +14,7 @@ A beautiful, modern landing page for Easy Basket - Instant Grocery Delivery app.
 - ✅ Modern, responsive design
 - ✅ Mobile-friendly
 - ✅ Smooth animations
-- ✅ Google Play & iOS badges
-- ✅ "Launching Soon" indicators
+- ✅ Live Google Play download link, iOS "coming soon" badge
 - ✅ Feature highlights
 - ✅ How it works section
 - ✅ Download section

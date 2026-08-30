@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Easy Basket - Instant Grocery Delivery. Get fresh groceries delivered to your doorstep in 10-20 minutes. Available on Google Play and iOS.">
+    <meta name="description" content="Easy Basket - Instant Grocery Delivery. Get fresh groceries delivered to your doorstep in 10-20 minutes. Now live on Google Play — iOS coming soon.">
+    <meta name="theme-color" content="#2ECC71">
+    <meta name="color-scheme" content="light">
     <title>Easy Basket - Instant Grocery Delivery</title>
     <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="images/favicon.svg">
@@ -27,12 +29,17 @@
                     </svg>
                     <span class="logo-text">Easy Basket</span>
                 </a>
-                <div class="nav-links">
+                <div class="nav-links" id="navLinks">
                     <a href="#features">Features</a>
                     <a href="#how-it-works">How It Works</a>
                     <a href="#team">Team</a>
                     <a href="#download" class="btn-download">Download</a>
                 </div>
+                <button class="nav-toggle" id="navToggle" type="button" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </div>
         </div>
     </nav>
@@ -47,7 +54,7 @@
                         <span class="gradient-text">In Minutes</span>
                     </h1>
                     <p class="hero-description">
-                        Get fresh groceries delivered to your doorstep in just 10-20 minutes. 
+                        Get fresh groceries delivered to your doorstep in just 10-20 minutes.
                         Easy Basket brings convenience right to your home.
                     </p>
                     <div class="hero-badges">
@@ -65,7 +72,7 @@
                                 <path d="M12 6V18"/>
                                 <path d="M6 12H18"/>
                             </svg>
-                            <span>Available on iOS</span>
+                            <span>iOS Coming Soon</span>
                         </div>
                     </div>
                     <div class="hero-cta">
@@ -74,7 +81,7 @@
                     </div>
                     <div class="coming-soon">
                         <span class="pulse-dot"></span>
-                        <span>Launching Soon</span>
+                        <span>Now Live on Google Play</span>
                     </div>
                 </div>
                 <div class="hero-image">
@@ -268,7 +275,7 @@
                 <h2>Ready to Get Started?</h2>
                 <p>Download Easy Basket now and experience instant grocery delivery</p>
                 <div class="download-buttons">
-                    <a href="#" class="download-btn google-play" aria-label="Download on Google Play">
+                    <a href="https://play.google.com/store/apps/details?id=com.easybasket.grocery" class="download-btn google-play" aria-label="Download on Google Play" target="_blank" rel="noopener noreferrer">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M3 20.5V3.5C3 2.91 3.34 2.39 3.84 2.15L13.69 12L3.84 21.85C3.34 21.6 3 21.09 3 20.5ZM16.81 15.12L6.05 21.34L14.54 12.85L16.81 15.12ZM20.16 10.81C20.5 11.08 20.75 11.5 20.75 12C20.75 12.5 20.53 12.9 20.18 13.18L17.89 14.5L15.39 12L17.89 9.5L20.16 10.81ZM6.05 2.66L16.81 8.88L14.54 11.15L6.05 2.66Z"/>
                         </svg>
@@ -277,19 +284,19 @@
                             <span class="download-name">Google Play</span>
                         </div>
                     </a>
-                    <a href="#" class="download-btn app-store" aria-label="Download on App Store">
+                    <a href="javascript:void(0)" class="download-btn app-store download-btn--soon" aria-label="App Store version coming soon" aria-disabled="true">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M17.05 20.28C16.07 21.28 14.87 21.47 13.67 21.47C11.59 21.47 9.84 20.75 8.38 19.3C6.92 17.85 6.2 16.1 6.2 14.02C6.2 12.82 6.39 11.62 7.39 10.64L8.7 9.33C9.7 8.33 10.9 8.14 12.1 8.14C14.18 8.14 15.93 8.86 17.39 10.32C18.84 11.77 19.56 13.52 19.56 15.6C19.56 16.8 19.37 18 18.37 18.98L17.05 20.28M12.03 3.28L13.5 4.75L6.81 11.44L5.34 9.97L12.03 3.28M19.5 4.5L18.78 5.22C18.07 5.93 17.15 6.3 16.2 6.3C15.25 6.3 14.33 5.93 13.62 5.22L12.9 4.5L13.62 3.78C14.33 3.07 15.25 2.7 16.2 2.7C17.15 2.7 18.07 3.07 18.78 3.78L19.5 4.5Z"/>
                         </svg>
                         <div>
-                            <span class="download-label">Download on the</span>
+                            <span class="download-label">Coming soon to the</span>
                             <span class="download-name">App Store</span>
                         </div>
                     </a>
                 </div>
                 <div class="coming-soon-badge">
                     <span class="pulse-dot"></span>
-                    <span>Launching Soon</span>
+                    <span>iOS version coming soon</span>
                 </div>
             </div>
         </div>
@@ -334,6 +341,7 @@
             </div>
             <div class="footer-bottom">
                 <p>&copy; 2026 Easy Basket. All rights reserved.</p>
+                <p class="footer-credit">Built by <span>Kaplas Technologies LLP</span></p>
             </div>
         </div>
     </footer>
