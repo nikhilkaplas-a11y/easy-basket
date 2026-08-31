@@ -44,13 +44,23 @@ class LanguageScreen extends StatelessWidget {
 
     // Order matters.
     //
-    // 1. Point the router at home first. AppRouter.router is a `static final`,
-    //    so it survives the restart below — setting the location here is what
-    //    makes the rebuilt tree come up on the home screen.
+    // 1. Send the router to /splash — NOT straight to /home. Splash is the
+    //    app's real bootstrap: it resolves the auth role and awaits
+    //    LocationProvider.checkPermission() before deciding where to land.
+    //    Jumping directly to /home skips that, and HomeScreen's init then
+    //    runs detectLocation() on a freshly-constructed LocationProvider that
+    //    has no permission state — the address fetch and the product fetch sit
+    //    behind that same `Future.wait`, so the user arrives to "no delivery
+    //    address" and an empty catalogue. Splash also routes admin/delivery
+    //    users to their own dashboards; /home would have stranded them on the
+    //    customer screen.
     // 2. Then rebuild everything. Providers are recreated, so ProductProvider
-    //    drops the catalogue it fetched in the old language and HomeScreen's
-    //    initState re-fetches it with the new Accept-Language header.
-    context.go('/home');
+    //    drops the catalogue it fetched in the old language and it is re-fetched
+    //    with the new Accept-Language header.
+    //
+    // Net effect is the same path a real app relaunch takes, which is why a
+    // cold start already showed the correct language and data.
+    context.go('/splash');
     RestartWidget.restartApp(context);
   }
 
