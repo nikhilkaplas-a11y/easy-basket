@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -9,7 +10,7 @@ class HelpSupportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & Support'),
+        title:  Text(AppLocalizations.of(context).helpTitle),
         backgroundColor: AppTheme.white,
         foregroundColor: AppTheme.black,
         elevation: 0,
@@ -30,9 +31,9 @@ class HelpSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            const Center(
+             Center(
               child: Text(
-                'How can we help you?',
+                AppLocalizations.of(context).helpHowCanWeHelpYou,
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
@@ -42,9 +43,9 @@ class HelpSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            const Center(
+             Center(
               child: Text(
-                'Choose an option below to get help with your order.',
+                AppLocalizations.of(context).helpChooseOption,
                 textAlign: TextAlign.center,
               ),
             ),
@@ -54,14 +55,14 @@ class HelpSupportScreen extends StatelessWidget {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.edit_note),
-                title: const Text(
-                  'Raise a Support Request',
+                title:  Text(
+                  AppLocalizations.of(context).helpRaiseRequest,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                subtitle: const Text(
-                  'Report an issue with your order, payment or delivery',
+                subtitle:  Text(
+                  AppLocalizations.of(context).helpReportIssue,
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {

@@ -520,4 +520,312 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileBirthdayHint => 'Select your birthday';
+
+  @override
+  String get homeAddAddressToOrder =>
+      'Add your delivery address to place orders';
+
+  @override
+  String get homeChange => 'Change';
+
+  @override
+  String get homeCheckBackSoon => 'Check back soon!';
+
+  @override
+  String get homeEnableLocationFast => 'Enable location for faster delivery';
+
+  @override
+  String get homeNoProducts => 'No products available';
+
+  @override
+  String get homeShopByCategory => 'Shop by category';
+
+  @override
+  String get homeSnackItAway => 'Snack it away';
+
+  @override
+  String get commonViewAll => 'View All';
+
+  @override
+  String get commonSeeAll => 'see all';
+
+  @override
+  String get productAddToCart => 'Add to cart';
+
+  @override
+  String get productOutOfStock => 'Out of stock';
+
+  @override
+  String get productUnavailableNow => 'Product unavailable right now';
+
+  @override
+  String get productDetailsMissing =>
+      'Some details are missing for this product. You can still add it to cart.';
+
+  @override
+  String get productYouMayAlsoLike => 'You may also like';
+
+  @override
+  String get productNoneFound => 'No products found';
+
+  @override
+  String get productAdd => 'ADD';
+
+  @override
+  String get productOutOfStockCaps => 'Out of Stock';
+
+  @override
+  String get productMicPermissionLong =>
+      'Easy Basket needs microphone permission to hear you. Please allow it in Settings.';
+
+  @override
+  String get categoryAll => 'All Categories';
+
+  @override
+  String get categoryNoneAvailable => 'No categories available';
+
+  @override
+  String get categoryNoSubcategories => 'No subcategories available';
+
+  @override
+  String get orderLoading => 'Loading your orders...';
+
+  @override
+  String get orderNoneYet => 'No orders yet';
+
+  @override
+  String get orderSomethingWrong => 'Oops! Something went wrong';
+
+  @override
+  String get orderStartShoppingHint => 'Start shopping to see your orders here';
+
+  @override
+  String get orderViewDetails => 'View Details';
+
+  @override
+  String get orderEta15 => 'ETA ~15 mins';
+
+  @override
+  String get orderNeedHelp => 'Need Help?';
+
+  @override
+  String get orderNotFound => 'Order not found';
+
+  @override
+  String get orderFetchingDetails =>
+      'Please wait while we fetch your order details';
+
+  @override
+  String get orderTrackYourOrder => 'Track Your Order';
+
+  @override
+  String get orderYourDeliveryPartner => 'Your Delivery Partner';
+
+  @override
+  String get orderPackedNoRefund =>
+      'Your order is already packed. Cancelling now will NOT refund your payment. Do you want to continue?';
+
+  @override
+  String get profileEditTitle => 'Edit Profile';
+
+  @override
+  String get profilePhotoComingSoon => 'Photo upload coming soon';
+
+  @override
+  String get profilePicture => 'Profile Picture';
+
+  @override
+  String get profileSaveChanges => 'Save Changes';
+
+  @override
+  String get profileNotifications => 'Notifications';
+
+  @override
+  String get profileEnableNotifHint =>
+      'Allow notifications for Easy Basket in your phone settings to turn this on.';
+
+  @override
+  String get paymentMaybeLater => 'Maybe Later';
+
+  @override
+  String get paymentStayUpdated => 'Stay updated on your order!';
+
+  @override
+  String get paymentNotifHint =>
+      'Turn on notifications to receive real-time order updates & delivery alerts.';
+
+  @override
+  String get authTerms =>
+      'By continuing, you agree to our Terms of Service\nand Privacy Policy';
+
+  @override
+  String get authChangePhone => 'Change phone number';
+
+  @override
+  String get authTagline => 'Fresh groceries at your doorstep';
+
+  @override
+  String get authLoginSignup => 'Login / Sign up';
+
+  @override
+  String get authVerifyOtp => 'Verify OTP';
+
+  @override
+  String get addressAddTitle => 'Add Address';
+
+  @override
+  String get addressEditTitle => 'Edit Address';
+
+  @override
+  String get addressLabelCaps => 'ADDRESS';
+
+  @override
+  String get addressDefaultCaps => 'DEFAULT';
+
+  @override
+  String get addressUseSavedAnyway => 'Use Saved Address Anyway';
+
+  @override
+  String get addressEnterManually => 'Enter Manually';
+
+  @override
+  String get addressSearchByArea =>
+      'Search by area, street name, sector, or landmark';
+
+  @override
+  String get addressSelectedLocation => 'Selected Location:';
+
+  @override
+  String get addressNotifyMe => 'Notify Me';
+
+  @override
+  String get addressWillNotify => 'We will notify you!';
+
+  @override
+  String get locationAllowAccess => 'Allow location access';
+
+  @override
+  String get locationAllowForDelivery => 'Allow location for delivery';
+
+  @override
+  String get locationEnterManually => 'Enter address manually instead';
+
+  @override
+  String get locationFreshGroceries => 'Fresh groceries in minutes';
+
+  @override
+  String get locationGroceriesFast => 'Groceries, delivered fast';
+
+  @override
+  String get locationIsOff => 'Location is off';
+
+  @override
+  String get locationShareOnce =>
+      'Share your location once so we can find your area, show accurate prices, and deliver to the right address.';
+
+  @override
+  String get locationChangeAnytime =>
+      'You can change this anytime in settings.';
+
+  @override
+  String get locationDetecting => 'Detecting your location...';
+
+  @override
+  String get locationAccessRequired => 'Location Access Required';
+
+  @override
+  String get locationPrivacyNote =>
+      'Your location is only used to find your delivery address. We never share it with anyone.';
+
+  @override
+  String get locationMapMobileOnly => 'Map View Available on Mobile';
+
+  @override
+  String get locationMapMobileHint =>
+      'For the best experience with interactive map and draggable pin, please use the mobile app.';
+
+  @override
+  String get serviceGoHome => 'Go to Home';
+
+  @override
+  String get serviceSelectedLocation => 'Selected Location';
+
+  @override
+  String get serviceNotifyMe => 'Want to be notified?';
+
+  @override
+  String get helpTitle => 'Help & Support';
+
+  @override
+  String get helpHowCanWeHelpYou => 'How can we help you?';
+
+  @override
+  String get helpChooseOption =>
+      'Choose an option below to get help with your order.';
+
+  @override
+  String get helpRaiseRequest => 'Raise a Support Request';
+
+  @override
+  String get helpReportIssue =>
+      'Report an issue with your order, payment or delivery';
+
+  @override
+  String get supportCategory => 'Category';
+
+  @override
+  String get supportDescribeProblem => 'Describe your problem';
+
+  @override
+  String get supportHowCanWeHelp => 'How can we help?';
+
+  @override
+  String get supportExplainHint => 'Please explain your issue...';
+
+  @override
+  String get supportLoginAgain =>
+      'Please login again to submit a support request.';
+
+  @override
+  String get supportSubmit => 'Submit Request';
+
+  @override
+  String get supportSubmitted => 'Support request submitted successfully';
+
+  @override
+  String get supportTellUs =>
+      'Tell us about your problem and our support team will help you.';
+
+  @override
+  String get cartViewCart => 'View Cart';
+
+  @override
+  String get orderTrackShort => 'Track';
+
+  @override
+  String get commonSwitch => 'Switch';
+
+  @override
+  String get storeClosedCaps => 'STORE CLOSED';
+
+  @override
+  String get authOtpSubtitle => 'We\'ll send a one-time password to verify';
+
+  @override
+  String get serviceNoDeliveryHere => 'Oops! We don\'t deliver here yet';
+
+  @override
+  String get serviceNotDeliveringNow =>
+      'We\'re currently not delivering to this location.';
+
+  @override
+  String get serviceExpanding =>
+      'Don\'t worry! We\'re expanding rapidly and will be in your area soon.';
+
+  @override
+  String get serviceWillNotifyYou =>
+      'We\'ll notify you as soon as we start delivering to your area!';
+
+  @override
+  String get productReviewCount => '1.2k reviews';
 }

@@ -41,7 +41,10 @@ class ActiveOrderModel {
   String get statusText {
     switch (status) {
       case 'pending': return 'Pending';
-      case 'accepted': return 'Confirmed';
+      // 'Confirmed' now belongs to the paid-but-unaccepted step; once the store
+      // actually accepts, say so rather than repeating the same word.
+      case 'awaiting_acceptance': return 'Confirmed';
+      case 'accepted': return 'Accepted';
       case 'preparing': return 'Preparing';
       case 'out_for_delivery': return 'Out for Delivery';
       case 'delivered': return 'Delivered';

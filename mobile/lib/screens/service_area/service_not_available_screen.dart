@@ -74,7 +74,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
               
               // Title - More prominent
               Text(
-                'Oops! We don\'t deliver here yet',
+                AppLocalizations.of(context).serviceNoDeliveryHere,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.black,
@@ -110,7 +110,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Selected Location',
+                              AppLocalizations.of(context).serviceSelectedLocation,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -141,7 +141,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      'We\'re currently not delivering to this location.',
+                      AppLocalizations.of(context).serviceNotDeliveringNow,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: AppTheme.black,
                             height: 1.6,
@@ -151,7 +151,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Don\'t worry! We\'re expanding rapidly and will be in your area soon.',
+                      AppLocalizations.of(context).serviceExpanding,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.grey,
                             height: 1.6,
@@ -206,8 +206,8 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                       context.go('/home');
                     },
                     icon: const Icon(Icons.home_outlined, size: 20),
-                    label: const Text(
-                      'Go to Home',
+                    label:  Text(
+                      AppLocalizations.of(context).serviceGoHome,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -251,7 +251,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Want to be notified?',
+                          AppLocalizations.of(context).serviceNotifyMe,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -262,7 +262,7 @@ class ServiceNotAvailableScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'We\'ll notify you as soon as we start delivering to your area!',
+                      AppLocalizations.of(context).serviceWillNotifyYou,
                       style: TextStyle(
                         fontSize: 14,
                         color: AppTheme.grey,

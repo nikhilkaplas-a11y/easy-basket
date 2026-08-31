@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/proximity_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Location Mismatch Screen
 ///
@@ -253,9 +254,9 @@ class LocationMismatchScreen extends StatelessWidget {
                         }
                         context.push('/address/add', extra: extra);
                       },
-                      child: const Center(
+                      child:  Center(
                         child: Text(
-                          'Add New Address',
+                          AppLocalizations.of(context).addressAddNew,
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                       ),
@@ -284,7 +285,7 @@ class LocationMismatchScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: Text(
-                    'Use Saved Address Anyway',
+                    AppLocalizations.of(context).addressUseSavedAnyway,
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
                   ),
                 ),

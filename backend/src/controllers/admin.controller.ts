@@ -38,8 +38,40 @@ export class AdminController {
         .leftJoinAndSelect('order.deliveryBoy', 'deliveryBoy')
         .orderBy('order.createdAt', 'DESC');
 
-      if (status) {
+      if (status === 'awaiting_payment') {
+        // Explicit opt-in view (D-06). Everything hidden by the default filter
+        // below, surfaced deliberately: an unpaid online order still exists, still
+        // holds stock, and a customer whose payment is stuck WILL ring up asking
+        // where it is. Support needs to be able to find it in one place.
+        queryBuilder
+          .where('order.status = :pending', { pending: 'pending' })
+          .andWhere('(order.paymentMethod IS NOT NULL AND order.paymentMethod != :cod)', {
+            cod: 'cod',
+          });
+      } else if (status) {
         queryBuilder.where('order.status = :status', { status });
+      } else {
+        // Default list (D-05): hide online orders that have not been paid for.
+        //
+        // An online order at 'pending' is UNPAID — the customer may still be on the
+        // payment sheet, or may have abandoned it entirely. Showing those to the
+        // store means acting on orders that may never exist. Once payment is
+        // confirmed the order moves to 'awaiting_acceptance' and appears here.
+        //
+        // COD is exempt: it has no payment to wait for, so a COD order is real the
+        // moment it is placed.
+        // NOTE the explicit NULL arm. paymentMethod is nullable, and in SQL
+        // `NULL = 'cod'` is NULL, not false — so `(status != 'pending' OR
+        // paymentMethod = 'cod')` evaluates to NULL for a legacy pending order with
+        // no payment method, and the row is dropped. That would silently hide real
+        // orders from the store.
+        //
+        // Unknown method is therefore treated as visible. When in doubt, show the
+        // order: an admin can judge it, but nobody can act on what they cannot see.
+        queryBuilder.where(
+          '(order.status != :pending OR order.paymentMethod IS NULL OR order.paymentMethod = :cod)',
+          { pending: 'pending', cod: 'cod' }
+        );
       }
 
       const [orders, total] = await queryBuilder.skip(skip).take(limit).getManyAndCount();
@@ -101,7 +133,7 @@ export class AdminController {
   static async updateOrderStatus(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { status, deliveryBoyId, notes } = req.body;
+      const { status, deliveryBoyId, notes, cancellationReason } = req.body;
 
       if (!status) {
         res.status(400).json({ message: 'Status is required' });
@@ -110,6 +142,10 @@ export class AdminController {
 
       const validStatuses = [
         'pending',
+        // Paid, waiting for the store to accept or refuse. Reachable only from a
+        // confirmed payment, which is what structurally closes the old hole where an
+        // admin could accept an UNPAID order and strand its stock forever.
+        'awaiting_acceptance',
         'accepted',
         'preparing',
         'out_for_delivery',
@@ -190,6 +226,15 @@ export class AdminController {
 
       if (notes) {
         order.notes = notes;
+      }
+
+      // Why the store refused / cancelled. Stored on every cancel, but it is the
+      // refusal path (D-12) that makes it matter: without a recorded reason,
+      // "the store refuses orders when it feels like it" stays an anecdote instead
+      // of a number somebody can be shown. Reuses the existing
+      // orders.cancellation_reason column.
+      if (status === 'cancelled' && typeof cancellationReason === 'string') {
+        order.cancellationReason = cancellationReason.trim().slice(0, 255) || null;
       }
 
       // Allow assigning delivery boy when accepting, preparing, or out_for_delivery
@@ -1112,7 +1157,11 @@ export class AdminController {
       // Policy: refund-on-cancel is only for orders NOT yet packed. If the admin
       // advanced the order past 'accepted', approving here would refund a packed
       // order (violates the "after packing, no refund" rule).
-      if (order.status !== 'pending' && order.status !== 'accepted') {
+      if (
+        order.status !== 'pending' &&
+        order.status !== 'awaiting_acceptance' &&
+        order.status !== 'accepted'
+      ) {
         res.status(400).json({
           message: `Cannot approve refund — order is already '${order.status}'. Refunds are only allowed before packing.`,
         });
@@ -1122,7 +1171,11 @@ export class AdminController {
       // Atomic claim: only ONE concurrent approve flips the request + status, so a
       // race (e.g. admin double-tap) can't restore stock / refund twice.
       const claim = await orderRepository.update(
-        { id: order.id, cancelRequestStatus: 'requested', status: In(['pending', 'accepted']) },
+        {
+          id: order.id,
+          cancelRequestStatus: 'requested',
+          status: In(['pending', 'awaiting_acceptance', 'accepted']),
+        },
         { cancelRequestStatus: 'none', status: 'cancelled' }
       );
       if (claim.affected !== 1) {

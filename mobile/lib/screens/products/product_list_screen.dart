@@ -618,7 +618,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                             Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[300]),
                             const SizedBox(height: 16),
                             Text(
-                              'No products found',
+                              AppLocalizations.of(context).productNoneFound,
                               style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                             ),
                           ],

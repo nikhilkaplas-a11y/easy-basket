@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/locale_provider.dart';
 import '../../utils/theme.dart';
+import '../../widgets/restart_widget.dart';
 
 /// Language picker.
 ///
@@ -18,29 +19,39 @@ class LanguageScreen extends StatelessWidget {
     LocaleProvider provider,
     AppLanguage language,
   ) async {
+    if (provider.language == language) {
+      context.go('/home');
+      return;
+    }
+
     final messenger = ScaffoldMessenger.of(context);
     final ok = await provider.setLanguage(language);
 
     if (!context.mounted) return;
 
-    // Read strings AFTER the switch so the confirmation itself appears in the
-    // language just chosen.
-    final l10n = AppLocalizations.of(context);
+    if (!ok) {
+      // Only surface a message on failure. On success the entire app visibly
+      // changing language is the confirmation, and the snackbar would be torn
+      // down by the restart below before anyone could read it.
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).languageChangeFailed),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
 
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(ok ? l10n.languageUpdated : l10n.languageChangeFailed),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    if (!ok) return;
-
-    // Land the user on home in the new language. `go` (not `push`) so the
-    // whole navigation stack is discarded — any screen still sitting under
-    // this one was built in the previous language, and popping back to it
-    // would show a half-translated app.
+    // Order matters.
+    //
+    // 1. Point the router at home first. AppRouter.router is a `static final`,
+    //    so it survives the restart below — setting the location here is what
+    //    makes the rebuilt tree come up on the home screen.
+    // 2. Then rebuild everything. Providers are recreated, so ProductProvider
+    //    drops the catalogue it fetched in the old language and HomeScreen's
+    //    initState re-fetches it with the new Accept-Language header.
     context.go('/home');
+    RestartWidget.restartApp(context);
   }
 
   @override

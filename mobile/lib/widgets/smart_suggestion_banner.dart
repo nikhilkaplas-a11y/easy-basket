@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/address_provider.dart';
 import '../models/address_model.dart';
 import '../utils/theme.dart';
+import '../l10n/app_localizations.dart';
 
 /// Smart Suggestion Banner — Phase 3
 ///
@@ -96,8 +97,8 @@ class _SmartSuggestionBannerState extends State<SmartSuggestionBanner> {
                       color: suggestion.iconColor,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'Switch',
+                    child:  Text(
+                      AppLocalizations.of(context).commonSwitch,
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                   ),

@@ -115,6 +115,9 @@ void _startAutoRefresh() {
   final status = order.status.toLowerCase();
 
   return status == 'pending' ||
+      // Paid and waiting on an accept/refuse decision — the single most
+      // action-required state there is.
+      status == 'awaiting_acceptance' ||
       status == 'accepted' ||
       status == 'preparing';
 }).toList();

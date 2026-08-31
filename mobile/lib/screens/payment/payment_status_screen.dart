@@ -171,8 +171,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen>
                         const Icon(Icons.notifications_active_rounded,
                             size: 36, color: Color(0xFF2E7D32)),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Stay updated on your order!',
+                         Text(
+                          AppLocalizations.of(context).paymentStayUpdated,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -181,7 +181,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen>
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Turn on notifications to receive real-time order updates & delivery alerts.',
+                          AppLocalizations.of(context).paymentNotifHint,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 13,
@@ -211,7 +211,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen>
                         GestureDetector(
                           onTap: _onSkip,
                           child: Text(
-                            'Maybe Later',
+                            AppLocalizations.of(context).paymentMaybeLater,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

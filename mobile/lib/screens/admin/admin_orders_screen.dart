@@ -98,6 +98,76 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
     _lastRefreshTime = DateTime.now();
   }
 
+  /// Fixed list rather than free text.
+  ///
+  /// Two reasons, and the second is the point. It adds a beat of friction against
+  /// a reflexive refusal. And it turns refusals into something countable — per
+  /// store, per hour, per person — instead of an invisible habit nobody can
+  /// challenge. Free text would give neither.
+  static const List<String> _refusalReasons = [
+    'Item out of stock',
+    'Store too busy',
+    'Address not serviceable',
+    'Closing soon',
+    'Other',
+  ];
+
+  /// Refusing is a cancel with a reason attached: the backend restores stock and
+  /// refunds the customer through the same path admin-cancel already uses.
+  Future<void> _refuseOrder(dynamic order) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('Refuse order #${order.id}?'),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
+            child: Text(
+              'The customer has already paid. They will be refunded automatically.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ),
+          for (final r in _refusalReasons)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, r),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(r),
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('Keep order', style: TextStyle(color: Colors.grey)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !mounted) return;
+
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.accessToken == null) return;
+
+    final ok = await adminProvider.updateOrderStatus(
+      token: authProvider.accessToken!,
+      orderId: order.id as int,
+      status: 'cancelled',
+      cancellationReason: reason,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Order #${order.id} refused — customer is being refunded.'
+            : 'Could not refuse order: ${adminProvider.error ?? 'unknown error'}'),
+        backgroundColor: ok ? Colors.deepOrange : Colors.red,
+      ),
+    );
+  }
+
   Future<void> _updateOrderStatus(int orderId, String newStatus, {int? deliveryBoyId}) async {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -329,6 +399,29 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                     },
                   ),
                   const SizedBox(width: 10),
+                  // Opt-in view for unpaid online orders, which the default list
+                  // deliberately hides. Support needs somewhere to look when a
+                  // customer says "I paid and there's no order".
+                  _StatusChip(
+                    label: 'Awaiting Payment',
+                    icon: Icons.hourglass_empty,
+                    isSelected: _selectedStatus == 'awaiting_payment',
+                    onTap: () {
+                      setState(() => _selectedStatus = 'awaiting_payment');
+                      _loadOrders();
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  _StatusChip(
+                    label: 'Needs Action',
+                    icon: Icons.pending_actions,
+                    isSelected: _selectedStatus == 'awaiting_acceptance',
+                    onTap: () {
+                      setState(() => _selectedStatus = 'awaiting_acceptance');
+                      _loadOrders();
+                    },
+                  ),
+                  const SizedBox(width: 10),
                   _StatusChip(
                     label: 'Accepted',
                     icon: Icons.check_circle_outline,
@@ -407,6 +500,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with WidgetsBindi
                             child: _OrderCard(
                               order: order,
                               onStatusUpdate: _updateOrderStatus,
+                              onRefuse: _refuseOrder,
                             ),
                           );
                         },
@@ -467,10 +561,12 @@ class _StatusChip extends StatelessWidget {
 class _OrderCard extends StatelessWidget {
   final dynamic order;
   final Function(int orderId, String status, {int? deliveryBoyId}) onStatusUpdate;
+  final Future<void> Function(dynamic order) onRefuse;
 
   const _OrderCard({
     required this.order,
     required this.onStatusUpdate,
+    required this.onRefuse,
   });
 
   @override
@@ -899,7 +995,11 @@ ConstrainedBox(
                               scrollDirection: Axis.horizontal,
                               child: Row(
                                 children: [
-                                  if (order.status == 'pending')
+                                  // COD only. An online order at 'pending' is
+                                  // UNPAID — accepting it would hide it from both
+                                  // auto-cancel and the stock-restore path, leaving
+                                  // its inventory consumed forever.
+                                  if (order.status == 'pending' && order.isCod)
                                     _StatusButton(
                                       icon: Icons.check,
                                       label: 'Accept',
@@ -907,6 +1007,23 @@ ConstrainedBox(
                                       onPressed: () =>
                                           onStatusUpdate(order.id, 'accepted'),
                                     ),
+                                  if (order.status == 'awaiting_acceptance') ...[
+                                    _StatusButton(
+                                      icon: Icons.check,
+                                      label: 'Accept',
+                                      color: Colors.blue,
+                                      onPressed: () =>
+                                          onStatusUpdate(order.id, 'accepted'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _StatusButton(
+                                      icon: Icons.block,
+                                      label: 'Refuse',
+                                      color: Colors.deepOrange,
+                                      onPressed: () => onRefuse(order),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
                                   if (order.status == 'accepted')
                                     _StatusButton(
                                       icon: Icons.local_dining,
@@ -959,6 +1076,11 @@ ConstrainedBox(
     switch (status) {
       case 'pending':
         return Colors.grey;
+      // Amber: needs a human decision now. Deliberately not blue/green — this is
+      // the only state in the list that is waiting on the store rather than
+      // progressing on its own.
+      case 'awaiting_acceptance':
+        return Colors.amber.shade800;
       case 'accepted':
         return Colors.blue;
       case 'preparing':

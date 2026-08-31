@@ -7,6 +7,7 @@ import '../providers/cart_provider.dart';
 import '../utils/theme.dart';
 import '../utils/responsive.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
 
 class ProductCard extends StatelessWidget {
   final ProductModel product;
@@ -214,13 +215,13 @@ class ProductCard extends StatelessWidget {
                       color: Colors.black.withOpacity(0.75),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Row(
+                    child:  Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.block, size: 12, color: Colors.white),
                         SizedBox(width: 4),
                         Text(
-                          'Out of Stock',
+                          AppLocalizations.of(context).productOutOfStockCaps,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -457,7 +458,7 @@ class ProductCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'ADD',
+                          AppLocalizations.of(context).productAdd,
                           style: TextStyle(
                             fontSize: screenWidth < 360 ? 11 : 12,
                             fontWeight: FontWeight.bold,
@@ -480,7 +481,7 @@ class ProductCard extends StatelessWidget {
                     ),
                   )
                 : Text(
-                    'ADD',
+                    AppLocalizations.of(context).productAdd,
                     style: TextStyle(
                       fontSize: screenWidth < 360 ? 12 : 13,
                       fontWeight: FontWeight.bold,
@@ -865,7 +866,7 @@ class ProductCard extends StatelessWidget {
                                           padding: const EdgeInsets.symmetric(horizontal: 16),
                                           child: Center(
                                             child: Text(
-                                              available ? 'ADD' : 'Out of Stock',
+                                              available ? AppLocalizations.of(context).productAdd : AppLocalizations.of(context).productOutOfStockCaps,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: screenWidth < 360 ? 12 : 13,

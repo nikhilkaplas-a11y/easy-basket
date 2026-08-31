@@ -4,6 +4,7 @@ import { AppDataSource } from './config/database';
 import { RequestTimingMiddleware } from './middleware/requestTiming.middleware';
 import { S3Service } from './services/s3.service';
 import { OrderAutoCancelService } from './services/order-auto-cancel.service';
+import { OrderAcceptanceAlertService } from './services/order-acceptance-alert.service';
 import { PaymentsReconcilerService } from './services/payments-reconciler.service';
 import { ServiceabilityService } from './services/serviceability.service';
 import { startPaymentWorker } from './services/queue/payment-reconcile.worker';
@@ -176,8 +177,13 @@ AppDataSource.initialize()
       );
     }
 
-    // Auto-cancel: pending orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
+    // Auto-cancel: pending (unpaid) orders past ORDER_AUTO_CANCEL_MINUTES (default 30)
     OrderAutoCancelService.start();
+
+    // Acceptance alert: PAID orders the store has not accepted yet. ALERTS ONLY —
+    // unlike the sweep above it never changes an order's state. No automatic action
+    // is taken on a non-terminal order; a human accepts or refuses.
+    OrderAcceptanceAlertService.start();
 
     // Payments reconciler: coarse 30-min safety net for stale payments / pending refunds.
     PaymentsReconcilerService.start();

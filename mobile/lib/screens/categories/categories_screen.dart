@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/product_provider.dart';
 import '../../models/category_model.dart';
 import '../../utils/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -43,8 +44,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text(
-          'All Categories',
+        title:  Text(
+          AppLocalizations.of(context).categoryAll,
           style: TextStyle(
             fontWeight: FontWeight.bold,
           ),
@@ -93,7 +94,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No categories available',
+                        AppLocalizations.of(context).categoryNoneAvailable,
                         style: TextStyle(
                           fontSize: 18,
                           color: AppTheme.grey,

@@ -1124,10 +1124,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               GestureDetector(
                                 onTap: () => context.push('/addresses'),
                                 behavior: HitTestBehavior.opaque,
-                                child: const Padding(
+                                child:  Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   child: Text(
-                                    'Change',
+                                    AppLocalizations.of(context).homeChange,
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
@@ -1193,9 +1193,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 children: [
                                   const Icon(Icons.my_location_rounded, color: Color(0xFF1565C0), size: 20),
                                   const SizedBox(width: 8),
-                                  const Expanded(
+                                   Expanded(
                                     child: Text(
-                                      'Enable location for faster delivery',
+                                      AppLocalizations.of(context).homeEnableLocationFast,
                                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1565C0)),
                                     ),
                                   ),
@@ -1384,8 +1384,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
-                                    'Shop by category',
+                                   Text(
+                                    AppLocalizations.of(context).homeShopByCategory,
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
@@ -1400,11 +1400,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       minimumSize: Size.zero,
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    child: const Row(
+                                    child:  Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          'View All',
+                                          AppLocalizations.of(context).commonViewAll,
                                           style: TextStyle(
                                             color: AppTheme.primaryGreen,
                                             fontWeight: FontWeight.w600,
@@ -1488,7 +1488,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'No products available',
+                              AppLocalizations.of(context).homeNoProducts,
                               style: TextStyle(
                                 fontSize: 18,
                                 color: AppTheme.grey,
@@ -1496,7 +1496,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Check back soon!',
+                              AppLocalizations.of(context).homeCheckBackSoon,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: AppTheme.grey,
@@ -1550,7 +1550,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Add your delivery address to place orders',
+                                    AppLocalizations.of(context).homeAddAddressToOrder,
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: AppTheme.grey,
@@ -1571,8 +1571,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
-                                    'Snack it away',
+                                   Text(
+                                    AppLocalizations.of(context).homeSnackItAway,
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
@@ -1582,11 +1582,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   GestureDetector(
                                     onTap: () => context.push('/products'),
-                                    child: const Row(
+                                    child:  Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          'see all',
+                                          AppLocalizations.of(context).commonSeeAll,
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w700,

@@ -166,6 +166,7 @@
       required String status,
       int? deliveryBoyId,
       String? notes,
+      String? cancellationReason,
     }) async {
       _isLoading = true;
       _error = null;
@@ -175,6 +176,9 @@
         final data = <String, dynamic>{'status': status};
         if (deliveryBoyId != null) data['deliveryBoyId'] = deliveryBoyId;
         if (notes != null) data['notes'] = notes;
+        if (cancellationReason != null) {
+          data['cancellationReason'] = cancellationReason;
+        }
 
         await apiService.put(
           '/admin/orders/$orderId/status',

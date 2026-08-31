@@ -381,6 +381,7 @@ export class PaymentsV2Service {
     // transaction, an order-save failure after the payment-save would leave payment
     // 'paid' (terminal, so the reconciler ignores it) while the order stays pending.
     let paidOnCancelledOrder = false;
+    let notifyStoreOfPaidOrder = false;
     await AppDataSource.transaction(async (mgr) => {
       payment.status = 'paid';
       if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
@@ -390,7 +391,18 @@ export class PaymentsV2Service {
       const order = await mgr.getRepository(Order).findOne({ where: { id: payment.orderId } });
       if (order) {
         if (order.status === 'pending') {
-          order.status = 'accepted';
+          // Payment confirms the order; it does NOT accept it on the store's behalf.
+          //
+          // This used to jump straight to 'accepted', which made that word a lie —
+          // no human had accepted anything, yet the customer was told the store had.
+          // The store now makes a real per-order decision (out of stock, too busy,
+          // address not serviceable), so the order waits here for it.
+          //
+          // Nothing may sit in this state indefinitely: OrderAcceptanceTimeoutService
+          // cancels and refunds an order the store never picks up. That sweep is safe
+          // precisely because nothing physical has happened yet — no pick, no rider.
+          order.status = 'awaiting_acceptance';
+          notifyStoreOfPaidOrder = true;
         }
         // Payment landed AFTER the order was already cancelled (classic case: the
         // 30-min auto-cancel fired, then the customer completed a slow UPI payment).
@@ -404,6 +416,23 @@ export class PaymentsV2Service {
         await mgr.getRepository(Order).save(order);
       }
     });
+
+    // Enqueued only after the commit, so a rolled-back transaction can never tell the
+    // store an order is waiting that does not exist. This is the notification that
+    // actually means something: money is in, and a human now has to accept or refuse.
+    if (notifyStoreOfPaidOrder) {
+      const amountRupees = (Number(payment.amountPaise) / 100).toFixed(2);
+      FCMService.enqueue(
+        () =>
+          FCMService.sendNotificationToRole(
+            'admin',
+            '🛒 New Paid Order — accept or refuse',
+            `Order #${payment.orderId} • ₹${amountRupees} paid. Open it to accept or refuse.`,
+            { orderId: String(payment.orderId), type: 'new_paid_order' }
+          ),
+        `notify admins paid order #${payment.orderId}`
+      );
+    }
 
     // Outside the transaction (createRefund has its own lock/transaction): auto-refund
     // a payment that confirmed on an order we can no longer fulfil. Idempotent via the

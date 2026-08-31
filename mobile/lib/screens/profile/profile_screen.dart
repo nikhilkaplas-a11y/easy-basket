@@ -507,9 +507,9 @@ class _NotificationToggleTileState extends State<_NotificationToggleTile> {
           _busy = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+           SnackBar(
             content: Text(
-                'Allow notifications for Easy Basket in your phone settings to turn this on.'),
+                AppLocalizations.of(context).profileEnableNotifHint),
           ),
         );
         return;
@@ -559,9 +559,9 @@ class _NotificationToggleTileState extends State<_NotificationToggleTile> {
                     color: Colors.orange, size: 20),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+               Expanded(
                 child: Text(
-                  'Notifications',
+                  AppLocalizations.of(context).profileNotifications,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,

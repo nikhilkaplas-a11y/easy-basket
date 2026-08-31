@@ -357,9 +357,9 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
                 children: [
                   Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen, size: 20),
                   const SizedBox(width: 12),
-                  const Expanded(
+                   Expanded(
                     child: Text(
-                      'Use Current Location',
+                      AppLocalizations.of(context).locationUseCurrent,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
                     ),
                   ),
@@ -387,7 +387,7 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Enter Manually',
+                      AppLocalizations.of(context).addressEnterManually,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
                     ),
                   ),
@@ -401,7 +401,7 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
 
           // Hint text
           Text(
-            'Search by area, street name, sector, or landmark',
+            AppLocalizations.of(context).addressSearchByArea,
             style: TextStyle(fontSize: 12, color: Colors.grey[400]),
             textAlign: TextAlign.center,
           ),

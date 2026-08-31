@@ -312,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Fresh groceries at your doorstep',
+                          AppLocalizations.of(context).authTagline,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
@@ -424,8 +424,8 @@ class _PhoneForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Login / Sign up',
+         Text(
+          AppLocalizations.of(context).authLoginSignup,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
@@ -435,7 +435,7 @@ class _PhoneForm extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'We\'ll send a one-time password to verify',
+          AppLocalizations.of(context).authOtpSubtitle,
           style: TextStyle(
             fontSize: 13,
             color: Colors.grey.shade500,
@@ -520,7 +520,7 @@ class _PhoneForm extends StatelessWidget {
         const SizedBox(height: 24),
         Center(
           child: Text(
-            'By continuing, you agree to our Terms of Service\nand Privacy Policy',
+            AppLocalizations.of(context).authTerms,
             style: TextStyle(
               fontSize: 11,
               color: Colors.grey.shade400,
@@ -557,8 +557,8 @@ class _OtpForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Verify OTP',
+         Text(
+          AppLocalizations.of(context).authVerifyOtp,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
@@ -633,8 +633,8 @@ class _OtpForm extends StatelessWidget {
             style: TextButton.styleFrom(
               foregroundColor: AppTheme.primaryGreen,
             ),
-            child: const Text(
-              'Change phone number',
+            child:  Text(
+              AppLocalizations.of(context).authChangePhone,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/store_status_model.dart';
+import '../l10n/app_localizations.dart';
 
 /// Full-width "store is closed" panel for the top of the home screen.
 ///
@@ -72,8 +73,8 @@ class StoreClosedBanner extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.20),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          'STORE CLOSED',
+                        child:  Text(
+                          AppLocalizations.of(context).storeClosedCaps,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 11,

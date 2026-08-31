@@ -201,7 +201,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Loading your orders...',
+            AppLocalizations.of(context).orderLoading,
             style: TextStyle(
               fontSize: 16,
               color: AppTheme.grey,
@@ -226,7 +226,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Oops! Something went wrong',
+              AppLocalizations.of(context).orderSomethingWrong,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -312,7 +312,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'No orders yet',
+                AppLocalizations.of(context).orderNoneYet,
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -322,7 +322,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Start shopping to see your orders here',
+                AppLocalizations.of(context).orderStartShoppingHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -506,11 +506,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     const Spacer(),
                     GestureDetector(
                       onTap: () => context.push('/order/${order.id}'),
-                      child: const Row(
+                      child:  Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'View Details',
+                            AppLocalizations.of(context).orderViewDetails,
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0C831F)),
                           ),
                           SizedBox(width: 4),

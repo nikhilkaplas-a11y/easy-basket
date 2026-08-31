@@ -295,17 +295,29 @@ export class OrderController {
         }
       }
 
-      console.log(`📤 [ORDER] Queued admin notification for order #${order.id}`);
-      FCMService.enqueue(
-        () =>
-          FCMService.sendNotificationToRole(
-            'admin',
-            '🛒 New Order!',
-            `🛒 New order • ₹${totalAmount} — Order #${order.id}`,
-            { orderId: order.id.toString(), type: 'new_order' }
-          ),
-        `notify admins new order #${order.id}`
-      );
+      // COD only.
+      //
+      // This used to fire unconditionally, so admins were interrupted for online
+      // orders that had not been paid for and might never be — while nothing at all
+      // told them when a payment actually succeeded. The signal arrived at the least
+      // informative moment.
+      //
+      // For online orders the notification now fires from PaymentsV2Service once the
+      // webhook confirms the money, where it carries a real accept-or-refuse decision.
+      // COD has no payment to wait for, so it still notifies here.
+      if (normalizedPaymentMethod === 'cod') {
+        console.log(`📤 [ORDER] Queued admin notification for COD order #${order.id}`);
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotificationToRole(
+              'admin',
+              '🛒 New Order! (Cash on delivery)',
+              `🛒 New COD order • ₹${totalAmount} — Order #${order.id}`,
+              { orderId: order.id.toString(), type: 'new_order' }
+            ),
+          `notify admins new COD order #${order.id}`
+        );
+      }
 
       res.status(201).json({
         order,

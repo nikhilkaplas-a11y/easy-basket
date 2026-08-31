@@ -143,7 +143,12 @@ class OrderModel {
 
   /// Refund-eligible window: customer can request cancellation WITH a refund only
   /// before packing begins (status pending/accepted). Matches the backend guard.
-  bool get isRefundEligible => status == 'pending' || status == 'accepted';
+  /// Cancellation/refund is allowed right up until the store starts preparing.
+  /// `awaiting_acceptance` MUST be here: it is where every paid order now lands,
+  /// so omitting it would silently strip the cancel option from every customer
+  /// who paid online.
+  bool get isRefundEligible =>
+      status == 'pending' || status == 'awaiting_acceptance' || status == 'accepted';
 
   /// After packing: customer can still cancel, but NO refund is given.
   bool get canCancelNoRefund => status == 'preparing' || status == 'out_for_delivery';
@@ -255,6 +260,12 @@ class OrderModel {
     switch (status) {
       case 'pending':
         return 'Pending';
+      // Paid, waiting for the store to accept. From the customer's side the only
+      // thing that has happened is that their payment went through, so that is
+      // what we tell them — not 'Accepted', which would claim a decision the
+      // store has not actually made yet.
+      case 'awaiting_acceptance':
+        return 'Confirmed';
       case 'accepted':
         return 'Accepted';
       case 'preparing':

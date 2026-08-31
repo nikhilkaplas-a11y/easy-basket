@@ -53,7 +53,7 @@ class LocationPermissionScreen extends StatelessWidget {
               
               // Title
               Text(
-                'Location Access Required',
+                AppLocalizations.of(context).locationAccessRequired,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.black,
@@ -129,8 +129,8 @@ class LocationPermissionScreen extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => context.push('/address/add'),
                   icon: const Icon(Icons.edit_location),
-                  label: const Text(
-                    'Add Address Manually',
+                  label:  Text(
+                    AppLocalizations.of(context).locationAddManually,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -166,7 +166,7 @@ class LocationPermissionScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Your location is only used to find your delivery address. We never share it with anyone.',
+                        AppLocalizations.of(context).locationPrivacyNote,
                         style: TextStyle(
                           fontSize: 13,
                           color: AppTheme.grey,

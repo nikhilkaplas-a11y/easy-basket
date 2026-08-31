@@ -96,8 +96,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
-          'Add Address',
+        title:  Text(
+          AppLocalizations.of(context).addressAddTitle,
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.black87),
         ),
       ),

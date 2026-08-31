@@ -516,4 +516,309 @@ class AppLocalizationsPa extends AppLocalizations {
 
   @override
   String get profileBirthdayHint => 'ਆਪਣਾ ਜਨਮਦਿਨ ਚੁਣੋ';
+
+  @override
+  String get homeAddAddressToOrder => 'ਆਰਡਰ ਕਰਨ ਲਈ ਡਿਲੀਵਰੀ ਦਾ ਪਤਾ ਪਾਓ';
+
+  @override
+  String get homeChange => 'ਬਦਲੋ';
+
+  @override
+  String get homeCheckBackSoon => 'ਜਲਦੀ ਫਿਰ ਵੇਖੋ!';
+
+  @override
+  String get homeEnableLocationFast => 'ਤੇਜ਼ ਡਿਲੀਵਰੀ ਲਈ ਟਿਕਾਣਾ ਚਾਲੂ ਕਰੋ';
+
+  @override
+  String get homeNoProducts => 'ਕੋਈ ਸਮਾਨ ਉਪਲਬਧ ਨਹੀਂ';
+
+  @override
+  String get homeShopByCategory => 'ਸ਼੍ਰੇਣੀ ਤੋਂ ਖਰੀਦੋ';
+
+  @override
+  String get homeSnackItAway => 'ਸਨੈਕਸ ਦਾ ਮਜ਼ਾ';
+
+  @override
+  String get commonViewAll => 'ਸਾਰੇ ਵੇਖੋ';
+
+  @override
+  String get commonSeeAll => 'ਸਾਰੇ ਵੇਖੋ';
+
+  @override
+  String get productAddToCart => 'ਕਾਰਟ ਵਿੱਚ ਪਾਓ';
+
+  @override
+  String get productOutOfStock => 'ਸਟਾਕ ਵਿੱਚ ਨਹੀਂ';
+
+  @override
+  String get productUnavailableNow => 'ਇਹ ਸਮਾਨ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ';
+
+  @override
+  String get productDetailsMissing =>
+      'ਇਸ ਸਮਾਨ ਦੀ ਕੁਝ ਜਾਣਕਾਰੀ ਅਧੂਰੀ ਹੈ। ਤੁਸੀਂ ਫਿਰ ਵੀ ਇਸਨੂੰ ਕਾਰਟ ਵਿੱਚ ਪਾ ਸਕਦੇ ਹੋ।';
+
+  @override
+  String get productYouMayAlsoLike => 'ਤੁਹਾਨੂੰ ਇਹ ਵੀ ਪਸੰਦ ਆ ਸਕਦਾ ਹੈ';
+
+  @override
+  String get productNoneFound => 'ਕੋਈ ਸਮਾਨ ਨਹੀਂ ਮਿਲਿਆ';
+
+  @override
+  String get productAdd => 'ਪਾਓ';
+
+  @override
+  String get productOutOfStockCaps => 'ਸਟਾਕ ਵਿੱਚ ਨਹੀਂ';
+
+  @override
+  String get productMicPermissionLong =>
+      'ਈਜ਼ੀ ਬਾਸਕਟ ਨੂੰ ਤੁਹਾਡੀ ਆਵਾਜ਼ ਸੁਣਨ ਲਈ ਮਾਈਕ ਦੀ ਇਜਾਜ਼ਤ ਚਾਹੀਦੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਜਾ ਕੇ ਇਜਾਜ਼ਤ ਦਿਓ।';
+
+  @override
+  String get categoryAll => 'ਸਾਰੀਆਂ ਸ਼੍ਰੇਣੀਆਂ';
+
+  @override
+  String get categoryNoneAvailable => 'ਕੋਈ ਸ਼੍ਰੇਣੀ ਉਪਲਬਧ ਨਹੀਂ';
+
+  @override
+  String get categoryNoSubcategories => 'ਕੋਈ ਉਪ-ਸ਼੍ਰੇਣੀ ਉਪਲਬਧ ਨਹੀਂ';
+
+  @override
+  String get orderLoading => 'ਤੁਹਾਡੇ ਆਰਡਰ ਲੋਡ ਹੋ ਰਹੇ ਹਨ...';
+
+  @override
+  String get orderNoneYet => 'ਹਾਲੇ ਕੋਈ ਆਰਡਰ ਨਹੀਂ';
+
+  @override
+  String get orderSomethingWrong => 'ਓਹ! ਕੁਝ ਗੜਬੜ ਹੋ ਗਈ';
+
+  @override
+  String get orderStartShoppingHint =>
+      'ਆਪਣੇ ਆਰਡਰ ਇੱਥੇ ਵੇਖਣ ਲਈ ਖਰੀਦਦਾਰੀ ਸ਼ੁਰੂ ਕਰੋ';
+
+  @override
+  String get orderViewDetails => 'ਜਾਣਕਾਰੀ ਵੇਖੋ';
+
+  @override
+  String get orderEta15 => 'ਲਗਭਗ 15 ਮਿੰਟ';
+
+  @override
+  String get orderNeedHelp => 'ਮਦਦ ਚਾਹੀਦੀ ਹੈ?';
+
+  @override
+  String get orderNotFound => 'ਆਰਡਰ ਨਹੀਂ ਮਿਲਿਆ';
+
+  @override
+  String get orderFetchingDetails =>
+      'ਕਿਰਪਾ ਕਰਕੇ ਰੁਕੋ, ਅਸੀਂ ਤੁਹਾਡੇ ਆਰਡਰ ਦੀ ਜਾਣਕਾਰੀ ਲਿਆ ਰਹੇ ਹਾਂ';
+
+  @override
+  String get orderTrackYourOrder => 'ਆਪਣਾ ਆਰਡਰ ਟਰੈਕ ਕਰੋ';
+
+  @override
+  String get orderYourDeliveryPartner => 'ਤੁਹਾਡਾ ਡਿਲੀਵਰੀ ਪਾਰਟਨਰ';
+
+  @override
+  String get orderPackedNoRefund =>
+      'ਤੁਹਾਡਾ ਆਰਡਰ ਪੈਕ ਹੋ ਚੁੱਕਾ ਹੈ। ਹੁਣ ਰੱਦ ਕਰਨ ਉੱਤੇ ਭੁਗਤਾਨ ਵਾਪਸ ਨਹੀਂ ਹੋਵੇਗਾ। ਕੀ ਤੁਸੀਂ ਅੱਗੇ ਵਧਣਾ ਚਾਹੁੰਦੇ ਹੋ?';
+
+  @override
+  String get profileEditTitle => 'ਪ੍ਰੋਫਾਈਲ ਸੋਧੋ';
+
+  @override
+  String get profilePhotoComingSoon => 'ਫ਼ੋਟੋ ਅੱਪਲੋਡ ਜਲਦੀ ਆ ਰਿਹਾ ਹੈ';
+
+  @override
+  String get profilePicture => 'ਪ੍ਰੋਫਾਈਲ ਫ਼ੋਟੋ';
+
+  @override
+  String get profileSaveChanges => 'ਬਦਲਾਅ ਸੰਭਾਲੋ';
+
+  @override
+  String get profileNotifications => 'ਸੂਚਨਾਵਾਂ';
+
+  @override
+  String get profileEnableNotifHint =>
+      'ਇਸਨੂੰ ਚਾਲੂ ਕਰਨ ਲਈ ਫ਼ੋਨ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਈਜ਼ੀ ਬਾਸਕਟ ਦੀਆਂ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਕਰੋ।';
+
+  @override
+  String get paymentMaybeLater => 'ਬਾਅਦ ਵਿੱਚ';
+
+  @override
+  String get paymentStayUpdated => 'ਆਪਣੇ ਆਰਡਰ ਦੀ ਜਾਣਕਾਰੀ ਪਾਉਂਦੇ ਰਹੋ!';
+
+  @override
+  String get paymentNotifHint =>
+      'ਆਰਡਰ ਦੀ ਤਾਜ਼ਾ ਜਾਣਕਾਰੀ ਅਤੇ ਡਿਲੀਵਰੀ ਅਲਰਟ ਪਾਉਣ ਲਈ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਕਰੋ।';
+
+  @override
+  String get authTerms =>
+      'ਅੱਗੇ ਵਧਣ ਉੱਤੇ ਤੁਸੀਂ ਸਾਡੀਆਂ ਸੇਵਾ ਸ਼ਰਤਾਂ\nਅਤੇ ਨਿੱਜਤਾ ਨੀਤੀ ਨਾਲ ਸਹਿਮਤ ਹੁੰਦੇ ਹੋ';
+
+  @override
+  String get authChangePhone => 'ਫ਼ੋਨ ਨੰਬਰ ਬਦਲੋ';
+
+  @override
+  String get authTagline => 'ਤਾਜ਼ਾ ਸਮਾਨ ਤੁਹਾਡੇ ਦਰਵਾਜ਼ੇ ਉੱਤੇ';
+
+  @override
+  String get authLoginSignup => 'ਲਾਗਇਨ / ਸਾਈਨ ਅੱਪ';
+
+  @override
+  String get authVerifyOtp => 'OTP ਜਾਂਚੋ';
+
+  @override
+  String get addressAddTitle => 'ਪਤਾ ਪਾਓ';
+
+  @override
+  String get addressEditTitle => 'ਪਤਾ ਸੋਧੋ';
+
+  @override
+  String get addressLabelCaps => 'ਪਤਾ';
+
+  @override
+  String get addressDefaultCaps => 'ਮੁੱਖ';
+
+  @override
+  String get addressUseSavedAnyway => 'ਫਿਰ ਵੀ ਸੰਭਾਲਿਆ ਪਤਾ ਵਰਤੋ';
+
+  @override
+  String get addressEnterManually => 'ਆਪ ਭਰੋ';
+
+  @override
+  String get addressSearchByArea => 'ਇਲਾਕੇ, ਗਲੀ, ਸੈਕਟਰ ਜਾਂ ਲੈਂਡਮਾਰਕ ਤੋਂ ਲੱਭੋ';
+
+  @override
+  String get addressSelectedLocation => 'ਚੁਣਿਆ ਟਿਕਾਣਾ:';
+
+  @override
+  String get addressNotifyMe => 'ਮੈਨੂੰ ਦੱਸੋ';
+
+  @override
+  String get addressWillNotify => 'ਅਸੀਂ ਤੁਹਾਨੂੰ ਦੱਸ ਦੇਵਾਂਗੇ!';
+
+  @override
+  String get locationAllowAccess => 'ਟਿਕਾਣੇ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ';
+
+  @override
+  String get locationAllowForDelivery => 'ਡਿਲੀਵਰੀ ਲਈ ਟਿਕਾਣਾ ਚਾਲੂ ਕਰੋ';
+
+  @override
+  String get locationEnterManually => 'ਇਸ ਦੀ ਥਾਂ ਪਤਾ ਆਪ ਭਰੋ';
+
+  @override
+  String get locationFreshGroceries => 'ਮਿੰਟਾਂ ਵਿੱਚ ਤਾਜ਼ਾ ਸਮਾਨ';
+
+  @override
+  String get locationGroceriesFast => 'ਸਮਾਨ, ਤੇਜ਼ੀ ਨਾਲ ਡਿਲੀਵਰ';
+
+  @override
+  String get locationIsOff => 'ਟਿਕਾਣਾ ਬੰਦ ਹੈ';
+
+  @override
+  String get locationShareOnce =>
+      'ਇੱਕ ਵਾਰ ਆਪਣਾ ਟਿਕਾਣਾ ਦਿਓ ਤਾਂ ਜੋ ਅਸੀਂ ਤੁਹਾਡਾ ਇਲਾਕਾ ਪਛਾਣ ਸਕੀਏ, ਸਹੀ ਕੀਮਤਾਂ ਵਿਖਾ ਸਕੀਏ ਅਤੇ ਸਹੀ ਪਤੇ ਉੱਤੇ ਡਿਲੀਵਰ ਕਰ ਸਕੀਏ।';
+
+  @override
+  String get locationChangeAnytime =>
+      'ਤੁਸੀਂ ਇਸਨੂੰ ਕਦੇ ਵੀ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਬਦਲ ਸਕਦੇ ਹੋ।';
+
+  @override
+  String get locationDetecting => 'ਤੁਹਾਡਾ ਟਿਕਾਣਾ ਲੱਭਿਆ ਜਾ ਰਿਹਾ ਹੈ...';
+
+  @override
+  String get locationAccessRequired => 'ਟਿਕਾਣੇ ਦੀ ਇਜਾਜ਼ਤ ਜ਼ਰੂਰੀ ਹੈ';
+
+  @override
+  String get locationPrivacyNote =>
+      'ਤੁਹਾਡਾ ਟਿਕਾਣਾ ਸਿਰਫ਼ ਡਿਲੀਵਰੀ ਦਾ ਪਤਾ ਲੱਭਣ ਲਈ ਵਰਤਿਆ ਜਾਂਦਾ ਹੈ। ਅਸੀਂ ਇਸਨੂੰ ਕਿਸੇ ਨਾਲ ਸਾਂਝਾ ਨਹੀਂ ਕਰਦੇ।';
+
+  @override
+  String get locationMapMobileOnly => 'ਨਕਸ਼ਾ ਮੋਬਾਈਲ ਐਪ ਉੱਤੇ ਉਪਲਬਧ ਹੈ';
+
+  @override
+  String get locationMapMobileHint =>
+      'ਨਕਸ਼ੇ ਅਤੇ ਪਿੰਨ ਖਿੱਚਣ ਦੀ ਸਹੂਲਤ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਮੋਬਾਈਲ ਐਪ ਵਰਤੋ।';
+
+  @override
+  String get serviceGoHome => 'ਹੋਮ ਉੱਤੇ ਜਾਓ';
+
+  @override
+  String get serviceSelectedLocation => 'ਚੁਣਿਆ ਟਿਕਾਣਾ';
+
+  @override
+  String get serviceNotifyMe => 'ਸੂਚਨਾ ਚਾਹੀਦੀ ਹੈ?';
+
+  @override
+  String get helpTitle => 'ਮਦਦ ਅਤੇ ਸਹਾਇਤਾ';
+
+  @override
+  String get helpHowCanWeHelpYou => 'ਅਸੀਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦੇ ਹਾਂ?';
+
+  @override
+  String get helpChooseOption =>
+      'ਆਪਣੇ ਆਰਡਰ ਵਿੱਚ ਮਦਦ ਲਈ ਹੇਠਾਂ ਤੋਂ ਇੱਕ ਵਿਕਲਪ ਚੁਣੋ।';
+
+  @override
+  String get helpRaiseRequest => 'ਸਹਾਇਤਾ ਬੇਨਤੀ ਭੇਜੋ';
+
+  @override
+  String get helpReportIssue => 'ਆਪਣੇ ਆਰਡਰ, ਭੁਗਤਾਨ ਜਾਂ ਡਿਲੀਵਰੀ ਦੀ ਸਮੱਸਿਆ ਦੱਸੋ';
+
+  @override
+  String get supportCategory => 'ਸ਼੍ਰੇਣੀ';
+
+  @override
+  String get supportDescribeProblem => 'ਆਪਣੀ ਸਮੱਸਿਆ ਦੱਸੋ';
+
+  @override
+  String get supportHowCanWeHelp => 'ਅਸੀਂ ਕਿਵੇਂ ਮਦਦ ਕਰੀਏ?';
+
+  @override
+  String get supportExplainHint => 'ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀ ਸਮੱਸਿਆ ਸਮਝਾਓ...';
+
+  @override
+  String get supportLoginAgain =>
+      'ਸਹਾਇਤਾ ਬੇਨਤੀ ਭੇਜਣ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਫਿਰ ਲਾਗਇਨ ਕਰੋ।';
+
+  @override
+  String get supportSubmit => 'ਬੇਨਤੀ ਭੇਜੋ';
+
+  @override
+  String get supportSubmitted => 'ਸਹਾਇਤਾ ਬੇਨਤੀ ਭੇਜ ਦਿੱਤੀ ਗਈ';
+
+  @override
+  String get supportTellUs => 'ਆਪਣੀ ਸਮੱਸਿਆ ਦੱਸੋ, ਸਾਡੀ ਟੀਮ ਤੁਹਾਡੀ ਮਦਦ ਕਰੇਗੀ।';
+
+  @override
+  String get cartViewCart => 'ਕਾਰਟ ਵੇਖੋ';
+
+  @override
+  String get orderTrackShort => 'ਟਰੈਕ ਕਰੋ';
+
+  @override
+  String get commonSwitch => 'ਬਦਲੋ';
+
+  @override
+  String get storeClosedCaps => 'ਸਟੋਰ ਬੰਦ ਹੈ';
+
+  @override
+  String get authOtpSubtitle => 'ਅਸੀਂ ਪੁਸ਼ਟੀ ਲਈ ਇੱਕ ਵਾਰ ਦਾ ਪਾਸਵਰਡ ਭੇਜਾਂਗੇ';
+
+  @override
+  String get serviceNoDeliveryHere => 'ਓਹ! ਅਸੀਂ ਹਾਲੇ ਇੱਥੇ ਡਿਲੀਵਰੀ ਨਹੀਂ ਕਰਦੇ';
+
+  @override
+  String get serviceNotDeliveringNow =>
+      'ਅਸੀਂ ਫਿਲਹਾਲ ਇਸ ਥਾਂ ਡਿਲੀਵਰੀ ਨਹੀਂ ਕਰ ਰਹੇ।';
+
+  @override
+  String get serviceExpanding =>
+      'ਚਿੰਤਾ ਨਾ ਕਰੋ! ਅਸੀਂ ਤੇਜ਼ੀ ਨਾਲ ਵਧ ਰਹੇ ਹਾਂ ਅਤੇ ਜਲਦੀ ਤੁਹਾਡੇ ਇਲਾਕੇ ਵਿੱਚ ਹੋਵਾਂਗੇ।';
+
+  @override
+  String get serviceWillNotifyYou =>
+      'ਜਿਵੇਂ ਹੀ ਅਸੀਂ ਤੁਹਾਡੇ ਇਲਾਕੇ ਵਿੱਚ ਡਿਲੀਵਰੀ ਸ਼ੁਰੂ ਕਰਾਂਗੇ, ਅਸੀਂ ਤੁਹਾਨੂੰ ਦੱਸ ਦੇਵਾਂਗੇ!';
+
+  @override
+  String get productReviewCount => '1.2k ਸਮੀਖਿਆਵਾਂ';
 }

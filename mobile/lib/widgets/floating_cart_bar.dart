@@ -109,8 +109,8 @@ class FloatingCartBar extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'View Cart',
+                           Text(
+                            AppLocalizations.of(context).cartViewCart,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,

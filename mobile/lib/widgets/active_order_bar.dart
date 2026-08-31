@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../providers/order_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/active_order_model.dart';
+import '../l10n/app_localizations.dart';
 
 /// Active order bar — home screen ke bottom pe dikhta hai jab orders active hain
 /// Multiple orders hain toh horizontal scroll hota hai (Zomato/Blinkit style)
@@ -176,7 +177,7 @@ class _OrderCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                'Track',
+                AppLocalizations.of(context).orderTrackShort,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,

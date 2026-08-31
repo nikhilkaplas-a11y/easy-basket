@@ -228,9 +228,9 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
                                 children: [
                                   const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 18),
                                   const SizedBox(width: 8),
-                                  const Expanded(
+                                   Expanded(
                                     child: Text(
-                                      'We will notify you!',
+                                      AppLocalizations.of(context).addressWillNotify,
                                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primaryGreen),
                                     ),
                                   ),
@@ -268,8 +268,8 @@ class _AddressCompletionSheetState extends State<AddressCompletionSheet> {
                                         color: const Color(0xFFF57C00),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: const Text(
-                                        'Notify Me',
+                                      child:  Text(
+                                        AppLocalizations.of(context).addressNotifyMe,
                                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                                       ),
                                     ),

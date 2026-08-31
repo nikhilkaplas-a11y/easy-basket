@@ -126,8 +126,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         backgroundColor: AppTheme.white,
         iconTheme: const IconThemeData(color: AppTheme.black),
-        title: const Text(
-          'Edit Profile',
+        title:  Text(
+          AppLocalizations.of(context).profileEditTitle,
           style: TextStyle(
             color: AppTheme.black,
             fontWeight: FontWeight.bold,
@@ -185,7 +185,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Profile Picture',
+                      AppLocalizations.of(context).profilePicture,
                       style: TextStyle(
                         fontSize: 14,
                         color: AppTheme.grey,
@@ -194,7 +194,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Photo upload coming soon',
+                      AppLocalizations.of(context).profilePhotoComingSoon,
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.grey.withOpacity(0.7),
@@ -378,8 +378,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             valueColor: AlwaysStoppedAnimation<Color>(AppTheme.white),
                           ),
                         )
-                      : const Text(
-                          'Save Changes',
+                      :  Text(
+                          AppLocalizations.of(context).profileSaveChanges,
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                         ),
                 ),

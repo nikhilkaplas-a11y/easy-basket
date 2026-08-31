@@ -1041,6 +1041,582 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select your birthday'**
   String get profileBirthdayHint;
+
+  /// No description provided for @homeAddAddressToOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your delivery address to place orders'**
+  String get homeAddAddressToOrder;
+
+  /// No description provided for @homeChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get homeChange;
+
+  /// No description provided for @homeCheckBackSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Check back soon!'**
+  String get homeCheckBackSoon;
+
+  /// No description provided for @homeEnableLocationFast.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable location for faster delivery'**
+  String get homeEnableLocationFast;
+
+  /// No description provided for @homeNoProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No products available'**
+  String get homeNoProducts;
+
+  /// No description provided for @homeShopByCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop by category'**
+  String get homeShopByCategory;
+
+  /// No description provided for @homeSnackItAway.
+  ///
+  /// In en, this message translates to:
+  /// **'Snack it away'**
+  String get homeSnackItAway;
+
+  /// No description provided for @commonViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View All'**
+  String get commonViewAll;
+
+  /// No description provided for @commonSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'see all'**
+  String get commonSeeAll;
+
+  /// No description provided for @productAddToCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to cart'**
+  String get productAddToCart;
+
+  /// No description provided for @productOutOfStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of stock'**
+  String get productOutOfStock;
+
+  /// No description provided for @productUnavailableNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Product unavailable right now'**
+  String get productUnavailableNow;
+
+  /// No description provided for @productDetailsMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Some details are missing for this product. You can still add it to cart.'**
+  String get productDetailsMissing;
+
+  /// No description provided for @productYouMayAlsoLike.
+  ///
+  /// In en, this message translates to:
+  /// **'You may also like'**
+  String get productYouMayAlsoLike;
+
+  /// No description provided for @productNoneFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No products found'**
+  String get productNoneFound;
+
+  /// No description provided for @productAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'ADD'**
+  String get productAdd;
+
+  /// No description provided for @productOutOfStockCaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of Stock'**
+  String get productOutOfStockCaps;
+
+  /// No description provided for @productMicPermissionLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Easy Basket needs microphone permission to hear you. Please allow it in Settings.'**
+  String get productMicPermissionLong;
+
+  /// No description provided for @categoryAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All Categories'**
+  String get categoryAll;
+
+  /// No description provided for @categoryNoneAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No categories available'**
+  String get categoryNoneAvailable;
+
+  /// No description provided for @categoryNoSubcategories.
+  ///
+  /// In en, this message translates to:
+  /// **'No subcategories available'**
+  String get categoryNoSubcategories;
+
+  /// No description provided for @orderLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your orders...'**
+  String get orderLoading;
+
+  /// No description provided for @orderNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No orders yet'**
+  String get orderNoneYet;
+
+  /// No description provided for @orderSomethingWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Oops! Something went wrong'**
+  String get orderSomethingWrong;
+
+  /// No description provided for @orderStartShoppingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start shopping to see your orders here'**
+  String get orderStartShoppingHint;
+
+  /// No description provided for @orderViewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View Details'**
+  String get orderViewDetails;
+
+  /// No description provided for @orderEta15.
+  ///
+  /// In en, this message translates to:
+  /// **'ETA ~15 mins'**
+  String get orderEta15;
+
+  /// No description provided for @orderNeedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Need Help?'**
+  String get orderNeedHelp;
+
+  /// No description provided for @orderNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Order not found'**
+  String get orderNotFound;
+
+  /// No description provided for @orderFetchingDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait while we fetch your order details'**
+  String get orderFetchingDetails;
+
+  /// No description provided for @orderTrackYourOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Track Your Order'**
+  String get orderTrackYourOrder;
+
+  /// No description provided for @orderYourDeliveryPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Delivery Partner'**
+  String get orderYourDeliveryPartner;
+
+  /// No description provided for @orderPackedNoRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order is already packed. Cancelling now will NOT refund your payment. Do you want to continue?'**
+  String get orderPackedNoRefund;
+
+  /// No description provided for @profileEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Profile'**
+  String get profileEditTitle;
+
+  /// No description provided for @profilePhotoComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo upload coming soon'**
+  String get profilePhotoComingSoon;
+
+  /// No description provided for @profilePicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile Picture'**
+  String get profilePicture;
+
+  /// No description provided for @profileSaveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Changes'**
+  String get profileSaveChanges;
+
+  /// No description provided for @profileNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get profileNotifications;
+
+  /// No description provided for @profileEnableNotifHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications for Easy Basket in your phone settings to turn this on.'**
+  String get profileEnableNotifHint;
+
+  /// No description provided for @paymentMaybeLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Maybe Later'**
+  String get paymentMaybeLater;
+
+  /// No description provided for @paymentStayUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay updated on your order!'**
+  String get paymentStayUpdated;
+
+  /// No description provided for @paymentNotifHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on notifications to receive real-time order updates & delivery alerts.'**
+  String get paymentNotifHint;
+
+  /// No description provided for @authTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'By continuing, you agree to our Terms of Service\nand Privacy Policy'**
+  String get authTerms;
+
+  /// No description provided for @authChangePhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Change phone number'**
+  String get authChangePhone;
+
+  /// No description provided for @authTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh groceries at your doorstep'**
+  String get authTagline;
+
+  /// No description provided for @authLoginSignup.
+  ///
+  /// In en, this message translates to:
+  /// **'Login / Sign up'**
+  String get authLoginSignup;
+
+  /// No description provided for @authVerifyOtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify OTP'**
+  String get authVerifyOtp;
+
+  /// No description provided for @addressAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Address'**
+  String get addressAddTitle;
+
+  /// No description provided for @addressEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Address'**
+  String get addressEditTitle;
+
+  /// No description provided for @addressLabelCaps.
+  ///
+  /// In en, this message translates to:
+  /// **'ADDRESS'**
+  String get addressLabelCaps;
+
+  /// No description provided for @addressDefaultCaps.
+  ///
+  /// In en, this message translates to:
+  /// **'DEFAULT'**
+  String get addressDefaultCaps;
+
+  /// No description provided for @addressUseSavedAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Saved Address Anyway'**
+  String get addressUseSavedAnyway;
+
+  /// No description provided for @addressEnterManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Manually'**
+  String get addressEnterManually;
+
+  /// No description provided for @addressSearchByArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by area, street name, sector, or landmark'**
+  String get addressSearchByArea;
+
+  /// No description provided for @addressSelectedLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Location:'**
+  String get addressSelectedLocation;
+
+  /// No description provided for @addressNotifyMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify Me'**
+  String get addressNotifyMe;
+
+  /// No description provided for @addressWillNotify.
+  ///
+  /// In en, this message translates to:
+  /// **'We will notify you!'**
+  String get addressWillNotify;
+
+  /// No description provided for @locationAllowAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow location access'**
+  String get locationAllowAccess;
+
+  /// No description provided for @locationAllowForDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow location for delivery'**
+  String get locationAllowForDelivery;
+
+  /// No description provided for @locationEnterManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter address manually instead'**
+  String get locationEnterManually;
+
+  /// No description provided for @locationFreshGroceries.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh groceries in minutes'**
+  String get locationFreshGroceries;
+
+  /// No description provided for @locationGroceriesFast.
+  ///
+  /// In en, this message translates to:
+  /// **'Groceries, delivered fast'**
+  String get locationGroceriesFast;
+
+  /// No description provided for @locationIsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off'**
+  String get locationIsOff;
+
+  /// No description provided for @locationShareOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Share your location once so we can find your area, show accurate prices, and deliver to the right address.'**
+  String get locationShareOnce;
+
+  /// No description provided for @locationChangeAnytime.
+  ///
+  /// In en, this message translates to:
+  /// **'You can change this anytime in settings.'**
+  String get locationChangeAnytime;
+
+  /// No description provided for @locationDetecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Detecting your location...'**
+  String get locationDetecting;
+
+  /// No description provided for @locationAccessRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Location Access Required'**
+  String get locationAccessRequired;
+
+  /// No description provided for @locationPrivacyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location is only used to find your delivery address. We never share it with anyone.'**
+  String get locationPrivacyNote;
+
+  /// No description provided for @locationMapMobileOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Map View Available on Mobile'**
+  String get locationMapMobileOnly;
+
+  /// No description provided for @locationMapMobileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For the best experience with interactive map and draggable pin, please use the mobile app.'**
+  String get locationMapMobileHint;
+
+  /// No description provided for @serviceGoHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Home'**
+  String get serviceGoHome;
+
+  /// No description provided for @serviceSelectedLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Location'**
+  String get serviceSelectedLocation;
+
+  /// No description provided for @serviceNotifyMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Want to be notified?'**
+  String get serviceNotifyMe;
+
+  /// No description provided for @helpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get helpTitle;
+
+  /// No description provided for @helpHowCanWeHelpYou.
+  ///
+  /// In en, this message translates to:
+  /// **'How can we help you?'**
+  String get helpHowCanWeHelpYou;
+
+  /// No description provided for @helpChooseOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an option below to get help with your order.'**
+  String get helpChooseOption;
+
+  /// No description provided for @helpRaiseRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise a Support Request'**
+  String get helpRaiseRequest;
+
+  /// No description provided for @helpReportIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Report an issue with your order, payment or delivery'**
+  String get helpReportIssue;
+
+  /// No description provided for @supportCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get supportCategory;
+
+  /// No description provided for @supportDescribeProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your problem'**
+  String get supportDescribeProblem;
+
+  /// No description provided for @supportHowCanWeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'How can we help?'**
+  String get supportHowCanWeHelp;
+
+  /// No description provided for @supportExplainHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Please explain your issue...'**
+  String get supportExplainHint;
+
+  /// No description provided for @supportLoginAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Please login again to submit a support request.'**
+  String get supportLoginAgain;
+
+  /// No description provided for @supportSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Request'**
+  String get supportSubmit;
+
+  /// No description provided for @supportSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Support request submitted successfully'**
+  String get supportSubmitted;
+
+  /// No description provided for @supportTellUs.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us about your problem and our support team will help you.'**
+  String get supportTellUs;
+
+  /// No description provided for @cartViewCart.
+  ///
+  /// In en, this message translates to:
+  /// **'View Cart'**
+  String get cartViewCart;
+
+  /// No description provided for @orderTrackShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Track'**
+  String get orderTrackShort;
+
+  /// No description provided for @commonSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get commonSwitch;
+
+  /// No description provided for @storeClosedCaps.
+  ///
+  /// In en, this message translates to:
+  /// **'STORE CLOSED'**
+  String get storeClosedCaps;
+
+  /// No description provided for @authOtpSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll send a one-time password to verify'**
+  String get authOtpSubtitle;
+
+  /// No description provided for @serviceNoDeliveryHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Oops! We don\'t deliver here yet'**
+  String get serviceNoDeliveryHere;
+
+  /// No description provided for @serviceNotDeliveringNow.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'re currently not delivering to this location.'**
+  String get serviceNotDeliveringNow;
+
+  /// No description provided for @serviceExpanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t worry! We\'re expanding rapidly and will be in your area soon.'**
+  String get serviceExpanding;
+
+  /// No description provided for @serviceWillNotifyYou.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll notify you as soon as we start delivering to your area!'**
+  String get serviceWillNotifyYou;
+
+  /// No description provided for @productReviewCount.
+  ///
+  /// In en, this message translates to:
+  /// **'1.2k reviews'**
+  String get productReviewCount;
 }
 
 class _AppLocalizationsDelegate

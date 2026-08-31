@@ -1026,7 +1026,10 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (order.status == 'pending')
+          // COD only at 'pending'. An online order sitting at 'pending' is UNPAID,
+          // and accepting it would hide it from both auto-cancel and the
+          // stock-restore path, stranding its inventory permanently.
+          if (order.status == 'pending' && order.isCod)
             ElevatedButton.icon(
               onPressed: () => _updateStatus(context, order.id, 'accepted', adminProvider, authProvider),
               icon: const Icon(Icons.check_circle),
@@ -1036,6 +1039,28 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
+          if (order.status == 'awaiting_acceptance') ...[
+            ElevatedButton.icon(
+              onPressed: () => _updateStatus(context, order.id, 'accepted', adminProvider, authProvider),
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Accept Order'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _refuseOrder(context, order, adminProvider, authProvider),
+              icon: const Icon(Icons.block),
+              label: const Text('Refuse Order'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.deepOrange,
+                side: const BorderSide(color: Colors.deepOrange),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ],
           if (order.status == 'accepted') ...[
             const SizedBox(height: 8),
             ElevatedButton.icon(
@@ -1088,6 +1113,79 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Same fixed list as the orders list — refusals must be countable, not free text.
+  static const List<String> _refusalReasons = [
+    'Item out of stock',
+    'Store too busy',
+    'Address not serviceable',
+    'Closing soon',
+    'Other',
+  ];
+
+  /// Refusing is a cancel with a reason. The backend restores stock and refunds the
+  /// customer through the same path admin-cancel already uses.
+  Future<void> _refuseOrder(
+    BuildContext context,
+    dynamic order,
+    AdminProvider adminProvider,
+    AuthProvider authProvider,
+  ) async {
+    if (authProvider.accessToken == null) return;
+
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('Refuse order #${order.id}?'),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
+            child: Text(
+              'The customer has already paid. They will be refunded automatically.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ),
+          for (final r in _refusalReasons)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, r),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(r),
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('Keep order', style: TextStyle(color: Colors.grey)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+
+    final ok = await adminProvider.updateOrderStatus(
+      token: authProvider.accessToken!,
+      orderId: order.id as int,
+      status: 'cancelled',
+      cancellationReason: reason,
+    );
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Order refused — customer is being refunded.'
+            : (adminProvider.error ?? 'Failed to refuse order')),
+        backgroundColor: ok ? Colors.deepOrange : Colors.red,
+      ),
+    );
+    if (ok) {
+      await _loadOrder();
+      adminProvider.fetchOrders(token: authProvider.accessToken);
+    }
   }
 
   Future<void> _updateStatus(

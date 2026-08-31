@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../services/support_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class SupportRequestScreen extends StatefulWidget {
   final int? orderId;
@@ -47,8 +48,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
 
     if (token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login again to submit a support request.'),
+         SnackBar(
+          content: Text(AppLocalizations.of(context).supportLoginAgain),
         ),
       );
       return;
@@ -69,8 +70,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Support request submitted successfully'),
+         SnackBar(
+          content: Text(AppLocalizations.of(context).supportSubmitted),
         ),
       );
 
@@ -96,7 +97,7 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & Support'),
+        title:  Text(AppLocalizations.of(context).helpTitle),
       ),
       body: SafeArea(
         child: Form(
@@ -111,8 +112,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
 
               const SizedBox(height: 16),
 
-              const Text(
-                'How can we help?',
+               Text(
+                AppLocalizations.of(context).supportHowCanWeHelp,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 24,
@@ -122,8 +123,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
 
               const SizedBox(height: 8),
 
-              const Text(
-                'Tell us about your problem and our support team will help you.',
+               Text(
+                AppLocalizations.of(context).supportTellUs,
                 textAlign: TextAlign.center,
               ),
 
@@ -131,8 +132,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
 
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
+                decoration:  InputDecoration(
+                  labelText: AppLocalizations.of(context).supportCategory,
                   border: OutlineInputBorder(),
                 ),
                 items: _categories.map((category) {
@@ -156,9 +157,9 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
                 controller: _descriptionController,
                 maxLines: 6,
                 maxLength: 1000,
-                decoration: const InputDecoration(
-                  labelText: 'Describe your problem',
-                  hintText: 'Please explain your issue...',
+                decoration:  InputDecoration(
+                  labelText: AppLocalizations.of(context).supportDescribeProblem,
+                  hintText: AppLocalizations.of(context).supportExplainHint,
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                 ),
@@ -189,8 +190,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          'Submit Request',
+                      :  Text(
+                          AppLocalizations.of(context).supportSubmit,
                           style: TextStyle(fontSize: 16),
                         ),
                 ),

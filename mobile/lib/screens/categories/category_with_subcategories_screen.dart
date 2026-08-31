@@ -10,6 +10,7 @@ import '../../widgets/product_card.dart';
 import '../../widgets/floating_cart_bar.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
+import '../../l10n/app_localizations.dart';
 
 class CategoryWithSubcategoriesScreen extends StatefulWidget {
   final int parentCategoryId;
@@ -214,7 +215,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                           Icon(Icons.shopping_bag_outlined, size: 64, color: AppTheme.grey),
                           const SizedBox(height: 16),
                           Text(
-                            'No products found',
+                            AppLocalizations.of(context).productNoneFound,
                             style: TextStyle(
                               fontSize: 18,
                               color: AppTheme.grey,
@@ -428,7 +429,7 @@ class _CategoryWithSubcategoriesScreenState extends State<CategoryWithSubcategor
                     Icon(Icons.shopping_bag_outlined, size: 64, color: AppTheme.grey),
                     const SizedBox(height: 16),
                     Text(
-                      'No products found',
+                      AppLocalizations.of(context).productNoneFound,
                       style: TextStyle(
                         fontSize: 18,
                         color: AppTheme.grey,

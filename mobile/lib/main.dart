@@ -10,6 +10,7 @@ import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'widgets/app_lifecycle_refresh.dart';
+import 'widgets/restart_widget.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/product_provider.dart';
@@ -64,7 +65,9 @@ void main() async {
   }
 
   // Start the UI without waiting for non-critical initialization.
-  runApp(MyApp(prefs: prefs));
+  // Wrapped so a language change can rebuild every provider from scratch
+  // (see RestartWidget) instead of leaving stale catalogue data behind.
+  runApp(RestartWidget(child: MyApp(prefs: prefs)));
 
   // Non-critical initialization can happen after the app starts.
   initializeDateFormatting();

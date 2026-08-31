@@ -252,7 +252,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                         valueColor: AlwaysStoppedAnimation(Color(0xFF2E7D32))),
                     const SizedBox(height: 16),
                     Text(
-                      'Please wait while we fetch your order details',
+                      AppLocalizations.of(context).orderFetchingDetails,
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                     ),
@@ -261,7 +261,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                         size: 48, color: Colors.grey[400]),
                     const SizedBox(height: 16),
                     Text(
-                      'Order not found',
+                      AppLocalizations.of(context).orderNotFound,
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                     ),
@@ -365,9 +365,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                       color: Colors.white, size: 22),
                   onPressed: () => popOrRoleHub(context),
                 ),
-                const Expanded(
+                 Expanded(
                   child: Text(
-                    'Track Your Order',
+                    AppLocalizations.of(context).orderTrackYourOrder,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -598,7 +598,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Your Delivery Partner',
+                  AppLocalizations.of(context).orderYourDeliveryPartner,
                   style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                 ),
                 const SizedBox(height: 2),
@@ -894,8 +894,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 const Icon(Icons.access_time_rounded,
                     size: 14, color: Color(0xFF2E7D32)),
                 const SizedBox(width: 4),
-                const Text(
-                  'ETA ~15 mins',
+                 Text(
+                  AppLocalizations.of(context).orderEta15,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -1304,8 +1304,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title:  Text(AppLocalizations.of(context).orderCancelQuestion),
-        content: const Text(
-            'Your order is already packed. Cancelling now will NOT refund your payment. Do you want to continue?'),
+        content:  Text(
+            AppLocalizations.of(context).orderPackedNoRefund),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -1380,8 +1380,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
         ),
-        child: const Text(
-          'Need Help?',
+        child:  Text(
+          AppLocalizations.of(context).orderNeedHelp,
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),

@@ -400,7 +400,7 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
               // Title
               Text(
                 _isDetecting 
-                    ? 'Detecting your location...'
+                    ? AppLocalizations.of(context).locationDetecting
                     : _hasError
                         ? 'Location Detection'
                         : 'We found your location!',
@@ -428,7 +428,7 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Detecting your location...',
+                      AppLocalizations.of(context).locationDetecting,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.grey,
                             fontSize: 14,

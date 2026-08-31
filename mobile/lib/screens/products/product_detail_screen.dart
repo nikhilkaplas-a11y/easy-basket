@@ -138,8 +138,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: const Icon(Icons.info_outline, size: 40, color: Colors.orange),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Product unavailable right now',
+                   Text(
+                    AppLocalizations.of(context).productUnavailableNow,
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 12),
@@ -433,7 +433,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '• 1.2k reviews',
+                      '• ' + AppLocalizations.of(context).productReviewCount,
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.white.withValues(alpha: 0.8),
@@ -744,7 +744,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Some details are missing for this product. You can still add it to cart.',
+              AppLocalizations.of(context).productDetailsMissing,
               style: TextStyle(fontSize: 12, color: AppTheme.darkGrey),
             ),
           ),
@@ -765,8 +765,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
             children: [
-              const Text(
-                'You may also like',
+               Text(
+                AppLocalizations.of(context).productYouMayAlsoLike,
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black),
               ),
               const Spacer(),
@@ -778,11 +778,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     });
                   }
                 },
-                child: const Row(
+                child:  Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'View All',
+                      AppLocalizations.of(context).commonViewAll,
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0C831F)),
                     ),
                     SizedBox(width: 2),
@@ -891,8 +891,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   color: const Color(0xFFFFEBEE),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  'Out of stock',
+                child:  Text(
+                  AppLocalizations.of(context).productOutOfStock,
                   style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
               )
@@ -1037,11 +1037,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.shopping_cart_outlined, size: 18, color: Color(0xFF0C831F)),
-                SizedBox(width: 8),
+              children: [
+                const Icon(Icons.shopping_cart_outlined, size: 18, color: Color(0xFF0C831F)),
+                const SizedBox(width: 8),
                 Text(
-                  'Add to cart',
+                  AppLocalizations.of(context).productAddToCart,
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0C831F)),
                 ),
               ],

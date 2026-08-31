@@ -647,8 +647,8 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                                 ),
                                               ],
                                               if (address.tag == null)
-                                                const Text(
-                                                  'ADDRESS',
+                                                 Text(
+                                                  AppLocalizations.of(context).addressLabelCaps,
                                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black),
                                                 ),
                                               if (address.isDefault) ...[
@@ -659,8 +659,8 @@ class _AddressListScreenState extends State<AddressListScreen> {
                                                     color: const Color(0xFFE8F5E9),
                                                     borderRadius: BorderRadius.circular(4),
                                                   ),
-                                                  child: const Text(
-                                                    'DEFAULT',
+                                                  child:  Text(
+                                                    AppLocalizations.of(context).addressDefaultCaps,
                                                     style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF0C831F)),
                                                   ),
                                                 ),

@@ -599,16 +599,16 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
               color: AppTheme.primaryGreen,
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Map View Available on Mobile',
+             Text(
+              AppLocalizations.of(context).locationMapMobileOnly,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'For the best experience with interactive map and draggable pin, please use the mobile app.',
+             Text(
+              AppLocalizations.of(context).locationMapMobileHint,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -638,8 +638,8 @@ class _MapAddressPickerScreenState extends State<MapAddressPickerScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Selected Location:',
+                       Text(
+                        AppLocalizations.of(context).addressSelectedLocation,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                         ),

@@ -188,7 +188,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Text(
-                                    'Allow location for delivery',
+                                    AppLocalizations.of(context).locationAllowForDelivery,
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
@@ -199,7 +199,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Groceries, delivered fast',
+                                    AppLocalizations.of(context).locationGroceriesFast,
                                     style: GoogleFonts.poppins(
                                       fontSize: (size.width * 0.078).clamp(26.0, 34.0),
                                       fontWeight: FontWeight.w800,
@@ -211,7 +211,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Share your location once so we can find your area, show accurate prices, and deliver to the right address.',
+                                    AppLocalizations.of(context).locationShareOnce,
                                     style: GoogleFonts.poppins(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w400,
@@ -222,7 +222,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'You can change this anytime in settings.',
+                                    AppLocalizations.of(context).locationChangeAnytime,
                                     style: GoogleFonts.poppins(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -271,7 +271,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                       ),
                                       child: Text(
-                                        'Enter address manually instead',
+                                        AppLocalizations.of(context).locationEnterManually,
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
@@ -335,7 +335,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
         ),
         const SizedBox(height: 6),
         Text(
-          'Fresh groceries in minutes',
+          AppLocalizations.of(context).locationFreshGroceries,
           style: GoogleFonts.poppins(
             fontSize: 15,
             fontWeight: FontWeight.w500,
@@ -382,7 +382,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                     const Icon(Icons.my_location_rounded, color: Colors.white, size: 22),
                   const SizedBox(width: 10),
                   Text(
-                    'Allow location access',
+                    AppLocalizations.of(context).locationAllowAccess,
                     style: GoogleFonts.poppins(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -707,9 +707,9 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+             Expanded(
               child: Text(
-                'Location is off',
+                AppLocalizations.of(context).locationIsOff,
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),

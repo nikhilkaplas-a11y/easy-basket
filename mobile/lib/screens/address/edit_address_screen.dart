@@ -85,8 +85,8 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
-          'Edit Address',
+        title:  Text(
+          AppLocalizations.of(context).addressEditTitle,
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87),
         ),
         centerTitle: false,

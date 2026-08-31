@@ -103,7 +103,7 @@ class _SubcategorySelectionScreenState extends State<SubcategorySelectionScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No subcategories available',
+                        AppLocalizations.of(context).categoryNoSubcategories,
                         style: TextStyle(
                           fontSize: 18,
                           color: AppTheme.grey,
@@ -220,7 +220,7 @@ class _ViewAllCard extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Text(
-                    'View All',
+                    AppLocalizations.of(context).commonViewAll,
                     style: TextStyle(
                       fontSize: responsive.fontSize(11),
                       fontWeight: FontWeight.w600,
