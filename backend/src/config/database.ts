@@ -55,6 +55,11 @@ export const AppDataSource = new DataSource({
   RoleChangeAudit,
   Translation,
   MissingTranslation,
+  // Was imported above but never registered here, so TypeORM had no metadata for it
+  // and every store-status read threw EntityMetadataNotFoundError. The service fails
+  // OPEN by design, which turned a permanent break into silent log noise — and left
+  // the server-side STORE_CLOSED guard in createOrder permanently inert.
+  StoreStatus,
 ],
   subscribers: [],
   migrations: [],
