@@ -34,6 +34,11 @@ export class OrderInventoryService {
       }
     }
 
-    await ProductController.invalidateProductListCache();
+    // No cache invalidation. Restoring stock is the mirror of reserving it, and
+    // for the same reason as in OrderController.createOrder there is nothing to
+    // invalidate: the search cache holds IDs, not stock values, and every hit
+    // re-reads the rows. This path runs from the auto-cancel sweep, which can
+    // process a batch of orders in one tick — a keyspace sweep per order was
+    // pure waste.
   }
 }

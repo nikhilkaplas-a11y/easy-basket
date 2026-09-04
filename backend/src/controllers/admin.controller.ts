@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { AppDataSource } from '../config/database';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { AuthRequest, invalidateCachedUser } from '../middleware/auth.middleware';
 import { Category } from '../entities/Category';
 import { FCMService } from '../services/fcm.service';
 import { Order } from '../entities/Order';
@@ -505,6 +505,10 @@ export class AdminController {
       if (isActive !== undefined) user.isActive = isActive;
 
       await userRepository.save(user);
+      // isActive is an authorization input, and auth.middleware caches it. Drop
+      // the cached identity so a deactivation takes effect on the next request
+      // rather than up to AUTH_CACHE_TTL_SEC later.
+      await invalidateCachedUser(user.id);
       res.json(user);
     } catch (error) {
       console.error(error);
@@ -557,6 +561,10 @@ export class AdminController {
       const previousRole = target.role;
       target.role = newRole;
       await userRepository.save(target);
+      // Role drives every authorize() check and is cached by auth.middleware.
+      // Invalidate immediately so a demotion cannot be outlived by a cached
+      // entry still carrying the old role.
+      await invalidateCachedUser(target.id);
 
       const auditRepo = AppDataSource.getRepository(RoleChangeAudit);
       await auditRepo.save(

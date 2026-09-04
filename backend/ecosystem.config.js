@@ -38,6 +38,23 @@ module.exports = {
       REDIS_USERNAME: process.env.REDIS_USERNAME,
       REDIS_PASSWORD: process.env.REDIS_PASSWORD,
       REDIS_TLS: process.env.REDIS_TLS,
+      // Serviceability — the GPS radius is the authority for whether an address
+      // is deliverable. These were missing from this allowlist, so however they
+      // were set in .env they never reached the app: ServiceabilityService
+      // .isConfigured() returned false and NO delivery-area check ran at order
+      // creation at all. Every address in India was accepted.
+      STORE_LAT: process.env.STORE_LAT,
+      STORE_LNG: process.env.STORE_LNG,
+      DELIVERY_RADIUS_KM: process.env.DELIVERY_RADIUS_KM,
+      // Optional. Absorbs GPS jitter right at the edge of the circle.
+      DELIVERY_RADIUS_BUFFER_KM: process.env.DELIVERY_RADIUS_BUFFER_KM,
+      // Optional tuning, all with safe defaults in code:
+      //   ORDER_AUTO_CANCEL_MINUTES (30), ORDER_UNPAID_AUTO_CANCEL_MINUTES (10),
+      //   RATE_LIMIT_PER_MINUTE (300), CORS_ALLOWED_ORIGINS (none).
+      ORDER_AUTO_CANCEL_MINUTES: process.env.ORDER_AUTO_CANCEL_MINUTES,
+      ORDER_UNPAID_AUTO_CANCEL_MINUTES: process.env.ORDER_UNPAID_AUTO_CANCEL_MINUTES,
+      RATE_LIMIT_PER_MINUTE: process.env.RATE_LIMIT_PER_MINUTE,
+      CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
     },
     // Auto-restart settings
     autorestart: true,

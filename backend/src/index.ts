@@ -19,7 +19,9 @@ import categoryRoutes from './routes/category.routes';
 import cors from 'cors';
 import deliveryRoutes from './routes/delivery.routes';
 import dotenv from 'dotenv';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import orderRoutes from './routes/order.routes';
 import paymentRoutes from './routes/payment.routes';
 import { PaymentController } from './controllers/payment.controller';
@@ -53,13 +55,51 @@ S3Service.initialize();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration - allow all origins for development
+// Behind an ALB, so req.ip must come from X-Forwarded-For — otherwise every
+// request looks like it originates from the load balancer and both the rate
+// limiter above and AuthController's per-IP OTP limit would key every user in
+// the country to one bucket. `1` = trust exactly one proxy hop (the ALB), which
+// is right; `true` would trust a client-supplied header outright and let anyone
+// spoof their way past the limits.
+app.set('trust proxy', 1);
+
+// Security headers. Cheap, and there were none at all before.
+// crossOriginResourcePolicy is relaxed because product images are served from a
+// different origin (S3/CDN) and embedded by the web front-ends.
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+// CORS.
+//
+// This was `origin: true` — reflect ANY origin — together with
+// credentials: true. Low risk in practice because authentication is a bearer
+// header rather than a cookie, so a hostile page could not ride an ambient
+// session. But it costs nothing to close, so it is closed.
+//
+// The mobile app sends no Origin header at all, and neither does curl or a
+// server-to-server call (the Razorpay webhook included), so requests without an
+// origin must keep working — that is the majority of real traffic.
+//
+// CORS_ALLOWED_ORIGINS is a comma-separated list. Absent, only origin-less
+// requests are accepted, which is exactly what the mobile app needs.
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: true, // Allow all origins
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'Accept-Language'],
   })
 );
 
@@ -72,6 +112,30 @@ app.post(
 );
 
 app.use(express.json());
+
+// Baseline rate limit.
+//
+// Only OTP send and the three payment endpoints were limited; product search,
+// order creation, address writes and token refresh were all unbounded. This is
+// the floor for everything, deliberately loose enough that no real user meets
+// it — the per-endpoint limits in AuthController and PaymentController stay as
+// the tight ones where abuse actually costs money.
+//
+// Keyed on IP. Behind an ALB that requires trust proxy (set below) so the key is
+// the client address from X-Forwarded-For and not the load balancer's.
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: Number(process.env.RATE_LIMIT_PER_MINUTE) || 300,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    // The webhook is authenticated by HMAC and must never be throttled — losing
+    // one costs a confirmed payment.
+    skip: (req) => req.path === '/api/payment/webhook/razorpay',
+    message: { message: 'Too many requests. Please slow down and try again shortly.' },
+  })
+);
+
 app.use(languageMiddleware);
 app.use(responseMiddleware);
 app.use(RequestTimingMiddleware.handle);
@@ -100,12 +164,63 @@ app.get('/', (req, res) => {
   res.send('Easy Basket Backend is running');
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Easy Basket Backend is running',
+// Health check that actually checks health.
+//
+// This used to return 200 {status:'ok'} without touching anything, so an
+// instance whose database was unreachable stayed in the ALB target group and
+// kept taking its share of traffic while failing every real request. Now it
+// verifies both dependencies and answers 503 when either is down, so the load
+// balancer can route around a sick instance.
+app.get('/api/health', async (_req, res) => {
+  const checks: Record<string, 'ok' | 'fail'> = { database: 'fail', redis: 'fail' };
+
+  try {
+    await AppDataSource.query('SELECT 1');
+    checks.database = 'ok';
+  } catch {
+    // leave as 'fail'
+  }
+
+  try {
+    await RedisService.ping();
+    checks.redis = 'ok';
+  } catch {
+    // leave as 'fail'
+  }
+
+  const healthy = checks.database === 'ok' && checks.redis === 'ok';
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    checks,
     timestamp: new Date().toISOString(),
   });
+});
+
+// Terminal error handler. MUST be last — after every route.
+//
+// There was none, so anything thrown outside a controller's own try/catch fell
+// to Express's default handler, which in a non-production NODE_ENV returns the
+// stack trace to the caller. Multer is the most likely source: a file over the
+// 5MB limit, or a rejected type, raises here rather than inside a handler.
+//
+// Four arguments is what marks this as an error handler to Express; `_next` is
+// unused but required for that signature.
+app.use((err: Error & { code?: string }, req: Request, res: Response, _next: NextFunction) => {
+  console.error(`[error] unhandled on ${req.method} ${req.path}:`, err);
+
+  if (res.headersSent) return;
+
+  if (err?.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ message: 'That file is too large. The limit is 5MB.' });
+    return;
+  }
+  if (err?.message === 'Not allowed by CORS') {
+    res.status(403).json({ message: 'Origin not allowed.' });
+    return;
+  }
+
+  // Deliberately generic: never leak a stack or an internal message to a client.
+  res.status(500).json({ message: 'Something went wrong on our side. Please try again.' });
 });
 
 AppDataSource.initialize()
@@ -223,6 +338,9 @@ AppDataSource.initialize()
   })
   .catch((error: any) => {
     console.error('❌ Database connection error:', error.message || error);
+    // NOTE: this handler now EXITS rather than starting the listener — see the
+    // process.exit(1) at the end. The hints below still print first so the cause
+    // is visible in the PM2 logs.
 
     // Helpful hints for ETIMEDOUT (can't reach DB host)
     if (error.code === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT')) {
@@ -250,9 +368,14 @@ AppDataSource.initialize()
       console.error('');
     }
 
-    console.error('⚠️  Server will still start, but database operations will fail');
-    // Start server anyway (for health checks)
-    app.listen(PORT, () => {
-      console.log(`⚠️  Server is running on port ${PORT} (without database)`);
-    });
+    // Do NOT start the listener.
+    //
+    // This used to call app.listen() anyway "for health checks" — but the health
+    // check did not test the database, so the instance passed the ALB probe,
+    // stayed in the target group, and failed every real request it was handed.
+    // A process that cannot serve traffic should exit and let PM2 restart it (or
+    // let the ALB replace the instance), which is loud and self-correcting
+    // rather than quiet and broken.
+    console.error('❌ Refusing to start without a database. Exiting so PM2 can restart.');
+    process.exit(1);
   });

@@ -136,12 +136,50 @@ export class OrderController {
 
       const productRepository = AppDataSource.getRepository(Product);
       const variantRepository = AppDataSource.getRepository(ProductVariant);
-      let totalAmount = 0;
+
+      // Money is accumulated in integer PAISE, not rupee floats.
+      //
+      // This used to be `totalAmount += itemPrice * item.quantity` on JS numbers,
+      // carrying every line through binary floating point before landing in a
+      // DECIMAL(10,2). PaymentsV2Service.toPaise rounds at the boundary so no
+      // charge was ever wrong, but orders.totalAmount and SUM(order_items.total)
+      // could drift by a paise on carts with fractional-weight lines — a
+      // reconciliation puzzle for no reason. It also becomes a real problem the
+      // moment discounts or tax are layered on, where the errors compound.
+      let totalPaise = 0;
       const orderItems: OrderItem[] = [];
+
+      // Batch-load every product and variant the cart references, in two queries.
+      //
+      // The loop below used to issue one findOneBy per product AND one findOne
+      // (with a relation join) per variant, sequentially — roughly 3 round-trips
+      // per cart line, so ~45 for a 15-item cart, against a pool capped at 10
+      // connections. That made the most important endpoint in the app scale its
+      // latency with cart size and made checkout the likeliest place to exhaust
+      // the pool during a rush.
+      const productIds = [...new Set(items.map((i: { productId: number }) => i.productId))];
+      const variantIds = [
+        ...new Set(
+          items
+            .map((i: { variantId?: number }) => i.variantId)
+            .filter((v: number | undefined): v is number => v != null)
+        ),
+      ];
+
+      const products = await productRepository.findBy({ id: In(productIds) });
+      const productById = new Map(products.map((p) => [p.id, p]));
+
+      const variants = variantIds.length
+        ? await variantRepository.find({
+            where: { id: In(variantIds) },
+            relations: ['product'],
+          })
+        : [];
+      const variantById = new Map(variants.map((v) => [v.id, v]));
 
       // Validate items and calculate total
       for (const item of items) {
-        const product = await productRepository.findOneBy({ id: item.productId });
+        const product = productById.get(item.productId);
 
         if (!product) {
           res.status(404).json({ message: `Product ${item.productId} not found` });
@@ -161,11 +199,7 @@ export class OrderController {
         let displayLabel: string;
 
         if (item.variantId) {
-          // Fetch and validate variant
-          variant = await variantRepository.findOne({
-            where: { id: item.variantId },
-            relations: ['product'],
-          });
+          variant = variantById.get(item.variantId) ?? null;
 
           if (!variant) {
             res.status(404).json({ message: `Variant ${item.variantId} not found` });
@@ -210,20 +244,28 @@ export class OrderController {
           displayLabel = item.quantity > 1 ? `${item.quantity} × ${product.name}` : product.name;
         }
 
-        const itemTotal = itemPrice * item.quantity;
-        totalAmount += itemTotal;
+        // MySQL DECIMAL columns arrive as strings through the driver, so coerce
+        // explicitly rather than relying on `*` doing it implicitly.
+        const unitPaise = Math.round(Number(itemPrice) * 100);
+        const linePaise = unitPaise * item.quantity;
+        totalPaise += linePaise;
 
         const orderItem = new OrderItem();
         orderItem.product = product;
         orderItem.variant = variant;
         orderItem.quantity = item.quantity;
         orderItem.unit = itemUnit;
-        orderItem.price = itemPrice;
-        orderItem.total = itemTotal;
+        orderItem.price = unitPaise / 100;
+        orderItem.total = linePaise / 100;
         orderItem.displayLabel = displayLabel;
 
         orderItems.push(orderItem);
       }
+
+      // Back to rupees once, at the boundary, for the DECIMAL(10,2) column and
+      // the mobile client that reads it. Exact: totalPaise is an integer, so the
+      // division lands on a value DECIMAL(10,2) represents precisely.
+      const totalAmount = totalPaise / 100;
 
       // Atomically: decrement stock with row-level guards, then insert the order.
       // The conditional UPDATE (`stock >= :q`) is the real safety net against
@@ -270,7 +312,17 @@ export class OrderController {
         return orderRepo.save(created);
       });
 
-      await ProductController.invalidateProductListCache();
+      // Deliberately NOT invalidating the product cache here.
+      //
+      // Placing an order only changes stock, and the search-results cache stores
+      // product IDs ONLY — hydrateProductsInOrder re-reads every row from the
+      // database on each cache hit, precisely so price and stock can never be
+      // more than one read stale. Wiping the whole catalogue cache to reflect one
+      // decrement bought nothing, and it did so by running a keyspace-wide sweep
+      // on the hottest path in the app.
+      //
+      // Genuine catalogue writes (product/variant/category create, update,
+      // delete) still invalidate — those change the cached IDs themselves.
 
       // Create payment order if UPI.
       //

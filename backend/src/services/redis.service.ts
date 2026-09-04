@@ -131,13 +131,37 @@ export class RedisService {
 
   /**
    * Delete all keys matching a glob pattern (e.g. `cache:categories:list:*`).
-   * Uses KEYS — suitable for small key counts (admin cache invalidation).
+   *
+   * SCAN + UNLINK, not KEYS + DEL. KEYS is O(N) over the ENTIRE keyspace and
+   * blocks the single-threaded server for its whole duration — and this same
+   * Redis instance also holds the per-payment locks, the BullMQ queues, the
+   * idempotency keys and the rate-limit counters. Blocking it degrades exactly
+   * the things that must not slow down under load.
+   *
+   * SCAN is incremental: bounded work per call, other clients interleave freely.
+   * UNLINK frees memory on a background thread rather than inline like DEL.
+   *
+   * The trade-off SCAN makes is a weaker guarantee — keys created *during* the
+   * sweep may be missed. That is fine here: every caller is invalidating a cache
+   * whose entries all carry a TTL, so anything missed expires on its own.
    */
   static async deleteKeysMatching(pattern: string): Promise<number> {
     const c = await this.getClient();
-    const keys = await c.keys(pattern);
-    if (keys.length === 0) return 0;
-    return c.del(keys);
+    // node-redis v5 types the SCAN cursor as a RedisArgument (string), not the
+    // number v4 used. String throughout, compared against '0' to detect the end
+    // of a full iteration.
+    let cursor = '0';
+    let deleted = 0;
+
+    do {
+      const reply = await c.scan(cursor, { MATCH: pattern, COUNT: 500 });
+      cursor = String(reply.cursor);
+      if (reply.keys.length > 0) {
+        deleted += await c.unlink(reply.keys);
+      }
+    } while (cursor !== '0');
+
+    return deleted;
   }
 
   static async exists(key: string): Promise<boolean> {
