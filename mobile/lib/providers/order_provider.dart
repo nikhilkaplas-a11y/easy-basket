@@ -28,6 +28,24 @@ class OrderProvider with ChangeNotifier {
   int get ordersTotal => _ordersTotal;
   String? get error => _error;
 
+  /// Drop every piece of user-scoped state this provider holds.
+  ///
+  /// Called on logout via core/session.dart. Without it, `_orders` survived a
+  /// logout in memory, so the next person to sign in on the same device saw the
+  /// previous user's order list — names, phone numbers and full delivery
+  /// addresses — until the first refetch replaced it.
+  void reset() {
+    _orders = [];
+    _activeOrders = [];
+    _addresses = [];
+    _isLoading = false;
+    _isLoadingMore = false;
+    _hasMoreOrders = true;
+    _ordersTotal = 0;
+    _error = null;
+    notifyListeners();
+  }
+
   /// Sync addresses from AddressProvider — no extra API call
   /// Used by home screen to keep OrderProvider in sync
   void syncAddresses(List<AddressModel> addresses) {
@@ -36,6 +54,30 @@ class OrderProvider with ChangeNotifier {
   }
 
   OrderProvider({required this.apiService});
+
+  /// Parse a page of order rows, dropping any single row we cannot read.
+  ///
+  /// OrderModel.fromJson hard-casts `user` and `deliveryAddress` to non-null
+  /// while parsing every other field defensively. One row missing either — a
+  /// relation some endpoint does not join, or an address removed by a manual
+  /// cleanup — threw inside .map() and took the ENTIRE page with it, so the
+  /// customer saw an empty Orders tab instead of the orders that parsed fine.
+  ///
+  /// Losing one row visibly beats losing all of them silently.
+  List<OrderModel> _parseOrders(List<dynamic> data) {
+    final parsed = <OrderModel>[];
+    for (final row in data) {
+      try {
+        parsed.add(OrderModel.fromJson(row as Map<String, dynamic>));
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Skipped an unreadable order row: $e');
+          print('Row: $row');
+        }
+      }
+    }
+    return parsed;
+  }
 
   /// Fetches orders. Use [paginated] for My Orders list (15 per page + infinite scroll).
   /// Without [paginated], behavior is unchanged: full list, replaces [_orders].
@@ -89,9 +131,7 @@ class OrderProvider with ChangeNotifier {
         final rawList = response['orders'];
         final total = (response['total'] as num?)?.toInt() ?? 0;
         final List<dynamic> data = rawList is List ? rawList : [];
-        final page = data.map((json) {
-          return OrderModel.fromJson(json as Map<String, dynamic>);
-        }).toList();
+        final page = _parseOrders(data);
 
         if (append) {
           _orders = [..._orders, ...page];
@@ -105,17 +145,7 @@ class OrderProvider with ChangeNotifier {
         }
       } else {
         final List<dynamic> data = response is List ? response : [];
-        _orders = data.map((json) {
-          try {
-            return OrderModel.fromJson(json as Map<String, dynamic>);
-          } catch (e) {
-            if (kDebugMode) {
-              print('❌ Error parsing order: $e');
-              print('Order data: $json');
-            }
-            rethrow;
-          }
-        }).toList();
+        _orders = _parseOrders(data);
         if (!paginated) {
           _hasMoreOrders = false;
           _ordersTotal = _orders.length;

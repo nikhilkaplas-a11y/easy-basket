@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/api_client.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../models/campaign_model.dart';
@@ -105,7 +106,7 @@ class _CampaignFormScreenState extends State<CampaignFormScreen> {
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final token = auth.accessToken ?? auth.token;
-      final api = ApiService();
+      final api = sharedApiService;
 
       final data = {
         'title': _titleController.text.trim(),

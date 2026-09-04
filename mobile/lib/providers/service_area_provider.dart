@@ -2,7 +2,13 @@ import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 
 class ServiceAreaProvider with ChangeNotifier {
-  final ApiService apiService = ApiService();
+  /// Injected so this provider shares the one wired ApiService instead of
+  /// creating an unwired one of its own — see AddressProvider for why that
+  /// mattered.
+  final ApiService apiService;
+
+  ServiceAreaProvider({ApiService? apiService})
+      : apiService = apiService ?? ApiService();
 
   bool _isChecking = false;
   bool? _isServiceAvailable;
@@ -80,14 +86,23 @@ class ServiceAreaProvider with ChangeNotifier {
       
       return _isServiceAvailable ?? false;
     } catch (e) {
+      // FAIL OPEN. This used to set _isServiceAvailable = false, which made a
+      // timeout, DNS blip or brief 5xx indistinguishable from a real "we don't
+      // deliver here" — and a serviceable customer on a flaky connection was
+      // turned away at the top of the funnel with no reason to try again.
+      //
+      // null means "we genuinely do not know", not "no". The server is the real
+      // gate: POST /api/orders re-checks and returns OUT_OF_SERVICE_AREA if the
+      // address really is out of range. Same reasoning StoreStatusProvider
+      // already documents for the store-open check.
       _error = e.toString().replaceAll('Exception: ', '');
-      _isServiceAvailable = false;
+      _isServiceAvailable = null;
       _isChecking = false;
       notifyListeners();
       if (kDebugMode) {
-        print('❌ [API ERROR] Error checking service availability for pincode $pincode: ${_error ?? "Unknown error"}');
+        print('⚠️ [API ERROR] Service availability unknown for pincode $pincode (proceeding optimistically): ${_error ?? "Unknown error"}');
       }
-      return false;
+      return true;
     }
   }
 

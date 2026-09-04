@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
@@ -81,7 +82,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final categoryId = product.category?.id;
     if (categoryId == null) return;
     try {
-      final apiService = ApiService();
+      final apiService = sharedApiService;
       final response = await apiService.get('/products?categoryId=$categoryId');
       final List<dynamic> data = response is List ? response : [];
       final products = data

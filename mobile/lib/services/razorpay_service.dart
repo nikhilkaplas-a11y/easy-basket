@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/app_config.dart';
 import 'api_service.dart';
+import '../core/api_client.dart';
 
 // Conditional import - only import Razorpay on mobile platforms
 import 'package:razorpay_flutter/razorpay_flutter.dart' if (dart.library.html) 'razorpay_web_stub.dart';
@@ -50,7 +51,11 @@ class RazorpayService {
     required String token,
   }) async {
     try {
-      final apiService = ApiService();
+      // sharedApiService, not a fresh ApiService(): a locally built one carries
+      // no onTokenExpired, so an access token that lapsed while the customer
+      // filled their cart made this 401 with no refresh and no way to start
+      // the payment. Checkout is the worst place in the app for that.
+      final apiService = sharedApiService;
       final response = await apiService.post(
         '/payment/create-order',
         {
@@ -87,7 +92,11 @@ class RazorpayService {
     required String token,
   }) async {
     try {
-      final apiService = ApiService();
+      // sharedApiService, not a fresh ApiService(): a locally built one carries
+      // no onTokenExpired, so an access token that lapsed while the customer
+      // filled their cart made this 401 with no refresh and no way to start
+      // the payment. Checkout is the worst place in the app for that.
+      final apiService = sharedApiService;
       final response = await apiService.post(
         '/payment/verify',
         {

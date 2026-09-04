@@ -202,11 +202,26 @@ class _OrderCard extends StatelessWidget {
           icon: Icons.schedule_rounded,
           color: const Color(0xFFFF9800),
         );
-      case 'accepted':
+      // Paid, waiting on the store's accept/refuse decision. Newly reachable —
+      // the backend's `active` filter omitted this status, so a successfully
+      // paid order used to vanish from this bar entirely. Without a case here
+      // it would fall through to the grey "Processing / Please wait..." default,
+      // which tells a paying customer nothing.
+      case 'awaiting_acceptance':
         return _StatusInfo(
           label: 'Confirmed',
-          subtitle: 'Order accepted by store',
+          subtitle: 'Payment received — sending to store',
           icon: Icons.check_circle_rounded,
+          color: const Color(0xFF00897B),
+        );
+      case 'accepted':
+        return _StatusInfo(
+          // 'Confirmed' now belongs to the paid-but-unaccepted step above; once
+          // the store has actually accepted, say so rather than repeating the
+          // same word. Matches ActiveOrderModel.statusText.
+          label: 'Accepted',
+          subtitle: 'Order accepted by store',
+          icon: Icons.storefront_rounded,
           color: const Color(0xFF2196F3),
         );
       case 'preparing':

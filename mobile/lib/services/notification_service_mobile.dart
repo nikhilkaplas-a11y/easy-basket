@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
+import '../core/api_client.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
@@ -26,7 +27,11 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final ApiService _apiService = ApiService();
+  // sharedApiService, not a fresh ApiService(): the FCM-token calls this makes
+  // are ordinary authenticated requests, and a locally built instance carries no
+  // onTokenExpired, so they silently stopped working once the access token
+  // lapsed — leaving the device registered under a stale token.
+  final ApiService _apiService = sharedApiService;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 

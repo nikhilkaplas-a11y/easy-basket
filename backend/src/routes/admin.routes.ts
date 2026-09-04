@@ -4,6 +4,8 @@ import { StoreStatusController } from '../controllers/storeStatus.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { RedisService } from '../services/redis.service';
 import { MissingTranslationController } from '../controllers/missingTranslation.controller';
+import { UploadController } from '../controllers/upload.controller';
+import { uploadSingle } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -64,5 +66,15 @@ router.post('/orders/:id/retry-refund', AdminController.retryRefund);
 // the panel read back the authoritative state without a second base URL.
 router.get('/store/status', StoreStatusController.getStatus);
 router.put('/store/status', StoreStatusController.updateStatus);
+
+// --- Image upload ---
+// Moved here from the former upload.routes.ts, which index.ts mounted as a
+// SECOND router on '/api/admin'. A request for /api/admin/upload-image matched
+// no route in this router, ran its authenticate + authorize, fell through, and
+// then ran that router's identical pair again — two JWT verifications and two
+// user lookups per upload. URLs are unchanged: the mobile client still calls
+// /api/admin/upload-image.
+router.post('/upload-image', uploadSingle, UploadController.uploadImage);
+router.delete('/delete-image', UploadController.deleteImage);
 
 export default router;

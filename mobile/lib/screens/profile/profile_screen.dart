@@ -5,10 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
-import '../../providers/location_provider.dart';
-import '../../providers/address_provider.dart';
-import '../../providers/proximity_provider.dart';
 import '../../services/notification_service.dart';
+import '../../core/session.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/theme.dart';
 
@@ -278,12 +276,10 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     );
                     if (confirm == true && context.mounted) {
-                      // Reset all providers + unsubscribe notification topic
-                      Provider.of<LocationProvider>(context, listen: false).reset();
-                      Provider.of<AddressProvider>(context, listen: false).reset();
-                      Provider.of<ProximityProvider>(context, listen: false).reset();
-                      NotificationService().unsubscribeCurrentTopic();
-                      await authProvider.logout();
+                      // Single teardown path — see core/session.dart. This used
+                      // to reset Location/Address/Proximity but leave the cart
+                      // and order list behind for the next user of the device.
+                      await endSession(context);
                       if (context.mounted) context.go('/login');
                     }
                   },

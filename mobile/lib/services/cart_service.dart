@@ -38,7 +38,14 @@ class CartService {
 
   List<CartItem> get items => List.unmodifiable(_items);
 
+  /// Number of distinct product/variant LINES in the cart.
   int get itemCount => _items.length;
+
+  /// Total number of units across all lines — six of one product is 6, not 1.
+  /// Split out because `itemCount` reads as "items" beside a total that folds
+  /// over quantity, so a badge showing "1 item" next to a six-unit total looked
+  /// like a bug. Callers should pick whichever their copy actually means.
+  int get unitCount => _items.fold(0, (sum, item) => sum + item.quantity);
 
   double get totalAmount {
     return _items.fold(0.0, (sum, item) => sum + item.total);
@@ -76,7 +83,16 @@ class CartService {
         ? '${productId}_$variantId'
         : '${productId}_null';
     
-    final item = _items.firstWhere((item) => item.key == itemKey);
+    // No orElse on firstWhere threw StateError when the line was gone — reachable
+    // from a stepper firing after a concurrent removal, or when two screens
+    // disagree about variant identity. The exception escaped CartProvider into
+    // the widget tree AND skipped the _saveCart that follows, leaving the
+    // persisted cart inconsistent. getQuantity and contains both already guard
+    // for exactly this; updateQuantity was the one that did not.
+    final index = _items.indexWhere((item) => item.key == itemKey);
+    if (index < 0) return;
+    final item = _items[index];
+
     if (quantity <= 0) {
       removeItem(productId, variantId: variantId);
     } else {

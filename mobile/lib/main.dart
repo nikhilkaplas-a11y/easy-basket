@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/startup_deep_link.dart';
+import 'core/api_client.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
@@ -79,23 +80,11 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final SharedPreferences prefs;
-  
+
   const MyApp({super.key, required this.prefs});
 
   @override
   Widget build(BuildContext context) {
-    // Create a shared function to set up API service with token refresh
-    ApiService createApiService(AuthProvider authProvider) {
-      final apiService = ApiService();
-      // Set up automatic token refresh callback
-      apiService.onTokenExpired = () async {
-        return await authProvider.refreshAccessToken();
-      };
-      // So retries after a refresh pick up the fresh token (all verbs).
-      apiService.getCurrentToken = () => authProvider.token;
-      return apiService;
-    }
-    
     return MultiProvider(
       providers: [
         // Language — created first so ApiService.language is set before any
@@ -104,97 +93,67 @@ class MyApp extends StatelessWidget {
           create: (_) => LocaleProvider(prefs: prefs),
         ),
         ChangeNotifierProvider(
+          // lazy:false so the wiring below happens at startup, before any other
+          // provider can issue an authenticated request against an unwired
+          // sharedApiService.
+          lazy: false,
           create: (_) {
-            final apiService = ApiService();
-            final authService = AuthService(apiService: apiService);
             final authProvider = AuthProvider(
-              authService: authService,
+              authService: AuthService(apiService: authApiService),
               prefs: prefs,
             );
-            // Set up automatic token refresh callback after provider is created
-            // We'll set it up in update callbacks for other providers
+            // Wire the shared instance exactly once, here, where the
+            // AuthProvider first exists. Re-runs if RestartWidget rebuilds,
+            // re-pointing at the new AuthProvider — which is what we want.
+            sharedApiService.onTokenExpired = authProvider.refreshAccessToken;
+            sharedApiService.getCurrentToken = () => authProvider.token;
             return authProvider;
           },
         ),
         ChangeNotifierProvider(
           create: (_) => CartProvider()..initialize(),
         ),
-        ChangeNotifierProxyProvider<AuthProvider, ProductProvider>(
-          create: (_) => ProductProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) {
-            if (previous != null) {
-              // Update existing provider's API service callback
-              previous.apiService.onTokenExpired = () async {
-                return await authProvider.refreshAccessToken();
-              };
-              previous.apiService.getCurrentToken = () => authProvider.token;
-              return previous;
-            }
-            return ProductProvider(apiService: createApiService(authProvider));
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, OrderProvider>(
-          create: (_) => OrderProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) {
-            if (previous != null) {
-              // Update existing provider's API service callback
-              previous.apiService.onTokenExpired = () async {
-                return await authProvider.refreshAccessToken();
-              };
-              previous.apiService.getCurrentToken = () => authProvider.token;
-              return previous;
-            }
-            return OrderProvider(apiService: createApiService(authProvider));
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, DeliveryProvider>(
-          create: (_) => DeliveryProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) {
-            if (previous != null) {
-              // Update existing provider's API service callback
-              previous.apiService.onTokenExpired = () async {
-                return await authProvider.refreshAccessToken();
-              };
-              previous.apiService.getCurrentToken = () => authProvider.token;
-              return previous;
-            }
-            return DeliveryProvider(apiService: createApiService(authProvider));
-          },
-        ),
-        ChangeNotifierProxyProvider<AuthProvider, AdminProvider>(
-          create: (_) => AdminProvider(apiService: ApiService()),
-          update: (_, authProvider, previous) {
-            if (previous != null) {
-              // Update existing provider's API service callback
-              previous.apiService.onTokenExpired = () async {
-                return await authProvider.refreshAccessToken();
-              };
-              previous.apiService.getCurrentToken = () => authProvider.token;
-              return previous;
-            }
-            return AdminProvider(apiService: createApiService(authProvider));
-          },
+        // These were ChangeNotifierProxyProvider<AuthProvider, X> whose ONLY job
+        // was re-attaching onTokenExpired/getCurrentToken to a per-provider
+        // ApiService on every AuthProvider notification. With one shared
+        // instance wired above, that duplication is gone and none of them
+        // actually derives state from AuthProvider.
+        ChangeNotifierProvider(
+          create: (_) => ProductProvider(apiService: sharedApiService),
         ),
         ChangeNotifierProvider(
-          create: (_) => ServiceAreaProvider(),
+          create: (_) => OrderProvider(apiService: sharedApiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DeliveryProvider(apiService: sharedApiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AdminProvider(apiService: sharedApiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ServiceAreaProvider(apiService: sharedApiService),
         ),
         // Location — GPS permission + coordinates + reverse geocode
         ChangeNotifierProvider(
           create: (_) => LocationProvider(),
         ),
-        // Address — Saved addresses CRUD + selection
+        // Address — Saved addresses CRUD + selection.
+        // Now shares the wired ApiService, so address calls refresh an expired
+        // token like every other authenticated call.
         ChangeNotifierProvider(
-          create: (_) => AddressProvider(),
+          create: (_) => AddressProvider(apiService: sharedApiService),
         ),
         // Proximity — GPS vs saved addresses distance + decision
         ChangeNotifierProvider(
           create: (_) => ProximityProvider(),
         ),
-        // Store open/closed — public endpoint, so no auth wiring needed.
+        // Store open/closed — public endpoint, but it goes through the shared
+        // instance too so there is exactly one ApiService in the app.
         // Fetched immediately: the home banner and the checkout buttons both
         // read it, and guests need it before they ever log in.
         ChangeNotifierProvider(
-          create: (_) => StoreStatusProvider()..refresh(),
+          lazy: false,
+          create: (_) => StoreStatusProvider(apiService: sharedApiService)..refresh(),
         ),
       ],
       child: Consumer<LocaleProvider>(

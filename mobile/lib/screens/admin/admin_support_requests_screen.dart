@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/api_client.dart';
 import '../../services/api_service.dart';
 import '../../config/app_config.dart';
 
@@ -12,7 +13,7 @@ class AdminSupportRequestsScreen extends StatefulWidget {
 
 class _AdminSupportRequestsScreenState
     extends State<AdminSupportRequestsScreen> {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService = sharedApiService;
 
   List<dynamic> _requests = [];
   bool _loading = true;

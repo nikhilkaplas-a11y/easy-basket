@@ -7,6 +7,12 @@ class ProductProvider with ChangeNotifier {
   final ApiService apiService;
 
   List<ProductModel> _products = [];
+
+  /// Products fetched individually by id (product detail, deep links) that are
+  /// NOT part of the current list query. Kept apart from [_products] so a detail
+  /// view can never inject a foreign product into the category or search grid.
+  final Map<int, ProductModel> _productsById = {};
+
   List<CategoryModel> _categories = [];
   List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
@@ -25,6 +31,16 @@ class ProductProvider with ChangeNotifier {
   bool get hasMore => _hasMore;
   String? get error => _error;
 
+  /// A product we already hold, whether it came from the current list query or
+  /// from an individual fetch. Lets a detail screen render instantly without
+  /// pushing that product into the grid. Null when we have never loaded it.
+  ProductModel? productById(int id) {
+    final cached = _productsById[id];
+    if (cached != null) return cached;
+    final i = _products.indexWhere((p) => p.id == id);
+    return i >= 0 ? _products[i] : null;
+  }
+
   ProductProvider({required this.apiService});
 
   Future<void> fetchSuggestions(String query) async {
@@ -35,7 +51,13 @@ class ProductProvider with ChangeNotifier {
     }
 
     try {
-      final response = await apiService.get('/products/suggestions?search=$query');
+      // Encoded, not interpolated. A '#' in the term used to truncate the query
+      // into a fragment ("Kurkure #1" searched for "Kurkure "), '&' split it into
+      // a bogus extra parameter, and non-ASCII input — which Hindi/Punjabi voice
+      // search feeds straight into this field — risked a FormatException from
+      // Uri.parse that surfaced as a network error.
+      final response = await apiService
+          .get('/products/suggestions?search=${Uri.encodeQueryComponent(query)}');
       if (response is List) {
         _suggestions = response.map((item) => item as Map<String, dynamic>).toList();
       } else {
@@ -94,7 +116,9 @@ class ProductProvider with ChangeNotifier {
       // Build endpoint with query params
       final params = <String>[];
       if (categoryId != null) params.add('categoryId=$categoryId');
-      if (search != null && search.isNotEmpty) params.add('search=$search');
+      if (search != null && search.isNotEmpty) {
+        params.add('search=${Uri.encodeQueryComponent(search)}');
+      }
       // Default limit=20 for paginated screens, custom limit for home
       final useLimit = limit ?? 20;
       params.add('limit=$useLimit');
@@ -150,7 +174,9 @@ class ProductProvider with ChangeNotifier {
       _currentPage++;
       final params = <String>[];
       if (_currentCategoryId != null) params.add('categoryId=$_currentCategoryId');
-      if (_currentSearch != null && _currentSearch!.isNotEmpty) params.add('search=$_currentSearch');
+      if (_currentSearch != null && _currentSearch!.isNotEmpty) {
+        params.add('search=${Uri.encodeQueryComponent(_currentSearch!)}');
+      }
       params.add('limit=20');
       params.add('page=$_currentPage');
       final endpoint = '/products?${params.join('&')}';
@@ -214,15 +240,19 @@ class ProductProvider with ChangeNotifier {
     try {
       final response = await apiService.get('/products/$id');
       final product = ProductModel.fromJson(response as Map<String, dynamic>);
-      
-      // Add or update product in the list
+
+      // Refresh this product where the CURRENT list already contains it, but never
+      // append it. _products backs the category grid and search results; adding a
+      // product fetched by id (from search, or a deep link) made a foreign product
+      // appear in an unrelated category, and inflated the count loadMoreProducts
+      // uses as its paging offset, so the next page could skip or duplicate a row.
       final existingIndex = _products.indexWhere((p) => p.id == id);
       if (existingIndex >= 0) {
         _products[existingIndex] = product;
       } else {
-        _products.add(product);
+        _productsById[id] = product;
       }
-      
+
       _isLoading = false;
       notifyListeners();
       return product;

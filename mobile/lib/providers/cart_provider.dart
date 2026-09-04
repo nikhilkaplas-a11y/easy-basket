@@ -13,6 +13,7 @@ class CartProvider with ChangeNotifier {
 
   List<CartItem> get items => _cartService.items;
   int get itemCount => _cartService.itemCount;
+  int get unitCount => _cartService.unitCount;
   double get totalAmount => _cartService.totalAmount;
   bool isAddingItem(int productId) => _addingItems.contains(productId);
   bool get isLoading => _isLoading;

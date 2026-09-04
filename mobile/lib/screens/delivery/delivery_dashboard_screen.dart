@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/session.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -105,8 +106,9 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen>
                 );
                 
                 if (confirmed == true && context.mounted) {
-                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                  await authProvider.logout();
+                  // Same teardown as every other logout button — this one used
+                  // to call logout() alone and reset nothing.
+                  await endSession(context);
                   if (context.mounted) {
                     context.go('/login');
                   }

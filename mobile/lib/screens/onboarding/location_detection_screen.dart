@@ -288,8 +288,12 @@ class _LocationDetectionScreenState extends State<LocationDetectionScreen> {
       return;
     }
 
-    // Check service availability one more time
-    final isAvailable = serviceAreaProvider.isServiceAvailable ?? false;
+    // Check service availability one more time.
+    // `?? true`, not `?? false`: null means the check could not complete (network
+    // failure), not that we are out of area. Blocking onboarding on an unknown
+    // would turn away a serviceable customer over a dropped request — and the
+    // server re-checks at order time anyway. See ServiceAreaProvider's catch.
+    final isAvailable = serviceAreaProvider.isServiceAvailable ?? true;
     if (!isAvailable) {
       if (mounted) {
         context.push('/service-not-available', extra: {

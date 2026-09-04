@@ -33,8 +33,20 @@ class AddressProvider extends ChangeNotifier {
   // DEPENDENCIES
   // ══════════════════════════════════════════════════
 
-  /// API service — handles all HTTP calls to backend
-  final ApiService _apiService = ApiService();
+  /// API service — handles all HTTP calls to backend.
+  ///
+  /// Injected. This used to be a bare `ApiService()` created here, and because
+  /// AddressProvider was registered as a plain ChangeNotifierProvider rather
+  /// than a proxy, it never received the onTokenExpired / getCurrentToken
+  /// wiring the other providers get. Every address call therefore threw
+  /// TokenExpiredException with no refresh attempt once the 15-minute access
+  /// token lapsed — and addresses are needed on the home screen and required at
+  /// checkout, so ordering broke until some other provider happened to refresh
+  /// first. That made it look intermittent.
+  final ApiService _apiService;
+
+  AddressProvider({ApiService? apiService})
+      : _apiService = apiService ?? ApiService();
 
   // ══════════════════════════════════════════════════
   // STATE

@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Order } from '../entities/Order';
 import { OrderEvent } from '../entities/OrderEvent';
+import { Payment } from '../entities/Payment';
 import { PaymentsV2Service } from '../services/payments-v2.service';
 import { RazorpayService } from '../services/razorpay.service';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -89,6 +91,34 @@ export class PaymentController {
 
       if (order.status === 'cancelled' || order.status === 'delivered') {
         res.status(409).json({ message: `Cannot pay for order in status ${order.status}` });
+        return;
+      }
+
+      // Refuse to mint a second Razorpay order for an order that has already been
+      // paid for.
+      //
+      // The status guard above only rejects 'cancelled' and 'delivered'. An order
+      // in 'awaiting_acceptance' or 'accepted' — which is exactly what a PAID
+      // order looks like — sailed straight through, and initiatePayment then found
+      // no fresh `initiated` row (it only ever looks for that one status) and
+      // created a brand-new Razorpay order. The customer could pay twice.
+      //
+      // applyCapture does catch the duplicate afterwards and auto-refunds it as
+      // DUPLICATE_PAYMENT_FOR_ORDER, but the money really leaves the customer's
+      // account and takes 2-7 working days to come back. That is a recovery path
+      // being used as a control. This is the same sibling lookup applyCapture
+      // performs, applied as a precondition instead.
+      const settledPayment = await AppDataSource.getRepository(Payment).findOne({
+        where: {
+          orderId: orderIdNum,
+          status: In(['paid', 'refund_pending', 'refunded']),
+        },
+      });
+      if (settledPayment) {
+        res.status(409).json({
+          message: 'This order has already been paid for.',
+          code: 'ALREADY_PAID',
+        });
         return;
       }
 

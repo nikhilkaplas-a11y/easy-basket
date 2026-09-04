@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../models/user_model.dart';
+import '../core/auth_refresh_notifier.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService authService;
@@ -144,6 +145,9 @@ class AuthProvider with ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+      // Tell the router the guards need re-evaluating — it cannot listen to this
+      // provider directly. See core/auth_refresh_notifier.dart.
+      AuthRefreshNotifier.instance.authChanged();
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
@@ -231,6 +235,10 @@ class AuthProvider with ChangeNotifier {
     await prefs.remove('auth_token'); // Remove old token if exists
     await prefs.remove('user_data');
     notifyListeners();
+    // Critical on this path: without it the router keeps whatever gated screen
+    // the user was on mounted, still issuing calls with a now-null token. This
+    // also covers the automatic logout inside refreshAccessToken's catch.
+    AuthRefreshNotifier.instance.authChanged();
   }
 
   void clearError() {

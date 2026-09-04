@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/api_client.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -504,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   /// Fetch campaigns for active pincode
   Future<void> _fetchCampaigns(String pincode) async {
     try {
-      final apiService = ApiService();
+      final apiService = sharedApiService;
       final response = await apiService.get('/campaigns?pincode=$pincode');
       if (response is Map<String, dynamic> && mounted) {
         final heroBanners = (response['hero_banners'] as List?)

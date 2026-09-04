@@ -181,6 +181,43 @@ export class AdminController {
         return;
       }
 
+      // The terminal guard above only stopped an order LEAVING cancelled/delivered.
+      // Every other pair was a free-form assignment from the whitelist, so
+      // out_for_delivery could be pushed back to pending, re-firing customer
+      // notifications and desyncing the delivery state machine (_isForward below
+      // protects delivery_status, but nothing protected `status` itself).
+      if (status !== order.status) {
+        const allowed = ALLOWED_ORDER_TRANSITIONS[order.status] ?? [];
+        if (!allowed.includes(status)) {
+          res.status(400).json({
+            message: `Cannot move an order from '${order.status}' to '${status}'.`,
+            code: 'INVALID_STATUS_TRANSITION',
+          });
+          return;
+        }
+      }
+
+      // An online order may only be accepted once its payment has landed —
+      // which is the whole reason 'awaiting_acceptance' exists. Nothing enforced
+      // it, so an admin could accept, pack and dispatch an order that was never
+      // paid for.
+      //
+      // Scoped to paymentMethod === 'upi' rather than !== 'cod' on purpose:
+      // paymentMethod is nullable on legacy rows, and blocking those would hide
+      // real orders from the store. Same "when in doubt, let the admin act"
+      // reasoning getAllOrders applies to its NULL arm.
+      if (
+        status === 'accepted' &&
+        order.paymentMethod === 'upi' &&
+        order.paymentStatus !== 'paid'
+      ) {
+        res.status(409).json({
+          message: 'This order has not been paid for yet. Wait for the payment to confirm.',
+          code: 'ORDER_NOT_PAID',
+        });
+        return;
+      }
+
       // Admin-cancel hooks: restore inventory + refund any paid amount.
       // Runs only on the transition INTO 'cancelled', and only once per order
       // (idempotent via status guard + UNIQUE(payment_id, idempotency_key) on refunds).
@@ -219,6 +256,38 @@ export class AdminController {
               console.error(`[admin-cancel] refund call failed for order #${order.id}`, refErr);
             }
           }
+        }
+      }
+
+      // Atomic transition claim.
+      //
+      // Everything above this point validated against the row as it was READ,
+      // and the write below is a plain save(). Order carries no @VersionColumn,
+      // so between the findOne and the save the customer can cancel out from
+      // under us: the sweep or requestCancellation flips the row to 'cancelled'
+      // and restores its stock, then save() writes 'accepted' straight over the
+      // top — resurrecting a cancelled order whose inventory has already been
+      // given back, i.e. sold twice.
+      //
+      // The transition matrix above cannot catch this; it only ever saw the
+      // stale status. Claiming the transition conditionally is what makes it
+      // safe, and it is the same pattern cancelOrder, approveCancellation and
+      // OrderAutoCancelService already use.
+      //
+      // 'cancelled' is excluded because that branch performs its own claim above
+      // (and owns the stock restore that follows it).
+      if (status !== order.status && status !== 'cancelled') {
+        const transitionClaim = await orderRepository.update(
+          { id: order.id, status: order.status },
+          { status }
+        );
+        if (transitionClaim.affected !== 1) {
+          res.status(409).json({
+            message:
+              'This order changed while you were viewing it — most likely the customer cancelled it. Refresh and try again.',
+            code: 'ORDER_CHANGED',
+          });
+          return;
         }
       }
 
@@ -1329,6 +1398,27 @@ export class AdminController {
     }
   }
 }
+
+/**
+ * Which order statuses may follow which, for AdminController.updateOrderStatus.
+ *
+ * Deliberately shaped like DeliveryStateService.canTransition, which the delivery
+ * flow has had all along — the order status simply never got an equivalent, so a
+ * whitelist of *valid* values was standing in for a matrix of valid *moves*.
+ *
+ * Cancellation is reachable from every non-terminal state (the admin-cancel hooks
+ * that restore stock and refund live on that edge). Both terminal states are dead
+ * ends, which the guard above already enforces separately.
+ */
+const ALLOWED_ORDER_TRANSITIONS: Record<string, string[]> = {
+  pending: ['awaiting_acceptance', 'accepted', 'cancelled'],
+  awaiting_acceptance: ['accepted', 'cancelled'],
+  accepted: ['preparing', 'out_for_delivery', 'cancelled'],
+  preparing: ['out_for_delivery', 'cancelled'],
+  out_for_delivery: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
 
 /**
  * Forward-only delivery_status check. Used by the legacy admin updateOrderStatus

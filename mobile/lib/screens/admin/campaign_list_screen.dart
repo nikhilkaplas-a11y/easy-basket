@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/api_client.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/campaign_model.dart';
@@ -29,7 +30,7 @@ class _CampaignListScreenState extends State<CampaignListScreen> {
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final token = auth.accessToken ?? auth.token;
-      final api = ApiService();
+      final api = sharedApiService;
       final response = await api.get('/campaigns/admin', token: token);
       if (response is List && mounted) {
         setState(() {
@@ -62,7 +63,7 @@ class _CampaignListScreenState extends State<CampaignListScreen> {
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final token = auth.accessToken ?? auth.token;
-      final api = ApiService();
+      final api = sharedApiService;
       await api.delete('/campaigns/admin/$id', token: token);
       _fetchCampaigns();
     } catch (e) {
@@ -76,7 +77,7 @@ class _CampaignListScreenState extends State<CampaignListScreen> {
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final token = auth.accessToken ?? auth.token;
-      final api = ApiService();
+      final api = sharedApiService;
       final response = await api.post('/campaigns/admin/${campaign.id}/push', {}, token: token);
       if (mounted) {
         final sent = response['sent'] ?? 0;

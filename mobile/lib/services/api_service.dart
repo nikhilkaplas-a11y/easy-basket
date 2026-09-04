@@ -21,8 +21,9 @@ class ApiService {
   // one without every caller having to pass `getUpdatedToken`. Wired in main.dart.
   String? Function()? getCurrentToken;
 
-  // Prevent multiple simultaneous refresh attempts.
-  bool _isRefreshing = false;
+  /// The refresh currently in flight, if any. Concurrent callers await THIS
+  /// future rather than polling a flag, so they observe its real result.
+  Future<bool>? _refreshInFlight;
 
   ApiService({this.onTokenExpired, this.getCurrentToken});
 
@@ -172,8 +173,15 @@ class ApiService {
         return _handleResponse(await dispatch(newToken));
       }
       rethrow;
+    } on ApiException {
+      // The server answered and we understood it. This is NOT a transport
+      // problem, so it must not go through _mapNetworkError — that is what
+      // relabelled every business rule ("item out of stock", "outside our
+      // service area", "store closed") as a network failure.
+      rethrow;
     } catch (e) {
-      if (e is TokenExpiredException) rethrow;
+      // Only genuine transport failures reach here: DNS, refused connection,
+      // TLS, timeout.
       throw _mapNetworkError(e);
     }
   }
@@ -203,6 +211,41 @@ class ApiService {
     return Exception('Network error: $e');
   }
 
+  /// Decode a JSON object body, or null when it is empty / not an object
+  /// (e.g. Express's default HTML 404). Never throws — the caller decides.
+  static Map<String, dynamic>? _tryDecodeMap(String body) {
+    if (body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Used ONLY when the server sent no usable `message`. Never overrides one.
+  static String _fallbackMessage(int statusCode) {
+    if (statusCode == 400) {
+      return 'That request was not valid. Please check the details and try again.';
+    }
+    // Must stay exactly 'Authentication required': address_provider,
+    // order_provider and add_address_screen all test for that substring to
+    // decide whether to re-throw an auth failure to their caller.
+    if (statusCode == 401) return 'Authentication required';
+    if (statusCode == 403) return "You don't have permission to do that.";
+    if (statusCode == 404) return 'We could not find what you were looking for.';
+    if (statusCode == 409) {
+      return 'That conflicted with something else. Please refresh and try again.';
+    }
+    if (statusCode == 429) {
+      return 'Too many requests. Please wait a moment and try again.';
+    }
+    if (statusCode >= 500) {
+      return 'The server had a problem. Please try again in a moment.';
+    }
+    return 'Request failed (status $statusCode).';
+  }
+
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) {
@@ -210,48 +253,79 @@ class ApiService {
       }
       try {
         return jsonDecode(response.body);
-      } catch (e) {
-        throw Exception('Invalid JSON response: $e');
-      }
-    } else if (response.statusCode == 401) {
-      // Unauthorized - token expired or invalid
-      try {
-        final error = jsonDecode(response.body) as Map<String, dynamic>;
-        throw TokenExpiredException(error['message'] ?? 'Authentication required');
-      } catch (e) {
-        if (e is TokenExpiredException) rethrow;
-        throw TokenExpiredException('Authentication required');
-      }
-    } else {
-      try {
-        final error = jsonDecode(response.body) as Map<String, dynamic>;
-        throw Exception(error['message'] ?? 'Request failed');
-      } catch (e) {
-        throw Exception('Request failed with status ${response.statusCode}: ${response.body}');
+      } catch (_) {
+        // ApiException, not a bare Exception: _send must pass this through rather
+        // than relabel a malformed response as a network failure.
+        throw ApiException(
+          message: 'The server sent a response we could not read.',
+          statusCode: response.statusCode,
+        );
       }
     }
+
+    // ---- Error status -------------------------------------------------------
+    // Decode FIRST, then throw. The throw must not sit inside a try whose catch
+    // would swallow it — that is what used to replace every server message with
+    // a raw status dump, because `catch (e)` catches our own deliberate throw.
+    final body = _tryDecodeMap(response.body);
+
+    final rawMessage = body?['message'];
+    final message = rawMessage is String && rawMessage.trim().isNotEmpty
+        ? rawMessage.trim()
+        : _fallbackMessage(response.statusCode);
+
+    // Machine-readable reason where the backend sends one (STORE_CLOSED,
+    // OUT_OF_SERVICE_AREA, USE_REQUEST_CANCELLATION, ALREADY_PACKED, ...).
+    final rawCode = body?['code'];
+    final code = rawCode is String && rawCode.isNotEmpty ? rawCode : null;
+
+    if (response.statusCode == 401) {
+      throw TokenExpiredException(message);
+    }
+
+    throw ApiException(
+      message: message,
+      statusCode: response.statusCode,
+      code: code,
+    );
   }
 
   /// Handle token expiration with automatic refresh (single-flight).
+  ///
+  /// The previous version polled a boolean for up to 2 seconds and then returned
+  /// `!_isRefreshing` — reporting success merely because the other refresh had
+  /// FINISHED, with no visibility of whether it actually worked. After a failed
+  /// refresh, waiters retried with the stale token, hit another 401, and
+  /// surfaced an error instead of a clean logout. It also gave up after 2s on a
+  /// slow network, and `_isRefreshing` was per-instance so the guard never
+  /// spanned providers.
+  ///
+  /// Awaiting one shared future fixes all three: real result, no timeout, and —
+  /// now that every provider shares one ApiService — genuinely global. That last
+  /// property is what makes refresh-token rotation safe to add later; parallel
+  /// refreshes against a rotating token would invalidate each other.
   Future<bool> _handleTokenExpiration() async {
-    // A refresh is already running — wait briefly for it to finish, then assume
-    // success if it cleared. (Best-effort coordination.)
-    if (_isRefreshing) {
-      for (var i = 0; i < 20 && _isRefreshing; i++) {
-        await Future.delayed(const Duration(milliseconds: 100));
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    final refresh = onTokenExpired;
+    if (refresh == null) return false;
+
+    // Sanitised so every waiter sees `false` rather than an exception raised on
+    // a different caller's stack.
+    final future = Future<bool>(() async {
+      try {
+        return await refresh();
+      } catch (_) {
+        return false;
       }
-      return !_isRefreshing;
-    }
+    });
 
-    if (onTokenExpired == null) {
-      return false;
-    }
-
-    _isRefreshing = true;
+    _refreshInFlight = future;
     try {
-      return await onTokenExpired!();
+      return await future;
     } finally {
-      _isRefreshing = false;
+      _refreshInFlight = null;
     }
   }
 }
@@ -261,6 +335,40 @@ class TokenExpiredException implements Exception {
   final String message;
   TokenExpiredException(this.message);
 
+  @override
+  String toString() => message;
+}
+
+/// A response the server really produced and we understood: a non-2xx carrying
+/// (usually) a `message` written for the user.
+///
+/// Deliberately distinct from a transport failure. `_send` lets this pass through
+/// untouched, so the backend's wording survives to the UI — every one of these
+/// used to be rewritten as "Network error: ...", which is why "An item just went
+/// out of stock" and "Delivery address is outside our service area" never reached
+/// anyone.
+class ApiException implements Exception {
+  /// Safe to show the user. Either the server's `message` or, only when the
+  /// server sent none, a status-appropriate fallback.
+  final String message;
+
+  final int statusCode;
+
+  /// The backend's machine-readable reason where it sends one — e.g.
+  /// 'STORE_CLOSED', 'OUT_OF_SERVICE_AREA', 'USE_REQUEST_CANCELLATION',
+  /// 'ALREADY_PACKED'. Lets callers branch on the reason instead of matching
+  /// message text. Null when the response carried no `code`.
+  final String? code;
+
+  ApiException({
+    required this.message,
+    required this.statusCode,
+    this.code,
+  });
+
+  /// Just the message — call sites do `toString().replaceAll('Exception: ', '')`
+  /// and must keep producing clean, user-facing text. Same contract as
+  /// TokenExpiredException above.
   @override
   String toString() => message;
 }

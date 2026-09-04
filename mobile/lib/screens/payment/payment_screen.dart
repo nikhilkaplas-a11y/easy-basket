@@ -95,14 +95,16 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     if (!mounted) return;
     
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
-    
+
     if (authProvider.token == null) return;
     
     try {
-      // Refresh orders to see if payment went through
-      await orderProvider.fetchOrders(authProvider.token!);
-      
+      // Deliberately NOT refetching orders here. This called the unpaginated
+      // branch of GET /api/orders — every order the customer has ever placed,
+      // across six joins plus a refund-flags query — and then navigated away
+      // without using the result. It grew without bound per customer and delayed
+      // the confirmation screen at the exact moment someone is most likely to
+      // panic and pay again. The Orders screen loads its own first page.
       if (mounted) {
         setState(() {
           _isProcessingPayment = false;
@@ -162,7 +164,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       setState(() => _isProcessingPayment = false);
     }
     
-    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
     
@@ -253,9 +254,9 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       );
 
       if (verified) {
-        // Refresh orders before navigating
-        await orderProvider.fetchOrders(authProvider.token!);
-        
+        // No refetch here — see _checkPaymentStatus. Same unpaginated six-join
+        // read, same discarded result, on the path where the customer is
+        // waiting to hear that their money went through.
         if (mounted) {
           // Navigate to payment status page FIRST (before clearing cart to avoid showing zero)
           context.go('/payment/status', extra: {
@@ -402,12 +403,30 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       return itemMap;
     }).toList();
 
-    // Refresh token before creating order to avoid 401
-    await authProvider.refreshAccessToken();
+    // No pre-emptive refresh.
+    //
+    // This used to call refreshAccessToken() unconditionally and discard the
+    // result. On failure that method calls logout(), which nulls _accessToken —
+    // and the very next line dereferenced `authProvider.token!`, so an expired
+    // or revoked refresh token turned the Place Order tap into an unhandled
+    // TypeError on the last screen before payment, with a full cart.
+    //
+    // It also fired an extra auth round-trip on EVERY checkout regardless of
+    // whether the access token was still valid. ApiService._send already
+    // refreshes and retries once on a 401 for every verb, with a real
+    // single-flight guard, so this was redundant as well as dangerous.
+    final token = authProvider.token;
+    if (token == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).commonLoginFirst)),
+      );
+      return;
+    }
 
     // First create the order in our system
     final order = await orderProvider.createOrder(
-      token: authProvider.token!,
+      token: token,
       items: items,
       addressId: addressId,
       paymentMethod: _selectedPaymentMethod,
@@ -459,14 +478,14 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
         }
         return;
       }
-      await _processRazorpayPayment(order.id, cartProvider.totalAmount, authProvider.token!);
+      // `token`, not `authProvider.token!` — the local captured above cannot
+      // have been nulled by an intervening logout.
+      await _processRazorpayPayment(order.id, cartProvider.totalAmount, token);
     } else if (_selectedPaymentMethod == 'cash') {
       // Cash on Delivery - order already created
       // For COD, show order confirmation (not payment success)
       if (mounted) {
-        // Refresh orders before navigating
-        await orderProvider.fetchOrders(authProvider.token!);
-        
+        // No refetch — see _checkPaymentStatus.
         // Navigate to order confirmation page (not payment status)
         // Use orderPlaced status to show appropriate UI
         if (mounted) {

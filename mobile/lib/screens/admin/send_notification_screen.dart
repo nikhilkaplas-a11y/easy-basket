@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/api_client.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -92,7 +93,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
         return;
       }
 
-      final apiService = ApiService();
+      final apiService = sharedApiService;
       final response = await apiService.post(
         '/admin/notifications/send',
         {

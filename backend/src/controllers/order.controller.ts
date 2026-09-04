@@ -15,7 +15,7 @@ import { OrderInventoryService } from '../services/order-inventory.service';
 import { ServiceabilityService, isValidLat, isValidLng } from '../services/serviceability.service';
 import { StoreStatusService } from '../services/store-status.service';
 import { ProductController } from './product.controller';
-import { QueryFailedError, In } from 'typeorm';
+import { QueryFailedError, In, IsNull } from 'typeorm';
 import { PaymentsV2Service } from '../services/payments-v2.service';
 
 /**
@@ -378,8 +378,34 @@ export class OrderController {
       let whereCondition: any = { user: { id: userId } };
 
       if (status === 'active') {
+        // "Active" = an order the customer can meaningfully be told about.
+        //
+        // A bare `status: 'pending'` used to qualify, which was wrong in both
+        // directions. An abandoned UPI order sits at 'pending' forever (until
+        // auto-cancel), and the home bar rendered it as "Order Placed —
+        // confirming your order" for an order the store deliberately never
+        // sees, seconds after the app had already shown a "Payment failed"
+        // screen. Meanwhile 'awaiting_acceptance' — where every SUCCESSFULLY
+        // paid order lands — was missing entirely, so paying made the order
+        // disappear from the home bar. Exactly backwards.
         whereCondition = [
-          { user: { id: userId }, status: 'pending' },
+          // A pending COD order IS real: placed, stock held, waiting on the
+          // store. Nothing to pay, so nothing to abandon.
+          { user: { id: userId }, status: 'pending', paymentMethod: 'cod' },
+          // Legacy rows written before paymentMethod was recorded. When in
+          // doubt, show it — the same reasoning AdminController.getAllOrders
+          // applies to its own NULL arm.
+          { user: { id: userId }, status: 'pending', paymentMethod: IsNull() },
+          // Paid (or client-verified and awaiting the webhook) but still
+          // 'pending' for a few seconds. The customer's money is in; they must
+          // not stare at an empty home screen during that window.
+          {
+            user: { id: userId },
+            status: 'pending',
+            paymentStatus: In(['success_unverified', 'paid']),
+          },
+          // Paid, waiting for the store to accept or refuse.
+          { user: { id: userId }, status: 'awaiting_acceptance' },
           { user: { id: userId }, status: 'accepted' },
           { user: { id: userId }, status: 'preparing' },
           { user: { id: userId }, status: 'out_for_delivery' },
@@ -641,6 +667,9 @@ export class OrderController {
       const orderRepository = AppDataSource.getRepository(Order);
       const order = await orderRepository.findOne({
         where: { id: Number(id), user: { id: userId } },
+        // Relations needed for the immediate-cancel branch below, which restores
+        // reserved stock itself instead of handing that to an admin.
+        relations: ['items', 'items.product', 'items.variant'],
       });
 
       if (!order) {
@@ -648,8 +677,20 @@ export class OrderController {
         return;
       }
 
-      // Refund-eligible window only: before packing begins.
-      if (order.status !== 'pending' && order.status !== 'accepted') {
+      // Cancellable window: before packing begins.
+      //
+      // 'awaiting_acceptance' was MISSING here, and that is where every
+      // successfully paid order now lands. OrderModel.isRefundEligible on mobile
+      // includes it and shows the button; AdminController.approveCancellation
+      // accepts it. Only this guard was left behind — so a customer who had just
+      // paid tapped "Cancel & Request Refund" and was told "Order is already
+      // being prepared", which is both wrong and alarming when we are holding
+      // their money.
+      if (
+        order.status !== 'pending' &&
+        order.status !== 'awaiting_acceptance' &&
+        order.status !== 'accepted'
+      ) {
         res.status(400).json({
           message:
             'Order is already being prepared. You can cancel it, but no refund will be given.',
@@ -664,20 +705,89 @@ export class OrderController {
         return;
       }
 
+      // ── No decision required: cancel it outright ────────────────────────────
+      //
+      // When the store has not accepted yet AND there is no money to return,
+      // there is nothing for an admin to approve. Nothing has been committed on
+      // either side: no payment, no packing, no rider. Routing these through the
+      // approval queue made a COD customer wait on a decision nobody had to make,
+      // and pushed admins a "↩️ Refund Requested" alert for an order with no
+      // payment attached — which is why the panel was offering "Approve & Refund"
+      // on a cash order.
+      //
+      // Accepted orders still go through approval even when unpaid: the store has
+      // committed attention by then, so it gets a say.
+      const notYetAccepted =
+        order.status === 'pending' || order.status === 'awaiting_acceptance';
+      const nothingToRefund = order.paymentStatus !== 'paid';
+
+      if (notYetAccepted && nothingToRefund) {
+        const trimmedReason = (reason ?? '').trim().slice(0, 255) || null;
+
+        // Atomic claim before restoring stock — same pattern as cancelOrder,
+        // approveCancellation and the auto-cancel sweep. Without it a double-tap,
+        // or a race with the sweep, credits inventory twice for one cancellation.
+        const claim = await orderRepository.update(
+          { id: order.id, status: In(['pending', 'awaiting_acceptance']) },
+          {
+            status: 'cancelled',
+            cancelRequestStatus: 'none',
+            cancellationReason: trimmedReason,
+            cancellationRequestedAt: new Date(),
+          }
+        );
+        if (claim.affected !== 1) {
+          res.status(409).json({
+            message: 'Order already cancelled or its status changed.',
+            code: 'ORDER_CHANGED',
+          });
+          return;
+        }
+
+        await OrderInventoryService.restoreReservedStockForItems(order.items);
+        order.status = 'cancelled';
+        order.cancelRequestStatus = 'none';
+        order.cancellationReason = trimmedReason;
+
+        // Informational, NOT a decision request. The admin has nothing to action
+        // here — the order is already gone and its stock is already back. Note
+        // the type is 'order_cancelled', so the panel does not render the
+        // approve/reject card for it.
+        FCMService.enqueue(
+          () =>
+            FCMService.sendNotificationToRole(
+              'admin',
+              '😔 Order Cancelled',
+              `Order #${order.id} cancelled by the customer before it was accepted`,
+              { orderId: order.id.toString(), type: 'order_cancelled' }
+            ),
+          `notify admins customer cancelled unaccepted #${order.id}`
+        );
+
+        res.json({ message: 'Order cancelled', order });
+        return;
+      }
+
       order.cancelRequestStatus = 'requested';
       order.cancellationReason = (reason ?? '').trim().slice(0, 255) || null;
       order.cancellationRequestedAt = new Date();
       await orderRepository.save(order);
 
+      // Only orders that reach here need a human decision: either money must be
+      // returned, or the store has already accepted. Say which, so an admin is
+      // not told "Refund Requested" about a cash order.
+      const willRefund = order.paymentStatus === 'paid';
       FCMService.enqueue(
         () =>
           FCMService.sendNotificationToRole(
             'admin',
-            '↩️ Refund Requested',
-            `Order #${order.id}: customer requested cancellation & refund`,
+            willRefund ? '↩️ Refund Requested' : '↩️ Cancellation Requested',
+            willRefund
+              ? `Order #${order.id}: customer requested cancellation & refund`
+              : `Order #${order.id}: customer wants to cancel (cash order — nothing to refund)`,
             { orderId: order.id.toString(), type: 'refund_requested' }
           ),
-        `notify admins refund requested #${order.id}`
+        `notify admins cancellation requested #${order.id}`
       );
 
       res.json({ message: 'Cancellation request submitted', order });

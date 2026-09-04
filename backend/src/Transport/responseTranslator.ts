@@ -30,6 +30,35 @@ const TYPE_HINTS: Record<string, string> = {
 
 const DEFAULT_TYPE = "content";
 
+/*
+ * Object shapes whose text must NEVER reach the translation system.
+ *
+ * The walker matches on field NAME alone, with no idea which entity it is
+ * inside, so `user.name` and `deliveryBoy.name` on every order response were
+ * being translated exactly like a product name — and, on a miss, written to
+ * missing_translations, which the admin panel lists and exports to CSV. A
+ * customer called Anaar or Sona is a live collision with catalogue vocabulary.
+ *
+ * Why a deny-list and not an allow-list of catalogue types: TypeORM returns real
+ * entity instances for joined relations, so resolveType gives their class name
+ * and they match here. Catalogue payloads go through mapProductPublic /
+ * mapCategoryPublic, which spread into PLAIN objects — they carry no class name
+ * and resolve to the inherited hint ("content"). Allow-listing "product" would
+ * therefore have switched product translation off completely.
+ */
+const NEVER_TRANSLATE_TYPES = new Set([
+    "user",
+    "address",
+    "order",
+    "orderitem",
+    "payment",
+    "refund",
+    "supportrequest",
+    "riderprofile",
+    "riderwallet",
+    "ridercashdeposit",
+]);
+
 export class ResponseTranslator {
 
     /**
@@ -90,6 +119,26 @@ export class ResponseTranslator {
         return inheritedType;
     }
 
+    /**
+     * Structural tell that an object describes a PERSON rather than catalogue
+     * content.
+     *
+     * Needed because some person-shaped payloads are assembled by hand as plain
+     * objects and so carry no class name for NEVER_TRANSLATE_TYPES to match —
+     * AdminController.listRiders builds exactly that ({ riderId, name,
+     * phoneNumber, ... }), and its rows would otherwise still be translated.
+     *
+     * No product, category or campaign carries a phone number; every
+     * person-shaped row does.
+     */
+    private static describesAPerson(value: any): boolean {
+
+        if (value === null || typeof value !== "object")
+            return false;
+
+        return "phoneNumber" in value || "phone_number" in value;
+    }
+
     static translate(
         data: any,
         language: SupportedLanguage,
@@ -142,6 +191,15 @@ export class ResponseTranslator {
             const currentType =
                 this.resolveType(data, type);
 
+            /*
+             * PII guard. Nested objects are still walked — an order must keep
+             * reaching its items and their products — but no string on THIS
+             * object is handed to the translator.
+             */
+            const skipTranslation =
+                NEVER_TRANSLATE_TYPES.has(currentType) ||
+                this.describesAPerson(data);
+
             const translated: any = {};
 
             for (const key of Object.keys(data)) {
@@ -154,7 +212,8 @@ export class ResponseTranslator {
                  */
                 if (
                     TRANSLATABLE_FIELDS.has(key) &&
-                    typeof value === "string"
+                    typeof value === "string" &&
+                    !skipTranslation
                 ) {
 
                     translated[key] =

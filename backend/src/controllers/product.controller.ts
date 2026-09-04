@@ -32,6 +32,10 @@ const SEARCH_CACHE_TTL_SEC = 600; // 10 minutes
 const SEARCH_POPULARITY_KEY = 'search:count';
 const TOP_CACHE_N = 100; // only cache results for the top 100 queries
 
+// Public catalogue listing is always bounded — see getAllProducts.
+const DEFAULT_PRODUCT_LIMIT = 50;
+const MAX_PRODUCT_LIMIT = 100;
+
 // Legacy prefix — kept so existing invalidation helpers still wipe it.
 const PRODUCT_LIST_CACHE_PATTERN = 'cache:products:list:*';
 
@@ -187,9 +191,22 @@ export class ProductController {
       const query = normalizeQuery(req.query.search);
 
       const catKey = categoryId ? String(Number(categoryId)) : '_';
-      const takeLimit = limit ? Number(limit) : query ? 50 : undefined;
-      const pageNum = takeLimit && page ? Math.max(1, Number(page)) : 1;
-      const limKey = takeLimit ? String(takeLimit) : 'all';
+
+      // Always paginate. This used to resolve to `undefined` when neither a limit
+      // nor a search term was supplied, and the `if (takeLimit)` guard below then
+      // skipped take/skip entirely — so an unauthenticated GET /api/products
+      // returned the ENTIRE catalogue, with category and variant joins, on a route
+      // with no rate limit. The mobile client always sends a limit, which is the
+      // only reason this never surfaced.
+      //
+      // Same clamp getUserOrders already applies to its own limit.
+      const parsedLimit = limit != null ? parseInt(String(limit), 10) : NaN;
+      const takeLimit = Number.isFinite(parsedLimit)
+        ? Math.min(Math.max(parsedLimit, 1), MAX_PRODUCT_LIMIT)
+        : DEFAULT_PRODUCT_LIMIT;
+      const parsedPage = page != null ? parseInt(String(page), 10) : NaN;
+      const pageNum = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+      const limKey = String(takeLimit);
 
       // ----------------------------------------------------------------
       // Popularity + cache flow (only when we actually have a search query)
@@ -272,10 +289,9 @@ export class ProductController {
         );
       }
 
-      if (takeLimit) {
-        queryBuilder.take(takeLimit);
-        queryBuilder.skip((pageNum - 1) * takeLimit);
-      }
+      // Unconditional now — takeLimit is always a bounded number.
+      queryBuilder.take(takeLimit);
+      queryBuilder.skip((pageNum - 1) * takeLimit);
 
       const products = await queryBuilder.getMany();
 

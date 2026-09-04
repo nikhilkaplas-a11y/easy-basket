@@ -51,6 +51,7 @@ import '../screens/onboarding/location_detection_screen.dart';
 import '../screens/onboarding/location_permission_screen.dart';
 import '../screens/address/location_permission_screen.dart' as customer_location_gate;
 import '../core/startup_deep_link.dart';
+import '../core/auth_refresh_notifier.dart';
 import '../screens/help/help_support_screen.dart';
 import '../screens/support/support_request_screen.dart';
 import '../screens/admin/admin_support_requests_screen.dart';
@@ -69,6 +70,11 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    // Without this, `redirect` below ran only on explicit navigation — it reads
+    // AuthProvider with listen:false, so a logout (including the automatic one
+    // after a failed token refresh) left the user sitting on a gated screen
+    // making calls with a null token. See core/auth_refresh_notifier.dart.
+    refreshListenable: AuthRefreshNotifier.instance,
     redirect: (context, state) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final isAuthenticated = authProvider.isAuthenticated;

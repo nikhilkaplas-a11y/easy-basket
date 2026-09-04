@@ -44,15 +44,21 @@ CREATE TABLE IF NOT EXISTS store_status (
 -- never resets a store the admin has deliberately closed.
 INSERT IGNORE INTO store_status (id, is_open) VALUES (1, 1);
 
--- FK to users for the audit column. Added separately and guarded, because the
--- users table already exists and CREATE TABLE IF NOT EXISTS would skip an
--- inline constraint on a second run.
+-- FK to the user table for the audit column. Added separately and guarded,
+-- because that table already exists and CREATE TABLE IF NOT EXISTS would skip
+-- an inline constraint on a second run.
+--
+-- NOTE: `user`, singular. This said `users(id)` and therefore always failed —
+-- MySQL cannot add a constraint against a table that does not exist. The table
+-- and its seed row survived because both run BEFORE this step and DDL commits
+-- as it goes, so store open/close has worked all along; only this audit
+-- constraint was missing. Re-running the migration now adds it.
 SET @fk := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'store_status'
     AND CONSTRAINT_NAME = 'FK_store_status_updated_by');
 SET @ddl := IF(@fk = 0,
   'ALTER TABLE store_status
      ADD CONSTRAINT FK_store_status_updated_by
-     FOREIGN KEY (updated_by_id) REFERENCES users(id) ON DELETE SET NULL',
+     FOREIGN KEY (updated_by_id) REFERENCES user(id) ON DELETE SET NULL',
   'SELECT 1');
 PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;

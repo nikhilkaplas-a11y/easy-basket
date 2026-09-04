@@ -26,7 +26,7 @@ import { PaymentController } from './controllers/payment.controller';
 import productRoutes from './routes/product.routes';
 import serviceAreaRoutes from './routes/serviceArea.routes';
 import storeStatusRoutes from './routes/storeStatus.routes';
-import uploadRoutes from './routes/upload.routes';
+import supportRoutes from './routes/support.routes';
 import variantRoutes from './routes/variant.routes';
 import campaignRoutes from './routes/campaign.routes';
 import { languageMiddleware } from "./middleware/language.middleware";
@@ -87,7 +87,12 @@ app.use('/api/delivery', deliveryRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/service-area', serviceAreaRoutes);
 app.use('/api/store', storeStatusRoutes);
-app.use('/api/admin', uploadRoutes);
+// Was never mounted, so every Help & Support call from the app 404'd with
+// Express's default HTML body. The router and both screens already existed.
+app.use('/api/support', supportRoutes);
+// NOTE: upload routes now live inside adminRoutes (same /api/admin/upload-image
+// URL). They used to be a second router on this prefix, which meant every upload
+// ran authenticate + authorize twice.
 app.use('/api', variantRoutes);
 app.use('/api/campaigns', campaignRoutes);
 

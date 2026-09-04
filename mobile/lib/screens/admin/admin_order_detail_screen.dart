@@ -1462,7 +1462,12 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
             const SizedBox(height: 8),
           ],
           Text(
-            'Approving cancels the order and initiates a full refund (if prepaid).',
+            // Payment-aware. This was hardcoded to mention a refund "(if
+            // prepaid)", so a cash order — where no money has moved and none
+            // ever will — was presented as a refund decision.
+            order.paymentStatus == 'paid'
+                ? 'Approving cancels the order and initiates a full refund to the customer.'
+                : 'Approving cancels the order. Nothing was paid, so there is no refund to issue.',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 12),
@@ -1486,7 +1491,11 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                     backgroundColor: const Color(0xFFD32F2F),
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Approve & Refund'),
+                  child: Text(
+                    order.paymentStatus == 'paid'
+                        ? 'Approve & Refund'
+                        : 'Approve cancellation',
+                  ),
                 ),
               ),
             ],
