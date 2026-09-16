@@ -34,6 +34,7 @@ import '../screens/admin/admin_order_timeline_screen.dart';
 import '../screens/admin/admin_riders_screen.dart';
 import '../screens/admin/admin_users_screen.dart';
 import '../screens/admin/admin_products_screen.dart';
+import '../screens/admin/inventory_sheet_screen.dart';
 import '../screens/admin/admin_categories_screen.dart';
 import '../screens/admin/add_edit_category_screen.dart';
 import '../screens/admin/add_edit_product_screen.dart';
@@ -439,6 +440,12 @@ class AppRouter {
       GoRoute(
         path: '/admin/products',
         builder: (context, state) => const AdminProductsScreen(),
+      ),
+      // Bulk stock/price editing via spreadsheet. Declared before the
+      // '/admin/products/:id' routes below so the static segment wins.
+      GoRoute(
+        path: '/admin/inventory-sheet',
+        builder: (context, state) => const InventorySheetScreen(),
       ),
       GoRoute(
         path: '/admin/categories',

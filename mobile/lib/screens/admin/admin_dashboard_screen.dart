@@ -501,9 +501,16 @@ const SizedBox(height: 24),
 
     ActionTile(
       title: "Products",
-      subtitle: "Inventory management",
+      subtitle: "Add & edit one at a time",
       icon: Icons.inventory_2_outlined,
       onTap: () => context.push('/admin/products'),
+    ),
+
+    ActionTile(
+      title: "Update stock & prices",
+      subtitle: "Bulk edit in Excel",
+      icon: Icons.table_chart_outlined,
+      onTap: () => context.push('/admin/inventory-sheet'),
     ),
     
 

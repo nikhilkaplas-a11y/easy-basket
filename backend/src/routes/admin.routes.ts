@@ -4,8 +4,9 @@ import { StoreStatusController } from '../controllers/storeStatus.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { RedisService } from '../services/redis.service';
 import { MissingTranslationController } from '../controllers/missingTranslation.controller';
+import { InventoryController } from '../controllers/inventory.controller';
 import { UploadController } from '../controllers/upload.controller';
-import { uploadSingle } from '../middleware/upload.middleware';
+import { uploadCsvSingle, uploadSingle } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -66,6 +67,29 @@ router.post('/orders/:id/retry-refund', AdminController.retryRefund);
 // the panel read back the authoritative state without a second base URL.
 router.get('/store/status', StoreStatusController.getStatus);
 router.put('/store/status', StoreStatusController.updateStatus);
+
+// --- Bulk inventory (spreadsheet) ---
+// Download the whole catalogue as CSV for editing in Excel. Upload/preview/apply
+// follow; export is deliberately first so the file format can be validated
+// against real Excel before anything is built on top of it.
+router.get('/inventory/export', InventoryController.exportSheet);
+
+// Upload the edited sheet. Two steps on purpose: preview writes NOTHING and
+// reports what would change; apply is the only one that touches data. Both
+// accept the file as a multipart upload (browser file input) or as a raw text
+// body, matching the missing-translations bulk endpoint.
+router.post(
+  '/inventory/preview',
+  express.text({ type: ['text/csv', 'text/plain'], limit: '10mb' }),
+  uploadCsvSingle,
+  InventoryController.previewSheet
+);
+router.post(
+  '/inventory/apply',
+  express.text({ type: ['text/csv', 'text/plain'], limit: '10mb' }),
+  uploadCsvSingle,
+  InventoryController.applySheet
+);
 
 // --- Image upload ---
 // Moved here from the former upload.routes.ts, which index.ts mounted as a

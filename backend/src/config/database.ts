@@ -21,6 +21,8 @@ import { WebhookEvent } from '../entities/WebhookEvent';
 import dotenv from 'dotenv';
 import { Translation } from "../entities/Translation";
 import { MissingTranslation } from "../entities/MissingTranslation";
+import { InventoryBatch } from '../entities/InventoryBatch';
+import { InventoryAdjustment } from '../entities/InventoryAdjustment';
 
 
 dotenv.config();
@@ -60,6 +62,11 @@ export const AppDataSource = new DataSource({
   // OPEN by design, which turned a permanent break into silent log noise — and left
   // the server-side STORE_CLOSED guard in createOrder permanently inert.
   StoreStatus,
+  // Bulk inventory audit — see 008_inventory_batches.sql. That migration MUST
+  // be applied before this code is deployed: synchronize is false, so TypeORM
+  // will select columns by name against tables that would not exist yet.
+  InventoryBatch,
+  InventoryAdjustment,
 ],
   subscribers: [],
   migrations: [],

@@ -1,7 +1,7 @@
 name: easy_basket
 description: Easy Basket - Instant Grocery Delivery App
 publish_to: 'none'
-version: 10.0.3+103
+version: 10.0.4+104
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -48,6 +48,11 @@ dependencies:
   google_maps_flutter: ^2.5.0
   permission_handler: ^11.0.1
   
+  # File Handling
+  # Needed for the bulk-inventory CSV upload: image_picker cannot select a .csv,
+  # and this works on web (returns bytes directly) as well as mobile.
+  file_picker: ^8.1.7
+
   # Image Handling
   image_picker: ^1.0.7
   image: ^4.1.3
