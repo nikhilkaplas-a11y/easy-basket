@@ -90,11 +90,34 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
   .map((o) => o.trim())
   .filter(Boolean);
 
+// The allowlist is OPT-IN. With the variable unset we fall back to the previous
+// reflect-any-origin behaviour.
+//
+// The first version of this defaulted to blocking every browser origin, which
+// turned a hardening change into an outage the moment it deployed: the website
+// and the web admin panel both died on preflight while the mobile app carried on
+// fine (it sends no Origin header), so it looked like a partial, baffling
+// failure. A security improvement that breaks working traffic by default is not
+// an improvement — it is a change nobody can safely deploy.
+//
+// Set CORS_ALLOWED_ORIGINS to turn the restriction on, once the real origins are
+// known. Until then this is exactly as permissive as it was before.
+const corsAllowlistEnabled = allowedOrigins.length > 0;
+if (!corsAllowlistEnabled) {
+  console.warn(
+    '⚠️  CORS: CORS_ALLOWED_ORIGINS is not set — any browser origin is accepted. ' +
+      'Set it to a comma-separated list to restrict this.'
+  );
+}
+
 app.use(
   cors({
     origin(origin, callback) {
+      // No Origin header: mobile app, curl, server-to-server, Razorpay webhook.
       if (!origin) return callback(null, true);
+      if (!corsAllowlistEnabled) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+      console.warn(`[cors] blocked origin: ${origin}`);
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -205,19 +228,35 @@ app.get('/api/health', async (_req, res) => {
 //
 // Four arguments is what marks this as an error handler to Express; `_next` is
 // unused but required for that signature.
-app.use((err: Error & { code?: string }, req: Request, res: Response, _next: NextFunction) => {
-  console.error(`[error] unhandled on ${req.method} ${req.path}:`, err);
+app.use(
+  (
+    err: Error & { code?: string; status?: number; expose?: boolean },
+    req: Request,
+    res: Response,
+    _next: NextFunction
+  ) => {
+    console.error(`[error] unhandled on ${req.method} ${req.path}:`, err);
 
-  if (res.headersSent) return;
+    if (res.headersSent) return;
 
-  if (err?.code === 'LIMIT_FILE_SIZE') {
-    res.status(413).json({ message: 'That file is too large. The limit is 5MB.' });
-    return;
-  }
-  if (err?.message === 'Not allowed by CORS') {
-    res.status(403).json({ message: 'Origin not allowed.' });
-    return;
-  }
+    if (err?.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ message: 'That file is too large.' });
+      return;
+    }
+    if (err?.message === 'Not allowed by CORS') {
+      res.status(403).json({ message: 'Origin not allowed.' });
+      return;
+    }
+
+    // Errors explicitly marked safe to show — see clientError() in
+    // upload.middleware. Without this, a multer filter rejection ("please
+    // upload the .csv you downloaded") arrived as a generic 500, sending the
+    // user to look for a server fault when the message they needed already
+    // existed. Only `expose === true` qualifies; nothing else leaks.
+    if (err?.expose === true && typeof err.status === 'number') {
+      res.status(err.status).json({ message: err.message });
+      return;
+    }
 
   // Deliberately generic: never leak a stack or an internal message to a client.
   res.status(500).json({ message: 'Something went wrong on our side. Please try again.' });

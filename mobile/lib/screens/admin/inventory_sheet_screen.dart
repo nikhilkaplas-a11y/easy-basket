@@ -43,6 +43,11 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
   InventorySheetResult? _result;
   String? _error;
 
+  /// Which step produced [_error]. The banner used to be hardcoded to one
+  /// wording, so a failed DOWNLOAD was reported as "Upload failed" and sent
+  /// people to inspect a spreadsheet that was never the problem.
+  String? _errorStep;
+
   String? get _token => context.read<AuthProvider>().token;
 
   // ---------------------------------------------------------------- download
@@ -54,6 +59,7 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
     setState(() {
       _downloading = true;
       _error = null;
+      _errorStep = null;
     });
 
     try {
@@ -63,7 +69,12 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
       downloadCsvBytes(bytes, filename);
       if (mounted) _toast('Sheet downloaded. Open it in Excel.');
     } catch (e) {
-      if (mounted) setState(() => _error = _clean(e));
+      if (mounted) {
+        setState(() {
+          _error = _clean(e);
+          _errorStep = 'Download failed';
+        });
+      }
     } finally {
       if (mounted) setState(() => _downloading = false);
     }
@@ -88,6 +99,7 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _errorStep = null;
       _result = null;
       _pendingBytes = bytes;
       _pendingFilename = file!.name;
@@ -104,6 +116,7 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
       if (mounted) {
         setState(() {
           _error = _clean(e);
+          _errorStep = 'Could not read that file';
           _pendingBytes = null;
         });
       }
@@ -122,6 +135,7 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _errorStep = null;
     });
 
     try {
@@ -139,7 +153,12 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
       });
       _toast(result.applied ? 'Changes saved.' : (result.message ?? 'Nothing applied.'));
     } catch (e) {
-      if (mounted) setState(() => _error = _clean(e));
+      if (mounted) {
+        setState(() {
+          _error = _clean(e);
+          _errorStep = 'Could not save the changes';
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -208,10 +227,16 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
 
           if (_error != null) ...[
             const SizedBox(height: 16),
+            // Title stays neutral on purpose. It used to read "Could not read
+            // that file" for EVERY failure — including a 404 from an
+            // undeployed endpoint or a dropped connection — which sent people
+            // looking at their spreadsheet when the problem was elsewhere. The
+            // server's own message, in the body, is the part that says what
+            // actually went wrong.
             _Banner(
               colour: Colors.red,
               icon: Icons.error_outline,
-              title: 'Could not read that file',
+              title: _errorStep ?? 'Something went wrong',
               body: _error!,
             ),
           ],

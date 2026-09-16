@@ -2,6 +2,25 @@ import multer from 'multer';
 import { Request } from 'express';
 
 /**
+ * A rejection the CLIENT should see verbatim.
+ *
+ * multer reports a filter rejection by handing an Error to its callback, which
+ * Express routes to the terminal error handler — and that handler deliberately
+ * answers a generic 500 rather than leaking internal messages. Correct in
+ * general, wrong here: "only JPG, PNG and WebP are allowed" is exactly what the
+ * user needs to read.
+ *
+ * `expose` marks the ones that are safe to show, mirroring the convention the
+ * http-errors package uses. See the error handler in index.ts.
+ */
+function clientError(message: string, status = 400): Error {
+  const err = new Error(message) as Error & { status?: number; expose?: boolean };
+  err.status = status;
+  err.expose = true;
+  return err;
+}
+
+/**
  * Multer configuration for file uploads
  * Stores files in memory (as buffers) for S3 upload
  */
@@ -16,7 +35,7 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only JPG, PNG, and WebP images are allowed.'));
+    cb(clientError('Invalid file type. Only JPG, PNG, and WebP images are allowed.'));
   }
 };
 
@@ -74,7 +93,7 @@ const csvFileFilter = (
   if (okMime || okExtension) {
     cb(null, true);
   } else {
-    cb(new Error('Please upload the .csv file you downloaded and edited.'));
+    cb(clientError('Please upload the .csv file you downloaded and edited.'));
   }
 };
 
