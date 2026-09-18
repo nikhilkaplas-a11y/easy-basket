@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,9 +9,8 @@ import '../../providers/auth_provider.dart';
 import '../../services/inventory_service.dart';
 import '../../utils/theme.dart';
 
-// Browser download on web; a no-op stub elsewhere. See csv_download_stub.dart
-// for why mobile deliberately does not implement this.
-import '../../services/csv_download_stub.dart'
+// Browser download on web; the system share sheet on Android and iOS.
+import '../../services/csv_download_mobile.dart'
     if (dart.library.html) '../../services/csv_download_web.dart';
 
 /// Bulk stock and price editing via spreadsheet.
@@ -66,8 +66,12 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
       final bytes = await InventoryService.downloadSheet(token: token);
       final filename =
           'easybasket-inventory-${DateTime.now().toIso8601String().substring(0, 10)}.csv';
-      downloadCsvBytes(bytes, filename);
-      if (mounted) _toast('Sheet downloaded. Open it in Excel.');
+      await downloadCsvBytes(bytes, filename);
+      if (mounted) {
+        _toast(kIsWeb
+            ? 'Sheet downloaded. Open it in Excel.'
+            : 'Choose where to save or send the sheet.');
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -181,22 +185,19 @@ class _InventorySheetScreenState extends State<InventorySheetScreen> {
             number: '1',
             title: 'Download the sheet',
             body: 'Every product, with its current stock and price.',
-            action: canDownloadFiles
-                ? FilledButton.icon(
-                    onPressed: _downloading ? null : _download,
-                    icon: _downloading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.download),
-                    label: Text(_downloading ? 'Preparing…' : 'Download sheet'),
-                  )
-                : const Text(
-                    'Open the admin panel on a laptop to download the sheet.',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
+            // Available everywhere now: a browser download on web, the system
+            // share sheet on the phone app.
+            action: FilledButton.icon(
+              onPressed: _downloading ? null : _download,
+              icon: _downloading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download),
+              label: Text(_downloading ? 'Preparing…' : 'Download sheet'),
+            ),
           ),
           const SizedBox(height: 12),
 

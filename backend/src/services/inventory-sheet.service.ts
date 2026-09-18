@@ -325,13 +325,34 @@ function collectPrice(
 
   const current = round2(Number(currentRaw));
   const rounded = round2(next);
-  if (rounded === current) return;
 
-  const was = round2(Number(at(row, 'was_price')));
-  if (Number.isFinite(was) && was !== current) {
+  // "Changed" means changed BY THE OWNER — compared against was_price, never
+  // against the live database.
+  //
+  // This used to compare against the database, so a price someone edited in the
+  // app after the download looked like a sheet change on every row the owner
+  // never touched. Upload a sheet to change milk, and butter silently reverted
+  // to its Monday price — with a warning, but still applied. The owner had no
+  // way to say "I didn't mean that one" short of editing the cell back.
+  //
+  // Now it works the way stock does: an untouched cell is a no-op whatever the
+  // database says; an edited one is applied, and flagged if it overwrites a
+  // change made since the download.
+  const wasRaw = at(row, 'was_price');
+  const was = round2(Number(wasRaw));
+
+  if (wasRaw === '' || !Number.isFinite(was)) {
+    fail('The was_price column has been edited or cleared. Download a fresh sheet.');
+    return;
+  }
+  if (rounded === was) return; // owner did not touch it
+  if (rounded === current) return; // edited, but already matches — nothing to write
+
+  if (was !== current) {
     warn(
       `Price changed to ${current.toFixed(2)} in the app after you downloaded ` +
-        `(your sheet says it was ${was.toFixed(2)}). Applying ${rounded.toFixed(2)} will overwrite that.`
+        `(your sheet had ${was.toFixed(2)}). You changed it to ${rounded.toFixed(2)}, ` +
+        `which will overwrite that.`
     );
   }
 
@@ -354,11 +375,22 @@ function collectAvailable(
     fail(`Available must be YES or NO (got "${raw}").`);
     return;
   }
-  if (next === current) return;
 
+  // Same rule as price and stock: compare against the owner's own baseline, not
+  // the database — otherwise a product switched off in the app since the
+  // download would be silently switched back on by a sheet that never touched it.
   const was = parseYesNo(at(row, 'was_available'));
-  if (was !== null && was !== current) {
-    warn('Availability changed in the app after you downloaded. Your sheet will overwrite it.');
+  if (was === null) {
+    fail('The was_available column has been edited or cleared. Download a fresh sheet.');
+    return;
+  }
+  if (next === was) return; // owner did not touch it
+  if (next === current) return; // edited, but already matches
+
+  if (was !== current) {
+    warn(
+      'Availability was changed in the app after you downloaded. Your edit will overwrite it.'
+    );
   }
 
   changes.push({
